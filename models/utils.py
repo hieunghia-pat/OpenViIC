@@ -40,6 +40,51 @@ def clones(module, n):
     "Produce N identical layers."
     return nn.ModuleList([copy.deepcopy(module) for _ in range(n)])
 
+def generate_padding_mask(sequences: torch.IntTensor, padding_idx: int) -> torch.BoolTensor:
+    '''
+        sequences: (bs, seq_len)
+    '''
+    mask = (torch.sum(sequences, -1) == padding_idx) # (b_s, seq_len)
+
+    return mask
+
+def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
+    '''
+        Mask out subsequent positions
+    '''
+    attn_shape = (1, seq_len, seq_len)
+    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool)
+
+    return subsequent_mask
+
+def get_relative_pos(x, batch_size, norm_len):
+    x = x.view(1, -1, 1).expand(batch_size, -1, -1)
+    return  x / norm_len
+
+def get_grids_position(batch_size, seq_len, grid_size):
+    assert seq_len == grid_size[0] * grid_size[1]
+
+    # record the pos of each grid according to the form of region box
+    x = torch.arange(0, grid_size[0]).float().cuda()
+    y = torch.arange(0, grid_size[1]).float().cuda()
+
+    px_min = x.view(-1, 1).expand(-1, grid_size[0]).contiguous().view(-1)
+    py_min = y.view(1, -1).expand(grid_size[1], -1).contiguous().view(-1)
+
+    px_max = px_min + 1
+    py_max = py_min + 1
+
+    # scale pos into the range (0 ~ 1)
+    rpx_min = get_relative_pos(px_min, batch_size, grid_size[0])
+    rpy_min = get_relative_pos(py_min, batch_size, grid_size[1])
+
+    rpx_max = get_relative_pos(px_max, batch_size, grid_size[0])
+    rpy_max = get_relative_pos(py_max, batch_size, grid_size[1])
+
+    boxes = torch.cat([rpx_min, rpy_min, rpx_max, rpy_max], dim=-1) # (bs, n, 4)
+
+    return boxes
+
 def box_relational_embedding(f_g, dim_g=64, wave_len=1000, trignometric_embedding=True):
     """
     Given a tensor with bbox coordinates for detected objects on each batch image,

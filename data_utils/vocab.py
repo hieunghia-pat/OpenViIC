@@ -18,8 +18,8 @@ class Vocab(object):
             numerical identifiers.
         itos: A list of token strings indexed by their numerical identifiers.
     """
-    def __init__(self, json_dirs, max_size=None, min_freq=1, specials=['<pad>', "<sos>", "<eos>", "<unk>"],
-                 vectors=None, unk_init=unk_init, vectors_cache=None):
+    def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", eos_token="<eos>", padding_token="<pad>",
+                 unk_token="<unk>", vectors=None, unk_init=unk_init, vectors_cache=None):
         """Create a Vocab object from a collections.Counter.
         Arguments:
             counter: collections.Counter object holding the frequencies of
@@ -28,9 +28,6 @@ class Vocab(object):
                 maximum. Default: None.
             min_freq: The minimum frequency needed to include a token in the
                 vocabulary. Values less than 1 will be set to 1. Default: 1.
-            specials: The list of special tokens (e.g., padding or eos) that
-                will be prepended to the vocabulary in addition to an <unk>
-                token. Default: ['<pad>']
             vectors: One of either the available pretrained vectors
                 or custom pretrained vectors (see Vocab.load_vectors);
                 or a list of aforementioned vectors
@@ -43,7 +40,12 @@ class Vocab(object):
         counter = self.freqs.copy()
         min_freq = max(min_freq, 1)
 
-        self.itos = list(specials)
+        self.padding_token = padding_token
+        self.bos_token = bos_token
+        self.eos_token = eos_token
+        self.unk_token = unk_token
+        specials = [padding_token, bos_token, eos_token, unk_token]
+        self.itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -82,7 +84,7 @@ class Vocab(object):
 
     def encode_caption(self, question):
         """ Turn a caption into a vector of indices and a question length """
-        vec = torch.ones(self.max_caption_length).long() * self.stoi["<pad>"]
+        vec = torch.ones(self.max_caption_length).long() * self.padding_token
         for i, token in enumerate(question):
             vec[i] = self.stoi[token]
         return vec

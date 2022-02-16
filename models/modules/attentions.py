@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 import numpy as np
 from models.modules.containers import Module
-from models.utils import clones, box_relational_embedding
+from models.utils import clones, box_relational_embedding, get_grids_position
 
 class ScaledDotProductAttention(nn.Module):
     '''
@@ -67,7 +67,7 @@ class ScaledDotProductAttention(nn.Module):
 
         return out
 
-class BoxScaledDotProductAttention(nn.Module):
+class GeometryAugmentedScaledDotProductAttention(nn.Module):
     '''
     Scaled dot-product attention with box relation
     '''
@@ -79,7 +79,7 @@ class BoxScaledDotProductAttention(nn.Module):
             :param d_v: Dimensionality of values
             :param h: Number of heads
         '''
-        super(ScaledDotProductAttention, self).__init__()
+        super(GeometryAugmentedScaledDotProductAttention, self).__init__()
 
         self.trignometric_embedding = trignometric_embedding
         if trignometric_embedding:
@@ -115,19 +115,26 @@ class BoxScaledDotProductAttention(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(self.fc_g.bias, 0)
 
-    def forward(self, queries, keys, values, boxes, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, grid_size=None, attention_mask=None, attention_weights=None):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
             :param keys: Keys (b_s, nk, d_model)
             :param values: Values (b_s, nk, d_model)
-            :param boxes: Boxes (b_s, nk, 4)
+            :param boxes: Boxes (b_s, nk, 4). None indicates image is extracted under region-based methods.
+            :param grid_size: Size of the image features. Default value is None if image features is regional features
             :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
             :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
             :return:
         '''
         
         # embedding geometric information from boxes coordinates
+        if grid_size is not None:
+            assert boxes is None, "there is no boxe when using grid-based extractor"
+            bs, seq_len = queries.shape[:2]
+            boxes = get_grids_position(bs, seq_len, grid_size)
+        else:
+            assert boxes is not None, "coordinates of objects are requiered for region-based extractor"
         relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
         flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, self.d_g)
         bs, nk, _, _ = relative_geometry_embeddings.shape
@@ -156,7 +163,7 @@ class BoxScaledDotProductAttention(nn.Module):
 
         return out
 
-class ScaledDotProductAttentionMemory(nn.Module):
+class MemoryAugmentedScaledDotProductAttention(nn.Module):
     '''
         Scaled dot-product attention with memory
     '''
@@ -169,7 +176,7 @@ class ScaledDotProductAttentionMemory(nn.Module):
         :param h: Number of heads
         :param m: Number of memory slots
         '''
-        super(ScaledDotProductAttentionMemory, self).__init__()
+        super(MemoryAugmentedScaledDotProductAttention, self).__init__()
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
         self.fc_v = nn.Linear(d_model, h * d_v)
@@ -234,9 +241,15 @@ class MultiHeadAttention(Module):
     '''
 
     def __init__(self, d_model, d_k, d_v, h, dropout=.1, identity_map_reordering=False, can_be_stateful=False,
-                 attention_module=None, attention_module_kwargs=None):
+                 use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(MultiHeadAttention, self).__init__()
         self.identity_map_reordering = identity_map_reordering
+
+        self.use_aoa = use_aoa # whether to use Attention on Attention (AoA) mechanism or not
+        if self.use_aoa:    # define additionally AoA layers
+            self.informative_attention = nn.Linear(2*d_model, d_model)
+            self.gated_attention = nn.Linear(2*d_model, d_model)
+
         if attention_module is not None:
             if attention_module_kwargs is not None:
                 self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h, **attention_module_kwargs)
@@ -252,7 +265,7 @@ class MultiHeadAttention(Module):
             self.register_state('running_keys', torch.zeros((0, d_model)))
             self.register_state('running_values', torch.zeros((0, d_model)))
 
-    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, grid_size=None, attention_mask=None, attention_weights=None):
         if self.can_be_stateful and self._is_stateful:
             self.running_keys = torch.cat([self.running_keys, keys], 1)
             keys = self.running_keys
@@ -261,14 +274,28 @@ class MultiHeadAttention(Module):
             values = self.running_values
 
         if self.identity_map_reordering:
-            q_norm = self.layer_norm(queries)
-            k_norm = self.layer_norm(keys)
-            v_norm = self.layer_norm(values)
-            out = self.attention(q_norm, k_norm, v_norm, attention_mask, attention_weights)
+            queries = self.layer_norm(queries)
+            keys = self.layer_norm(keys)
+            values = self.layer_norm(values)
+            if boxes or grid_size:  # attention with geometry-augmented attention
+                out = self.attention(queries, keys, values, boxes, grid_size, attention_mask, attention_weights)
+            else:                   # original attention or memory augmented attention
+                out = self.attention(queries, keys, values, attention_mask, attention_weights)
             out = queries + self.dropout(torch.relu(out))
         else:
+            if boxes or grid_size:  # attention with geometry-augmented attention
+                out = self.attention(queries, keys, values, boxes, grid_size, attention_mask, attention_weights)
+            else:                   # original attention or memory augmented attention
+                out = self.attention(queries, keys, values, attention_mask, attention_weights)
+
             out = self.attention(queries, keys, values, attention_mask, attention_weights)
             out = self.dropout(out)
             out = self.layer_norm(queries + out)
+
+        if self.aoa:
+            aoa_input = torch.cat([queries, out], dim=-1)
+            i = self.informative_attention(aoa_input)
+            g = F.sigmoid(self.gated_attention(aoa_input))
+            out = i * g
             
         return out
