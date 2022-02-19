@@ -16,8 +16,8 @@ class EncoderLayer(nn.Module):
                                         attention_module_kwargs=attention_module_kwargs)
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
 
-    def forward(self, queries, keys, values, boxes=None, grid_size=None, attention_mask=None, attention_weights=None):
-        att = self.mhatt(queries, keys, values, boxes, grid_size, attention_mask, attention_weights)
+    def forward(self, queries, keys, values, boxes=None, grid_size=None, language_signals=None, attention_mask=None, attention_weights=None):
+        att = self.mhatt(queries, keys, values, boxes, grid_size, language_signals, attention_mask, attention_weights)
         ff = self.pwff(att)
         return ff
 
@@ -35,13 +35,13 @@ class Encoder(nn.Module):
                                      for _ in range(N)])
         self.padding_idx = padding_idx
 
-    def forward(self, input, boxes=None, grid_size=None, attention_weights=None):
+    def forward(self, input, boxes=None, grid_size=None, language_signals=None, attention_weights=None):
         # input (b_s, seq_len, d_in)
         attention_mask = generate_padding_mask(input, self.padding_idx).unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
         out = input
         for layer in self.layers:
-            out = layer(out, out, out, boxes, grid_size, attention_mask, attention_weights)
+            out = layer(out, out, out, boxes, grid_size, language_signals, attention_mask, attention_weights)
 
         return out, attention_mask
 
@@ -59,14 +59,14 @@ class MultiLevelEncoder(nn.Module):
                                      for _ in range(N)])
         self.padding_idx = padding_idx
 
-    def forward(self, input, boxes=None, grid_size=None, attention_weights=None):
+    def forward(self, input, boxes=None, grid_size=None, language_signals=None, attention_weights=None):
         # input (b_s, seq_len, d_in)
         attention_mask = generate_padding_mask(input, self.padding_idx).unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
         outs = []
         out = input
         for layer in self.layers:
-            out = layer(out, out, out, boxes, grid_size, attention_mask, attention_weights)
+            out = layer(out, out, out, boxes, grid_size, language_signals, attention_mask, attention_weights)
             outs.append(out.unsqueeze(1))
 
         outs = torch.cat(outs, 1)

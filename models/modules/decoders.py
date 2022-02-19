@@ -24,10 +24,10 @@ class DecoderLayer(Module):
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
 
     def forward(self, input, enc_output, mask_pad, mask_self_att, mask_enc_att):
-        self_att = self.self_att(input, input, input, mask_self_att)
+        self_att = self.self_att(input, input, input, attention_mask=mask_self_att)
         self_att = self_att * mask_pad
 
-        enc_att = self.enc_att(self_att, enc_output, enc_output, mask_enc_att) * mask_pad
+        enc_att = self.enc_att(self_att, enc_output, enc_output, attention_mask=mask_enc_att) * mask_pad
         enc_att = enc_att * mask_pad
 
         ff = self.pwff(enc_att)
@@ -64,12 +64,12 @@ class MeshedDecoderLayer(Module):
     def forward(self, input, enc_output, mask_pad, mask_self_att, mask_enc_att):
         assert enc_output.size(1) == self.N_enc, "total layers of the encoder must equal to total number of the encoder outputs"
         
-        self_att = self.self_att(input, input, input, mask_self_att)
+        self_att = self.self_att(input, input, input, attention_mask=mask_self_att)
         self_att = self_att * mask_pad
 
         enc_atts = []
         for ith in range(self.N_enc):
-            enc_atts.append(self.enc_att(self_att, enc_output[:, ith], enc_output[:, ith], mask_enc_att) * mask_pad)
+            enc_atts.append(self.enc_att(self_att, enc_output[:, ith], enc_output[:, ith], attention_mask=mask_enc_att) * mask_pad)
 
         alphas = []
         for fc_alpha, enc_att in zip(self.fc_alphas, enc_atts):
