@@ -383,7 +383,7 @@ class MultiHeadAttention(Module):
             out = self.dropout(out)
             out = self.layer_norm(queries + out)
 
-        if self.aoa:
+        if self.use_aoa:
             aoa_input = torch.cat([queries, out], dim=-1)
             i = self.informative_attention(aoa_input)
             g = F.sigmoid(self.gated_attention(aoa_input))
