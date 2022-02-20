@@ -2,10 +2,10 @@ import torch
 from torchvision import transforms
 import re
 
-def preprocess_sentence(question, sos_token, eos_token):
+def preprocess_sentence(question, bos_token, eos_token):
     question = re.sub("\"", "", question)
     question = question.lower().strip().split()
-    return [sos_token] + question + [eos_token]
+    return [bos_token] + question + [eos_token]
 
 def get_transform(target_size):
     return transforms.Compose([
@@ -52,3 +52,34 @@ def unk_init(token, dim):
     if token in ["<eos>", "</s>"]:
         return torch.ones(dim) * 2
     return torch.ones(dim) * 3
+
+def region_feature_collate_fn(samples):
+    features = []
+    boxes = []
+    tokens = []
+    shifted_right_tokens = []
+    max_seq_len = 0
+    for sample in samples:
+        feature, box, token, shifted_right_token = sample
+        if max_seq_len < feature.shape[0]:
+            max_seq_len = feature.shape[0]
+        features.append(torch.tensor(feature))
+        boxes.append(torch.tensor(box))
+        tokens.append(token)
+        shifted_right_tokens.append(shifted_right_token)
+
+    zero_feature = torch.zeros_like(features[-1][-1]).unsqueeze(0) # (1, dim)
+    zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
+    masks = torch.tensor([[False] * max_seq_len] * len(samples)) # (bs, max_seq_len)
+    for batch_ith in range(len(samples)):
+        for ith in range(features[batch_ith].shape[0], max_seq_len):
+            masks[:, ith] = True
+            features[batch_ith] = torch.cat([features[batch_ith], zero_feature], dim=0)
+            boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
+
+    features = torch.cat([feature.unsqueeze_(0) for feature in features], dim=0)
+    boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
+    tokens = torch.cat([token.unsqueeze_(0) for token in tokens], dim=0)
+    shifted_right_tokens = torch.cat([token.unsqueeze_(0) for token in shifted_right_tokens], dim=0)
+
+    return features, boxes, tokens, shifted_right_tokens

@@ -36,14 +36,15 @@ class Vocab(object):
                 returns a Tensor of the same size. Default: torch.Tensor.zero_
             vectors_cache: directory for cached vectors. Default: '.vector_cache'
         """ 
-        self.make_vocab(json_dirs)
-        counter = self.freqs.copy()
-        min_freq = max(min_freq, 1)
-
         self.padding_token = padding_token
         self.bos_token = bos_token
         self.eos_token = eos_token
         self.unk_token = unk_token
+
+        self.make_vocab(json_dirs)
+        counter = self.freqs.copy()
+        min_freq = max(min_freq, 1)
+
         specials = [padding_token, bos_token, eos_token, unk_token]
         self.itos = specials
         # frequencies of special tokens are not counted when building vocabulary
@@ -66,6 +67,11 @@ class Vocab(object):
         # stoi is simply a reverse dict for itos
         self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
 
+        self.padding_idx = self.stoi[self.padding_token]
+        self.bos_idx = self.stoi[self.bos_token]
+        self.eos_idx = self.stoi[self.eos_token]
+        self.unk_idx = self.stoi[self.unk_token]
+
         self.vectors = None
         if vectors is not None:
             self.load_vectors(vectors, unk_init=unk_init, cache=vectors_cache)
@@ -77,14 +83,14 @@ class Vocab(object):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                caption = preprocess_sentence(ann["caption"])
+                caption = preprocess_sentence(ann["caption"], self.bos_token, self.eos_token)
                 self.freqs.update(caption)
                 if len(caption) > self.max_caption_length:
                     self.max_caption_length = len(caption)
 
     def encode_caption(self, question):
         """ Turn a caption into a vector of indices and a question length """
-        vec = torch.ones(self.max_caption_length).long() * self.padding_token
+        vec = torch.ones(self.max_caption_length).long() * self.padding_idx
         for i, token in enumerate(question):
             vec[i] = self.stoi[token]
         return vec

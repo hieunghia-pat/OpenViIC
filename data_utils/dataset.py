@@ -1,7 +1,6 @@
 import torch
 from torch.utils import data
 from torch.utils.data.dataset import random_split
-from data_utils.typing import GridOrRegionFeatureDataset
 from data_utils.utils import preprocess_sentence
 from data_utils.vocab import Vocab
 import json
@@ -39,7 +38,7 @@ class GridFeatureDataset(data.Dataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     annotation = {
-                        "caption": preprocess_sentence(ann["caption"]),
+                        "caption": preprocess_sentence(ann["caption"], self.vocab.bos_token, self.vocab.eos_token),
                         "image_id": ann["image_id"]
                     }
                     break
@@ -49,8 +48,8 @@ class GridFeatureDataset(data.Dataset):
         return annotations
 
     def load_feature(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join("features", f"image_{image_id}.npy")
-        feature = np.load(feature_file, "r", allow_pickle=True)["feature"]
+        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature = np.load(feature_file, "r", allow_pickle=False)[:].copy()
 
         return feature
 
@@ -65,7 +64,7 @@ class GridFeatureDataset(data.Dataset):
 
 class RegionFeatureDataset(data.Dataset):
     def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None) -> None:
-        super(GridFeatureDataset, self).__init__()
+        super(RegionFeatureDataset, self).__init__()
         with open(json_path, 'r') as file:
             json_data = json.load(file)
 
@@ -92,7 +91,7 @@ class RegionFeatureDataset(data.Dataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     annotation = {
-                        "caption": preprocess_sentence(ann["caption"]),
+                        "caption": preprocess_sentence(ann["caption"], self.vocab.bos_token, self.vocab.eos_token),
                         "image_id": ann["image_id"]
                     }
                     break
@@ -102,22 +101,29 @@ class RegionFeatureDataset(data.Dataset):
         return annotations
 
     def load_feature(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join("features", f"image_{image_id}.npy")
-        feature = np.load(feature_file, "r", allow_pickle=True)["feature"]
+        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature = np.load(feature_file, allow_pickle=True)[()]["features"].copy()
 
         return feature
+
+    def load_boxes(self, image_id: int) -> np.ndarray:
+        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        boxes = np.load(feature_file, allow_pickle=True)[()]["boxes"].copy()
+
+        return boxes
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, str]:
         caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
         visual = self.load_feature(self.annotations[idx]["image_id"])
+        boxes = self.load_boxes(self.annotations[idx]["image_id"])
 
-        return visual, caption[:-1], caption[1:] # shifted-right output
+        return visual, boxes, caption[:-1], caption[1:] # shifted-right output
 
     def __len__(self) -> int:
         return len(self.annotations)
 
-def get_loader(train_dataset: GridOrRegionFeatureDataset, 
-                test_dataset: GridOrRegionFeatureDataset = None) -> Union[List[data.DataLoader], Tuple[List[data.DataLoader], data.DataLoader]]:
+def get_loader(train_dataset: data.Dataset, 
+                test_dataset: data.Dataset = None) -> Union[List[data.DataLoader], Tuple[List[data.DataLoader], data.DataLoader]]:
     """ Returns a data loader for the desired split """
 
     fold_size = int(len(train_dataset) * 0.2)
