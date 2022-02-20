@@ -8,6 +8,7 @@ import json
 import config
 import os
 import numpy as np
+import cv2 as cv
 from typing import Dict, List, Tuple, Union
 
 class GridFeatureDataset(data.Dataset):
@@ -24,7 +25,6 @@ class GridFeatureDataset(data.Dataset):
 
         # images
         self.image_features_path = image_features_path
-        self.image_id_to_index = self.create_image_id_to_index()
 
     @property
     def max_caption_length(self) -> int:
@@ -56,8 +56,8 @@ class GridFeatureDataset(data.Dataset):
         return feature
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, str]:
-        caption = self.vocab.encode_sentence(self.annotations[idx]["caption"])
-        visual = self.load_image(self.annotations["image_id"])
+        caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
+        visual = self.load_feature(self.annotations[idx]["image_id"])
 
         return visual, caption[:-1], caption[1:] # shifted-right output
 
@@ -78,7 +78,6 @@ class RegionFeatureDataset(data.Dataset):
 
         # images
         self.image_features_path = image_features_path
-        self.image_id_to_index = self.create_image_id_to_index()
 
     @property
     def max_caption_length(self) -> int:
@@ -111,7 +110,7 @@ class RegionFeatureDataset(data.Dataset):
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, str]:
         caption = self.vocab.encode_sentence(self.annotations[idx]["caption"])
-        visual = self.load_image(self.annotations["image_id"])
+        visual = self.load_image(self.annotations[idx]["image_id"])
 
         return visual, caption[:-1], caption[1:] # shifted-right output
 
