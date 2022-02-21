@@ -55,7 +55,8 @@ class BeamSearch(object):
             visual = tuple(new_visual)
         return visual
 
-    def apply(self, visual: TensorOrSequence, out_size=1, return_probs=False, **kwargs):
+    def apply(self, visual: TensorOrSequence, boxes: TensorOrNone = None, grid_size: TensorOrNone = None,
+                out_size=1, return_probs=False, **kwargs):
         self.b_s = get_batch_size(visual)
         self.device = get_device(visual)
         self.seq_mask = torch.ones((self.b_s, self.beam_size, 1), device=self.device)
@@ -68,7 +69,7 @@ class BeamSearch(object):
         outputs = []
         with self.model.statefulness(self.b_s):
             for t in range(self.max_len):
-                visual, outputs = self.iter(t, visual, outputs, return_probs, **kwargs)
+                visual, outputs = self.iter(t, visual, boxes, grid_size, outputs, return_probs, **kwargs)
 
         # Sort result
         seq_logprob, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)
@@ -98,14 +99,14 @@ class BeamSearch(object):
         selected_logprob, selected_idx = selected_logprob[:, :self.beam_size], selected_idx[:, :self.beam_size]
         return selected_idx, selected_logprob
 
-    def iter(self, t: int, visual: TensorOrSequence, outputs, return_probs, **kwargs):
+    def iter(self, t: int, visual: TensorOrSequence, boxes: TensorOrNone, grid_size: TensorOrNone, outputs, return_probs, **kwargs):
         cur_beam_size = 1 if t == 0 else self.beam_size
 
-        word_logprob = self.model.step(t, self.selected_words, visual, None, mode='feedback', **kwargs)
+        word_logprob = self.model.step(t, self.selected_words, visual, boxes, grid_size, mode='feedback', **kwargs)
         word_logprob = word_logprob.view(self.b_s, cur_beam_size, -1)
         candidate_logprob = self.seq_logprob + word_logprob
 
-        # Mask sequence if it reaches EOS
+        # Mask sequence if it reaches <eos>
         if t > 0:
             mask = (self.selected_words.view(self.b_s, cur_beam_size) != self.eos_idx).float().unsqueeze(-1)
             self.seq_mask = self.seq_mask * mask
@@ -115,7 +116,7 @@ class BeamSearch(object):
             candidate_logprob = self.seq_mask * candidate_logprob + old_seq_logprob * (1 - self.seq_mask)
 
         selected_idx, selected_logprob = self.select(t, candidate_logprob, **kwargs)
-        selected_beam = selected_idx // candidate_logprob.shape[-1]
+        selected_beam = torch.div(selected_idx, candidate_logprob.shape[-1], rounding_mode="trunc")
         selected_words = selected_idx - selected_beam * candidate_logprob.shape[-1]
 
         self.model.apply_to_states(self._expand_state(selected_beam, cur_beam_size))

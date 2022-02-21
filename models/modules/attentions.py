@@ -2,8 +2,10 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import numpy as np
+
 from models.modules.containers import Module
 from models.utils import clones, box_relational_embedding, get_grids_position
+import config
 
 class ScaledDotProductAttention(nn.Module):
     '''
@@ -61,13 +63,13 @@ class ScaledDotProductAttention(nn.Module):
             att = att * attention_weights
         if attention_mask is not None:
             att = att.masked_fill(attention_mask, -np.inf)
-        att = torch.softmax(att, -1)
+        att = torch.softmax(att, dim=-1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
 
         return out
 
-class GeometryAugmentedScaledDotProductAttention(nn.Module):
+class AugmentedGeometryScaledDotProductAttention(nn.Module):
     '''
     Scaled dot-product attention with box relation
     '''
@@ -79,7 +81,7 @@ class GeometryAugmentedScaledDotProductAttention(nn.Module):
             :param d_v: Dimensionality of values
             :param h: Number of heads
         '''
-        super(GeometryAugmentedScaledDotProductAttention, self).__init__()
+        super(AugmentedGeometryScaledDotProductAttention, self).__init__()
 
         self.trignometric_embedding = trignometric_embedding
         if trignometric_embedding:
@@ -163,12 +165,12 @@ class GeometryAugmentedScaledDotProductAttention(nn.Module):
 
         return out
 
-class MemoryAugmentedScaledDotProductAttention(nn.Module):
+class AugmentedMemoryScaledDotProductAttention(nn.Module):
     '''
         Scaled dot-product attention with memory
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, m):
+    def __init__(self, d_model, d_k, d_v, h, m=config.total_memory):
         '''
         :param d_model: Output dimensionality of the model
         :param d_k: Dimensionality of queries and keys
@@ -176,7 +178,7 @@ class MemoryAugmentedScaledDotProductAttention(nn.Module):
         :param h: Number of heads
         :param m: Number of memory slots
         '''
-        super(MemoryAugmentedScaledDotProductAttention, self).__init__()
+        super(AugmentedMemoryScaledDotProductAttention, self).__init__()
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
         self.fc_v = nn.Linear(d_model, h * d_v)
@@ -364,21 +366,30 @@ class MultiHeadAttention(Module):
             queries = self.layer_norm(queries)
             keys = self.layer_norm(keys)
             values = self.layer_norm(values)
-            if boxes or grid_size:  # attention with geometry-augmented attention
+
+            if (boxes is not None) or (grid_size is not None):  
+                # attention with geometry-augmented attention
                 out = self.attention(queries, keys, values, boxes, grid_size, attention_mask, attention_weights)
-            elif language_signals:  # adaptive attention
+            elif language_signals is not None:  
+                # adaptive attention
                 out = self.attention(queries, keys, values, language_signals, attention_mask, attention_weights)
-            else:                   # original attention or memory augmented attention
+            else:                   
+                # original attention or memory augmented attention
                 out = self.attention(queries, keys, values, attention_mask, attention_weights)
+            
             # residual connection after normalizing
             out = queries + self.dropout(torch.relu(out))
         else:
-            if boxes or grid_size:  # attention with geometry-augmented attention
+            if (boxes is not None) or (grid_size is not None):  
+                # attention with geometry-augmented attention
                 out = self.attention(queries, keys, values, boxes, grid_size, attention_mask, attention_weights)
-            elif language_signals:  # adaptive attention
+            elif language_signals is not None:  
+                # adaptive attention
                 out = self.attention(queries, keys, values, language_signals, attention_mask, attention_weights)
-            else:                   # original attention or memory augmented attention
+            else:                   
+                # original attention or memory augmented attention
                 out = self.attention(queries, keys, values, attention_mask, attention_weights)
+            
             # normalization after residual connection
             out = self.dropout(out)
             out = self.layer_norm(queries + out)

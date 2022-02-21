@@ -21,22 +21,22 @@ class Transformer(CaptioningModel):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, images, seq, *args):
-        enc_output, mask_enc = self.encoder(images)
-        dec_output = self.decoder(seq, enc_output, mask_enc)
+    def forward(self, input, tokens, boxes=None, grid_size=None, language_signals=None):
+        enc_output, mask_enc = self.encoder(input, boxes, grid_size, language_signals)
+        dec_output = self.decoder(tokens, enc_output, mask_encoder=mask_enc)
         return dec_output
 
     def init_state(self, b_s, device):
         return [torch.zeros((b_s, 0), dtype=torch.long, device=device),
                 None, None]
 
-    def step(self, t, prev_output, visual, seq, mode='teacher_forcing', **kwargs):
+    def step(self, t, prev_output, visual, boxes=None, grid_size=None, mode='teacher_forcing', **kwargs):
         it = None
         if mode == 'teacher_forcing':
             raise NotImplementedError
         elif mode == 'feedback':
             if t == 0:
-                self.enc_output, self.mask_enc = self.encoder(visual)
+                self.enc_output, self.mask_enc = self.encoder(visual, boxes, grid_size)
                 if isinstance(visual, torch.Tensor):
                     it = visual.data.new_full((visual.shape[0], 1), self.bos_idx).long()
                 else:
@@ -44,4 +44,4 @@ class Transformer(CaptioningModel):
             else:
                 it = prev_output
 
-        return self.decoder(it, self.enc_output, self.mask_enc)
+        return self.decoder(it, self.enc_output, mask_encoder=self.mask_enc)

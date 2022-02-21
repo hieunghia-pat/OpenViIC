@@ -88,17 +88,18 @@ class Vocab(object):
                 if len(caption) > self.max_caption_length:
                     self.max_caption_length = len(caption)
 
-    def encode_caption(self, question):
+    def encode_caption(self, caption):
         """ Turn a caption into a vector of indices and a question length """
         vec = torch.ones(self.max_caption_length).long() * self.padding_idx
-        for i, token in enumerate(question):
-            vec[i] = self.stoi[token]
+        for i, token in enumerate(caption):
+            vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
         return vec
 
     def decode_caption(self, caption_vecs):
         captions = []
         for vec in caption_vecs:
-            captions.append(" ".join([self.itos[idx] for idx in vec.tolist() if idx > 0]))
+            captions.append(" ".join([self.itos[idx] for idx in vec.tolist() 
+                                        if idx not in [self.padding_idx, self.bos_idx, self.eos_idx, self.unk_idx]]))
 
         return captions
 

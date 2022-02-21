@@ -113,11 +113,12 @@ class RegionFeatureDataset(data.Dataset):
         return boxes
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, str]:
-        caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
+        caption = self.vocab.encode_caption(self.annotations[idx]["caption"][:-1])
+        shifted_right_caption = self.vocab.encode_caption(self.annotations[idx]["caption"][1:])
         visual = self.load_feature(self.annotations[idx]["image_id"])
         boxes = self.load_boxes(self.annotations[idx]["image_id"])
 
-        return visual, boxes, caption[:-1], caption[1:] # shifted-right output
+        return visual, boxes, caption, shifted_right_caption
 
     def __len__(self) -> int:
         return len(self.annotations)

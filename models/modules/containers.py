@@ -1,6 +1,5 @@
 from contextlib import contextmanager
-from torch import nn
-from utils import *
+from models.utils import *
 
 class Module(nn.Module):
     def __init__(self):

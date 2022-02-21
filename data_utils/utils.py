@@ -2,10 +2,11 @@ import torch
 from torchvision import transforms
 import re
 
-def preprocess_sentence(question, bos_token, eos_token):
-    question = re.sub("\"", "", question)
-    question = question.lower().strip().split()
-    return [bos_token] + question + [eos_token]
+def preprocess_sentence(caption, bos_token, eos_token):
+    caption = re.sub("\"", "", caption)
+    caption = caption.lower().strip().split()
+    
+    return [bos_token] + caption + [eos_token]
 
 def get_transform(target_size):
     return transforms.Compose([
@@ -70,10 +71,8 @@ def region_feature_collate_fn(samples):
 
     zero_feature = torch.zeros_like(features[-1][-1]).unsqueeze(0) # (1, dim)
     zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
-    masks = torch.tensor([[False] * max_seq_len] * len(samples)) # (bs, max_seq_len)
     for batch_ith in range(len(samples)):
         for ith in range(features[batch_ith].shape[0], max_seq_len):
-            masks[:, ith] = True
             features[batch_ith] = torch.cat([features[batch_ith], zero_feature], dim=0)
             boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
 
