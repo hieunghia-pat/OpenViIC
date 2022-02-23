@@ -38,7 +38,6 @@ def evaluate_loss(model: Transformer, dataloader: data.DataLoader, loss_fn: NLLL
         with torch.no_grad():
             for it, (features, _, tokens, shifted_right_tokens) in enumerate(dataloader):
                 features = features.to(device)
-                boxes = boxes.to(device)
                 tokens = tokens.to(device)
                 shifted_right_tokens = shifted_right_tokens.to(device)
                 out = model(features, tokens).contiguous()
@@ -114,21 +113,21 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
     scheduler_rl.step()
 
     running_loss = .0
-    seq_len = 20
 
     with tqdm(desc='Epoch %d - Training with self-critical learning' % epoch, unit='it', total=len(dataloader)) as pbar:
-        for it, (detections, caps_gt) in enumerate(dataloader):
-            detections = detections.to(device)
-            outs, log_probs = model.beam_search(detections, seq_len, vocab.eos_idx,
-                                                config.sc_beam_size, out_size=config.sc_beam_size)
+        for it, (features, _, tokens, shifted_right_tokens) in enumerate(dataloader):
+            features = features.to(device)
+            outs, log_probs = model.beam_search(features, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+                                                beam_size=config.sc_beam_size, out_size=config.sc_beam_size)
             optim.zero_grad()
 
             # Rewards
-            caps_gen = vocab.decode_caption(outs.view(-1, seq_len))
+            caps_gen = vocab.decode_caption(outs.view(-1, vocab.max_caption_length)) # batch size when train with self-critical learning is always 1
+            caps_gt = vocab.decode_caption(tokens.view(-1, vocab.max_caption_length)) # batch size when train with self-critical learning is always 1
             caps_gt = list(itertools.chain(*([c, ] * config.sc_beam_size for c in caps_gt)))
             caps_gen, caps_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [caps_gen, caps_gt])
             reward = cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
-            reward = torch.from_numpy(reward).to(device).view(detections.shape[0], config.sc_beam_size)
+            reward = torch.from_numpy(reward).to(device).view(features.shape[0], config.sc_beam_size)
             reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
             loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
 
@@ -163,9 +162,16 @@ if __name__ == '__main__':
     val_dataset = RegionFeatureDataset(config.val_json_path, config.feature_path, vocab)
     test_dataset = RegionFeatureDataset(config.test_json_path, config.feature_path, vocab)
     # Creating data loader
-    train_dataloader = data.DataLoader(
+    xe_train_dataloader = data.DataLoader(
         dataset=train_dataset,
-        batch_size=config.train_batch_size,
+        batch_size=config.xe_train_batch_size,
+        shuffle=True,
+        num_workers=config.workers,
+        collate_fn=region_feature_collate_fn
+    )
+    scst_train_dataloader = data.DataLoader(
+        dataset=train_dataset,
+        batch_size=config.scst_train_batch_size,
         shuffle=True,
         num_workers=config.workers,
         collate_fn=region_feature_collate_fn
@@ -185,7 +191,7 @@ if __name__ == '__main__':
         collate_fn=region_feature_collate_fn
     )
 
-    # Defining the model
+    # Defining the Meshed Memory Transformer method
     encoder = MultiLevelEncoder(N=config.nlayers, padding_idx=vocab.padding_idx, d_model=config.d_model, d_k=config.d_k, d_v=config.d_v,
                                 d_ff=config.d_ff, dropout=config.dropout, attention_module=AugmentedMemoryScaledDotProductAttention)
     decoder = MeshedDecoder(vocab_size=len(vocab), max_len=vocab.max_caption_length, N_enc=config.nlayers, N_dec=config.nlayers, padding_idx=vocab.padding_idx,
@@ -194,7 +200,7 @@ if __name__ == '__main__':
     model = Transformer(vocab.bos_idx, encoder, decoder).to(device)
 
     # for evaluating self-critical learning
-    cider_train = Cider(PTBTokenizer.tokenize())
+    cider_train = Cider(PTBTokenizer.tokenize(train_dataset.captions))
 
     '''
     def lambda_lr(s):
@@ -273,9 +279,9 @@ if __name__ == '__main__':
 
     for epoch in range(start_epoch, start_epoch + config.epochs):
         if not use_rl:
-            train_loss = train_xe(model, train_dataloader, optim, vocab)
+            train_loss = train_xe(model, xe_train_dataloader, optim, vocab)
         else:
-            train_loss, reward, reward_baseline = train_scst(model, train_dataloader, optim_rl, cider_train, vocab=vocab)
+            train_loss, reward, reward_baseline = train_scst(model, scst_train_dataloader, optim_rl, cider_train, vocab=vocab)
 
         val_loss = evaluate_loss(model, val_dataloader, loss_fn, vocab)
 

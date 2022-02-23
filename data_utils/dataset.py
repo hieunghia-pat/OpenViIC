@@ -1,7 +1,7 @@
 import torch
 from torch.utils import data
 from torch.utils.data.dataset import random_split
-from data_utils.utils import preprocess_sentence
+from data_utils.utils import preprocess_caption
 from data_utils.vocab import Vocab
 import json
 import config
@@ -38,7 +38,7 @@ class GridFeatureDataset(data.Dataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     annotation = {
-                        "caption": preprocess_sentence(ann["caption"], self.vocab.bos_token, self.vocab.eos_token),
+                        "caption": preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token),
                         "image_id": ann["image_id"]
                     }
                     break
@@ -46,6 +46,10 @@ class GridFeatureDataset(data.Dataset):
             annotations.append(annotation)
 
         return annotations
+    
+    @property
+    def captions(self):
+        return [ann["caption"] for ann in self.annotations]
 
     def load_feature(self, image_id: int) -> np.ndarray:
         feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
@@ -91,7 +95,7 @@ class RegionFeatureDataset(data.Dataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     annotation = {
-                        "caption": preprocess_sentence(ann["caption"], self.vocab.bos_token, self.vocab.eos_token),
+                        "caption": preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token),
                         "image_id": ann["image_id"]
                     }
                     break
@@ -99,6 +103,10 @@ class RegionFeatureDataset(data.Dataset):
             annotations.append(annotation)
 
         return annotations
+
+    @property
+    def captions(self):
+        return [ann["caption"] for ann in self.annotations]
 
     def load_feature(self, image_id: int) -> np.ndarray:
         feature_file = os.path.join(config.feature_path, f"{image_id}.npy")

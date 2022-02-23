@@ -142,7 +142,7 @@ class Decoder(Module):
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
-    def forward(self, input, encoder_output, language_signals=None, mask_encoder=None):
+    def forward(self, input, encoder_output, mask_encoder=None):
         # input (b_s, seq_len)
         b_s, seq_len = input.shape[:2]
         mask_queries = generate_padding_mask(input, self.padding_idx).to(input.device)  # (b_s, seq_len)
@@ -161,7 +161,7 @@ class Decoder(Module):
 
         out = self.word_emb(input) + self.pos_emb(seq)
         for layer in self.layers:
-            out = layer(out, encoder_output, language_signals, mask_queries.unsqueeze(-1), mask_self_attention, mask_encoder)
+            out = layer(out, encoder_output, mask_pad=mask_queries.unsqueeze(-1), mask_self_att=mask_self_attention, mask_enc_att=mask_encoder)
 
         out = self.fc(out)
         return F.log_softmax(out, dim=-1)
@@ -185,7 +185,7 @@ class MeshedDecoder(Module):
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
-    def forward(self, input, encoder_output, language_signals=None, mask_encoder=None):
+    def forward(self, input, encoder_output, mask_encoder=None):
         # input (b_s, seq_len)
         b_s, seq_len = input.shape[:2]
         mask_queries = generate_padding_mask(input, self.padding_idx).to(input.device)  # (b_s, seq_len)
@@ -204,7 +204,7 @@ class MeshedDecoder(Module):
 
         out = self.word_emb(input) + self.pos_emb(seq)
         for layer in self.layers:
-            out = layer(out, encoder_output, language_signals, mask_queries.unsqueeze(-1), mask_self_attention, mask_encoder)
+            out = layer(out, encoder_output, mask_pad=mask_queries.unsqueeze(-1), mask_self_att=mask_self_attention, mask_enc_att=mask_encoder)
 
         out = self.fc(out)
         return F.log_softmax(out, dim=-1)

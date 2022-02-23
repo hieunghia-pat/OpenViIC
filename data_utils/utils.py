@@ -2,11 +2,29 @@ import torch
 from torchvision import transforms
 import re
 
-def preprocess_sentence(caption, bos_token, eos_token):
-    caption = re.sub("\"", "", caption)
-    caption = caption.lower().strip().split()
+def preprocess_caption(caption, bos_token, eos_token):
+    caption = re.sub(r"[“”]", "\"", caption)
+    caption = re.sub(r"!", " ! ", caption)
+    caption = re.sub(r"\?", " ? ", caption)
+    caption = re.sub(r":", " : ", caption)
+    caption = re.sub(r";", " ; ", caption)
+    caption = re.sub(r",", " , ", caption)
+    caption = re.sub(r"\"", " \" ", caption)
+    caption = re.sub(r"'", " ' ", caption)
+    caption = re.sub(r"\(", " ( ", caption)
+    caption = re.sub(r"\[", " [ ", caption)
+    caption = re.sub(r"\)", " ) ", caption)
+    caption = re.sub(r"\]", " ] ", caption)
+    caption = re.sub(r"/", " / ", caption)
+    caption = re.sub(r"\.", " . ", caption)
+    caption = re.sub(r".\. *\. *\. *", " ... ", caption)
+    caption = re.sub(r"\$", " $ ", caption)
+    caption = re.sub(r"\&", " & ", caption)
+    caption = re.sub(r"\*", " * ", caption)
+    caption = " ".join(caption.strip().split()) # remove duplicated spaces
+    tokens = caption.strip().split()
     
-    return [bos_token] + caption + [eos_token]
+    return [bos_token] + tokens + [eos_token]
 
 def get_transform(target_size):
     return transforms.Compose([

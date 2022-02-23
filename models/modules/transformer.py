@@ -21,8 +21,8 @@ class Transformer(CaptioningModel):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, input, tokens, boxes=None, grid_size=None, language_signals=None):
-        enc_output, mask_enc = self.encoder(input, boxes, grid_size, language_signals)
+    def forward(self, input, tokens, boxes=None, grid_size=None):
+        enc_output, mask_enc = self.encoder(input, boxes, grid_size)
         dec_output = self.decoder(tokens, enc_output, mask_encoder=mask_enc)
         return dec_output
 

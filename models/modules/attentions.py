@@ -115,7 +115,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
         for fc_g in self.fc_gs:
-            nn.init.constant_(self.fc_g.bias, 0)
+            nn.init.constant_(fc_g.bias, 0)
 
     def forward(self, queries, keys, values, boxes=None, grid_size=None, attention_mask=None, attention_weights=None):
         '''
@@ -157,7 +157,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         if attention_mask is not None:
             a = a.masked_fill(attention_mask, -np.inf)
 
-        g = relative_geometry_embeddings
+        g = relative_geometry_weights
         mn = torch.log(torch.clamp(g, min = 1e-6)) + a
         mn = torch.softmax(mn, dim=-1)
         out = torch.matmul(mn, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)

@@ -1,11 +1,12 @@
 import torch
 from data_utils.vector import Vectors
 from data_utils.vector import pretrained_aliases
-from data_utils.utils import preprocess_sentence, unk_init
+from data_utils.utils import preprocess_caption, unk_init
 from collections import defaultdict, Counter
 import logging
 import six
 import json
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -83,23 +84,23 @@ class Vocab(object):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                caption = preprocess_sentence(ann["caption"], self.bos_token, self.eos_token)
+                caption = preprocess_caption(ann["caption"], self.bos_token, self.eos_token)
                 self.freqs.update(caption)
                 if len(caption) > self.max_caption_length:
                     self.max_caption_length = len(caption)
 
-    def encode_caption(self, caption):
+    def encode_caption(self, caption) -> torch.Tensor:
         """ Turn a caption into a vector of indices and a question length """
         vec = torch.ones(self.max_caption_length).long() * self.padding_idx
         for i, token in enumerate(caption):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
         return vec
 
-    def decode_caption(self, caption_vecs):
+    def decode_caption(self, caption_vecs) -> List[str]:
         captions = []
         for vec in caption_vecs:
-            captions.append(" ".join([self.itos[idx] for idx in vec.tolist() 
-                                        if idx not in [self.padding_idx, self.bos_idx, self.eos_idx, self.unk_idx]]))
+            captions.append([self.itos[idx] for idx in vec.tolist() 
+                                        if idx not in [self.padding_idx, self.bos_idx, self.eos_idx, self.unk_idx]])
 
         return captions
 
