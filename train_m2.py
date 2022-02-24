@@ -150,6 +150,10 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
 
 if __name__ == '__main__':
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # creating checkpoint directory
+    if not os.path.isdir(os.path.join(config.checkpoint_path, config.model_name)):
+        os.makedirs(os.path.join(config.checkpoint_path, config.model_name))
 
     # Creating vocabulary and dataset
     if not os.path.isdir(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl")):
