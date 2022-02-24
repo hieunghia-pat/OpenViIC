@@ -267,7 +267,7 @@ if __name__ == '__main__':
             scheduler.load_state_dict(checkpoint['scheduler'])
             """
             start_epoch = checkpoint['epoch'] + 1
-            best_cider = checkpoint['best_cider']
+            best_val_cider = checkpoint['best_val_cider']
             best_test_cider = checkpoint['best_test_cider']
             patience = checkpoint['patience']
             use_rl = checkpoint['use_rl']
@@ -279,7 +279,7 @@ if __name__ == '__main__':
                 optim_rl.load_state_dict(checkpoint['optimizer'])
                 scheduler_rl.load_state_dict(checkpoint['scheduler'])
 
-            print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider {checkpoint['best_cider']} - best_test_cider {checkpoint['best_test_cider']}")
+            print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
 
     for epoch in range(start_epoch, start_epoch + config.epochs):
         if not use_rl:
@@ -300,8 +300,8 @@ if __name__ == '__main__':
 
         # Prepare for next epoch
         best = False
-        if val_cider >= best_cider:
-            best_cider = val_cider
+        if val_cider >= best_val_cider:
+            best_val_cider = val_cider
             patience = 0
             best = True
         else:
@@ -358,8 +358,8 @@ if __name__ == '__main__':
             np.random.set_state(checkpoint['numpy_rng_state'])
             random.setstate(checkpoint['random_rng_state'])
             model.load_state_dict(checkpoint['state_dict'])
-            print('Resuming from epoch %d, validation loss %f, best_cider %f, and best test_cider %f' % (
-                checkpoint['epoch'], checkpoint['val_loss'], checkpoint['best_cider'], checkpoint['best_test_cider']))
+            print('Resuming from epoch %d, validation loss %f, best_val_cider %f, and best test_cider %f' % (
+                checkpoint['epoch'], checkpoint['val_loss'], checkpoint['best_val_cider'], checkpoint['best_test_cider']))
 
         torch.save({
             'torch_rng_state': torch.get_rng_state(),
@@ -373,7 +373,7 @@ if __name__ == '__main__':
             'optimizer': optim.state_dict() if not use_rl else optim_rl.state_dict(),
             'scheduler': scheduler.state_dict() if not use_rl else scheduler_rl.state_dict(),
             'patience': patience,
-            'best_cider': best_cider,
+            'best_val_cider': best_val_cider,
             'best_test_cider': best_test_cider,
             'use_rl': use_rl,
         }, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
