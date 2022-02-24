@@ -294,7 +294,7 @@ if __name__ == '__main__':
         val_cider = scores['CIDEr']
 
         # Test scores
-        scores = evaluate_metrics(model, test_dataloader, vocab, vocab)
+        scores = evaluate_metrics(model, test_dataloader, vocab)
         print("Test scores", scores)
         test_cider = scores['CIDEr']
 

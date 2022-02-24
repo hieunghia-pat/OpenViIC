@@ -60,6 +60,7 @@ def evaluate_metrics(model: Transformer, dataloader: data.DataLoader, vocab: Voc
     with tqdm(desc='Epoch %d - Evaluation' % epoch, unit='it', total=len(dataloader)) as pbar:
         for it, (features, boxes, tokens, shifted_right_tokens) in enumerate(dataloader):
             features = features.to(device)
+            boxes = boxes.to(device)
             with torch.no_grad():
                 out, _ = model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
                                             beam_size=config.xe_beam_size, out_size=config.xe_beam_size)
@@ -215,7 +216,6 @@ if __name__ == '__main__':
     '''
 
     def lambda_lr(s):
-        print("s:", s)
         if s <= 3:
             lr = config.xe_base_lr * s / 4
         elif s <= 10:
@@ -228,7 +228,6 @@ if __name__ == '__main__':
     
     def lambda_lr_rl(s):
         refine_epoch = config.refine_epoch_rl 
-        print("rl_s:", s)
         if s <= refine_epoch:
             lr = config.rl_base_lr
         elif s <= refine_epoch + 3:
@@ -295,7 +294,7 @@ if __name__ == '__main__':
         val_cider = scores['CIDEr']
 
         # Test scores
-        scores = evaluate_metrics(model, test_dataloader, vocab, vocab)
+        scores = evaluate_metrics(model, test_dataloader, vocab)
         print("Test scores", scores)
         test_cider = scores['CIDEr']
 
