@@ -33,4 +33,4 @@ xe_train_batch_size = 32
 scst_train_batch_size = 1
 val_batch_size = 1
 test_batch_size = 1
-workers = 4
+workers = 2
