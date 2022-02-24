@@ -2,7 +2,7 @@
 checkpoint_path = "saved_models"
 start_from = None
 learning_rate = 1.
-epochs = 100
+epochs = 20
 xe_base_lr = 1e-4
 rl_base_lr = 5e-6
 refine_epoch_rl = 28

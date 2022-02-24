@@ -41,7 +41,7 @@ def evaluate_loss(model: Transformer, dataloader: data.DataLoader, loss_fn: NLLL
                 boxes = boxes.to(device)
                 tokens = tokens.to(device)
                 shifted_right_tokens = shifted_right_tokens.to(device)
-                out = model(features, tokens).contiguous()
+                out = model(features, tokens, boxes=boxes).contiguous()
                 loss = loss_fn(out.view(-1, len(vocab)), shifted_right_tokens.view(-1))
                 this_loss = loss.item()
                 running_loss += this_loss
@@ -80,7 +80,6 @@ def evaluate_metrics(model: Transformer, dataloader: data.DataLoader, vocab: Voc
 def train_xe(model: Transformer, dataloader: data.DataLoader, optim: Adam, vocab: Vocab):
     # Training with cross-entropy loss
     model.train()
-    scheduler.step()
     
     running_loss = .0
     with tqdm(desc='Epoch %d - Training with cross-entropy loss' % epoch, unit='it', total=len(dataloader)) as pbar:
@@ -99,7 +98,7 @@ def train_xe(model: Transformer, dataloader: data.DataLoader, optim: Adam, vocab
 
             pbar.set_postfix(loss=running_loss / (it + 1))
             pbar.update()
-            # scheduler.step()
+            scheduler.step()
 
     loss = running_loss / len(dataloader)
 
@@ -112,7 +111,6 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
     running_reward_baseline = .0
 
     model.train()
-    scheduler_rl.step()
 
     running_loss = .0
 
@@ -137,6 +135,7 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
             loss = loss.mean()
             loss.backward()
             optim.step()
+            scheduler_rl.step()
 
             running_loss += loss.item()
             running_reward += reward.mean().item()
