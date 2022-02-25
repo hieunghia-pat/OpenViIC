@@ -1,6 +1,6 @@
-from data_utils.dataset import RegionFeatureDataset
+from data_utils.dataset import RegionFeatureDataset, RegionDictionaryDataset
 from data_utils.vocab import Vocab
-from data_utils.utils import region_feature_collate_fn
+from data_utils.utils import region_feature_collate_fn, dict_region_feature_collate_fn
 
 import evaluation
 from evaluation import PTBTokenizer, Cider
@@ -58,14 +58,13 @@ def evaluate_metrics(model: Transformer, dataloader: data.DataLoader, vocab: Voc
     gen = {}
     gts = {}
     with tqdm(desc='Epoch %d - Evaluation' % epoch, unit='it', total=len(dataloader)) as pbar:
-        for it, (features, boxes, tokens, shifted_right_tokens) in enumerate(dataloader):
+        for it, (features, boxes, caps_gt) in enumerate(dataloader):
             features = features.to(device)
             boxes = boxes.to(device)
             with torch.no_grad():
                 out, _ = model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
                                             beam_size=config.xe_beam_size, out_size=config.xe_beam_size)
-            caps_gen = vocab.decode_caption(out)
-            caps_gt = vocab.decode_caption(tokens)
+            caps_gen = vocab.decode_caption(out, join_words=False)
             for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                 gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                 gen['%d_%d' % (it, i)] = [gen_i, ]
@@ -116,7 +115,7 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
     running_loss = .0
 
     with tqdm(desc='Epoch %d - Training with self-critical learning' % epoch, unit='it', total=len(dataloader)) as pbar:
-        for it, (features, boxes, tokens, shifted_right_tokens) in enumerate(dataloader):
+        for it, (features, boxes, caps_gt) in enumerate(dataloader):
             features = features.to(device)
             boxes = boxes.to(device)
             outs, log_probs = model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
@@ -124,8 +123,7 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
             optim.zero_grad()
 
             # Rewards
-            caps_gen = vocab.decode_caption(outs.view(-1, vocab.max_caption_length)) # batch size when train with self-critical learning is always 1
-            caps_gt = vocab.decode_caption(tokens.view(-1, vocab.max_caption_length)) # batch size when train with self-critical learning is always 1
+            caps_gen = vocab.decode_caption(outs.view(-1, vocab.max_caption_length), join_words=True)
             caps_gt = list(itertools.chain(*([c, ] * config.sc_beam_size for c in caps_gt)))
             caps_gen, caps_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [caps_gen, caps_gt])
             reward = cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
@@ -165,37 +163,49 @@ if __name__ == '__main__':
     else:
         vocab = pickle.load(open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "wb"))
 
-    train_dataset = RegionFeatureDataset(config.train_json_path, config.feature_path, vocab)
-    val_dataset = RegionFeatureDataset(config.val_json_path, config.feature_path, vocab)
-    test_dataset = RegionFeatureDataset(config.test_json_path, config.feature_path, vocab)
-    # Creating data loader
-    xe_train_dataloader = data.DataLoader(
+    # creating iterable dataset
+    train_dataset = RegionFeatureDataset(config.train_json_path, config.feature_path, vocab) # for training with cross-entropy loss
+    val_dataset = RegionFeatureDataset(config.val_json_path, config.feature_path, vocab) # for calculating evaluation loss
+
+    # creating dictionary dataset
+    train_dict_dataset = RegionDictionaryDataset(config.train_json_path, config.feature_path, vocab) # for training with self-critical learning
+    val_dict_dataset = RegionDictionaryDataset(config.val_json_path, config.feature_path, vocab) # for calculating metrics on validation set
+    test_dict_dataset = RegionDictionaryDataset(config.test_json_path, config.feature_path, vocab) # for calculating metrics on test set
+
+    # creating iterable-dataset data loader
+    train_dataloader = data.DataLoader(
         dataset=train_dataset,
-        batch_size=config.xe_train_batch_size,
-        shuffle=True,
-        num_workers=config.workers,
-        collate_fn=region_feature_collate_fn
-    )
-    scst_train_dataloader = data.DataLoader(
-        dataset=train_dataset,
-        batch_size=config.scst_train_batch_size,
+        batch_size=config.batch_size,
         shuffle=True,
         num_workers=config.workers,
         collate_fn=region_feature_collate_fn
     )
     val_dataloader = data.DataLoader(
         dataset=val_dataset,
-        batch_size=config.val_batch_size,
+        batch_size=config.batch_size,
         shuffle=True,
         num_workers=config.workers,
         collate_fn=region_feature_collate_fn
     )
-    test_dataloader = data.DataLoader(
-        dataset=test_dataset,
-        batch_size=config.test_batch_size,
+
+    # creating dictionary iterable-dataset data loader
+    train_dict_dataloader = data.DataLoader(
+        dataset=train_dict_dataset,
+        batch_size=config.batch_size // config.beam_size,
         shuffle=True,
-        num_workers=config.workers,
-        collate_fn=region_feature_collate_fn
+        collate_fn=dict_region_feature_collate_fn
+    )
+    val_dict_dataloader = data.DataLoader(
+        dataset=val_dict_dataset,
+        batch_size=config.batch_size // config.beam_size,
+        shuffle=True,
+        collate_fn=dict_region_feature_collate_fn
+    )
+    test_dict_dataloader = data.DataLoader(
+        dataset=test_dict_dataset,
+        batch_size=config.batch_size // config.beam_size,
+        shuffle=True,
+        collate_fn=dict_region_feature_collate_fn
     )
 
     # Defining the Object Relation Transformer method
@@ -283,19 +293,23 @@ if __name__ == '__main__':
 
     for epoch in range(start_epoch, start_epoch + config.epochs):
         if not use_rl:
-            train_loss = train_xe(model, xe_train_dataloader, optim, vocab)
+            train_loss = train_xe(model, train_dataloader, optim, vocab)
         else:
-            train_loss, reward, reward_baseline = train_scst(model, scst_train_dataloader, optim_rl, cider_train, vocab=vocab)
+            train_loss, reward, reward_baseline = train_scst(model, train_dict_dataloader, optim_rl, cider_train, vocab=vocab)
 
         val_loss = evaluate_loss(model, val_dataloader, loss_fn, vocab)
 
-        scores = evaluate_metrics(model, val_dataloader, vocab)
+        print("-"*10)
+        scores = evaluate_metrics(model, val_dict_dataloader, vocab)
         print("Validation scores", scores)
+        print("-"*10)
         val_cider = scores['CIDEr']
 
         # Test scores
-        scores = evaluate_metrics(model, test_dataloader, vocab)
+        print("-"*10)
+        scores = evaluate_metrics(model, test_dict_dataloader, vocab)
         print("Test scores", scores)
+        print("-"*10)
         test_cider = scores['CIDEr']
 
         # Prepare for next epoch
@@ -385,3 +399,5 @@ if __name__ == '__main__':
 
         if exit_train:
             break
+
+        print("+"*10)

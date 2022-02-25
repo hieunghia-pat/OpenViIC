@@ -96,11 +96,15 @@ class Vocab(object):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
         return vec
 
-    def decode_caption(self, caption_vecs) -> List[str]:
+    def decode_caption(self, caption_vecs, join_words=True) -> List[str]:
         captions = []
         for vec in caption_vecs:
-            captions.append([self.itos[idx] for idx in vec.tolist() 
-                                        if idx not in [self.padding_idx, self.bos_idx, self.eos_idx, self.unk_idx]])
+            if join_words:
+                captions.append(" ".join([self.itos[idx] for idx in vec.tolist() 
+                                            if idx not in [self.padding_idx, self.bos_idx, self.eos_idx, self.unk_idx]]))
+            else:
+                captions.append([self.itos[idx] for idx in vec.tolist() 
+                                            if idx not in [self.padding_idx, self.bos_idx, self.eos_idx, self.unk_idx]])
 
         return captions
 

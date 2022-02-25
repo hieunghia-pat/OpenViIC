@@ -100,3 +100,28 @@ def region_feature_collate_fn(samples):
     shifted_right_tokens = torch.cat([token.unsqueeze_(0) for token in shifted_right_tokens], dim=0)
 
     return features, boxes, tokens, shifted_right_tokens
+
+def dict_region_feature_collate_fn(samples):
+    features = []
+    boxes = []
+    captions = []
+    max_seq_len = 0
+    for sample in samples:
+        feature, box, caption = sample
+        if max_seq_len < feature.shape[0]:
+            max_seq_len = feature.shape[0]
+        features.append(torch.tensor(feature))
+        boxes.append(torch.tensor(box))
+        captions.append(caption)
+
+    zero_feature = torch.zeros_like(features[-1][-1]).unsqueeze(0) # (1, dim)
+    zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
+    for batch_ith in range(len(samples)):
+        for ith in range(features[batch_ith].shape[0], max_seq_len):
+            features[batch_ith] = torch.cat([features[batch_ith], zero_feature], dim=0)
+            boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
+
+    features = torch.cat([feature.unsqueeze_(0) for feature in features], dim=0)
+    boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
+
+    return features, boxes, captions

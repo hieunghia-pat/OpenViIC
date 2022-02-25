@@ -21,16 +21,12 @@ d_v = 64
 d_ff = 2048
 d_feature = 2048
 dropout = .1
-xe_beam_size = 1
-sc_beam_size = 5
+beam_size = 5
 
 # dataset configuration
 train_json_path = "features/region_features/UIT-ViIC/uitviic_captions_train2017.json"
 val_json_path = "features/region_features/UIT-ViIC/uitviic_captions_val2017.json"
 test_json_path = "features/region_features/UIT-ViIC/uitviic_captions_test2017.json"
 feature_path = "features/region_features/UIT-ViIC/faster_rcnn"
-xe_train_batch_size = 32
-scst_train_batch_size = 1
-val_batch_size = 1
-test_batch_size = 1
+batch_size = 16
 workers = 2

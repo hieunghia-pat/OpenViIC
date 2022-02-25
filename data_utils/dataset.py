@@ -9,6 +9,133 @@ import os
 import numpy as np
 from typing import Dict, List, Tuple, Union
 
+class GridDictionaryDataset(data.Dataset):
+    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None) -> None:
+        super(GridDictionaryDataset, self).__init__()
+        with open(json_path, 'r') as file:
+            json_data = json.load(file)
+
+        # vocab
+        self.vocab = Vocab([json_path]) if vocab is None else vocab
+
+        # captions
+        self.image_ids, self.captions_with_image = self.load_json(json_data)
+
+        # images
+        self.image_features_path = image_features_path
+
+    @property
+    def max_caption_length(self) -> int:
+        if not hasattr(self, '_max_length'):
+            self._max_length = max(map(len, self.captions)) + 2
+        
+        return self._max_length
+
+    def load_json(self, json_data: Dict) -> List[Dict]:
+        examples = {}
+        for image in json_data["images"]:
+            examples[image["id"]] = []
+
+        for ann in json_data["annotations"]:
+            caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token)
+            caption = " ".join(caption[1:-1]) # ignore <bos> and <eos>
+            examples[ann["image_id"]].append(caption)
+
+        image_ids = []
+        captions_with_image = []
+        for image_id, captions in examples.items():
+            image_ids.append(image_id)
+            captions_with_image.append(captions)
+
+        return image_ids, captions_with_image
+    
+    @property
+    def captions(self) -> List[str]:
+        return [caption for caption in self.captions]
+
+    def load_feature(self, image_id: int) -> np.ndarray:
+        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature = np.load(feature_file, "r", allow_pickle=False)[:].copy()
+
+        return feature
+
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, List[str]]:
+        image_id = self.image_ids[idx]
+        features = self.load_feature(image_id)
+        captions = self.captions_with_image[idx]
+
+        return features, captions
+
+    def __len__(self) -> int:
+        return len(self.image_ids)
+
+class RegionDictionaryDataset(data.Dataset):
+    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None) -> None:
+        super(RegionDictionaryDataset, self).__init__()
+        with open(json_path, 'r') as file:
+            json_data = json.load(file)
+
+        # vocab
+        self.vocab = Vocab([json_path]) if vocab is None else vocab
+
+        # captions
+        self.image_ids, self.captions_with_image = self.load_json(json_data)
+
+        # images
+        self.image_features_path = image_features_path
+
+    @property
+    def max_caption_length(self) -> int:
+        if not hasattr(self, '_max_length'):
+            self._max_length = max(map(len, self.captions)) + 2
+        
+        return self._max_length
+
+    def load_json(self, json_data: Dict) -> List[Dict]:
+        examples = {}
+        for image in json_data["images"]:
+            examples[image["id"]] = []
+
+        for ann in json_data["annotations"]:
+            caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token)
+            caption = " ".join(caption[1:-1]) # ignore <bos> and <eos>
+            examples[ann["image_id"]].append(caption)
+
+        image_ids = []
+        captions_with_image = []
+        for image_id, captions in examples.items():
+            image_ids.append(image_id)
+            captions_with_image.append(captions)
+
+        return image_ids, captions_with_image
+    
+    @property
+    def captions(self) -> List[str]:
+        return [caption for caption in self.captions]
+
+    def load_feature(self, image_id: int) -> np.ndarray:
+        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature = np.load(feature_file, allow_pickle=True)[()]["features"].copy()
+
+        return feature
+
+    def load_boxes(self, image_id: int) -> np.ndarray:
+        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        boxes = np.load(feature_file, allow_pickle=True)[()]["boxes"].copy()
+
+        return boxes
+
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, List[str]]:
+        image_id = self.image_ids[idx]
+        features = self.load_feature(image_id)
+        boxes = self.load_boxes(image_id)
+        captions = self.captions_with_image[idx]
+
+        return features, boxes, captions
+
+    def __len__(self) -> int:
+        return len(self.image_ids)
+
 class GridFeatureDataset(data.Dataset):
     def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None) -> None:
         super(GridFeatureDataset, self).__init__()
