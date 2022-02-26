@@ -63,7 +63,7 @@ def evaluate_metrics(model: Transformer, dataloader: data.DataLoader, vocab: Voc
             boxes = boxes.to(device)
             with torch.no_grad():
                 out, _ = model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
-                                            beam_size=config.xe_beam_size, out_size=config.xe_beam_size)
+                                            beam_size=config.beam_size, out_size=1)
             caps_gen = vocab.decode_caption(out, join_words=False)
             for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                 gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -119,7 +119,7 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
             features = features.to(device)
             boxes = boxes.to(device)
             outs, log_probs = model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
-                                                beam_size=config.sc_beam_size, out_size=config.sc_beam_size)
+                                                beam_size=config.beam_size, out_size=config.beam_size)
             optim.zero_grad()
 
             # Rewards

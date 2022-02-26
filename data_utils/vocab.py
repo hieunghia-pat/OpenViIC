@@ -96,7 +96,10 @@ class Vocab(object):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
         return vec
 
-    def decode_caption(self, caption_vecs, join_words=True) -> List[str]:
+    def decode_caption(self, caption_vecs: torch.Tensor, join_words=True) -> List[str]:
+        '''
+            caption_vecs: (bs, max_length)
+        '''
         captions = []
         for vec in caption_vecs:
             if join_words:
