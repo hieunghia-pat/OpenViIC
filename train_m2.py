@@ -189,7 +189,8 @@ if __name__ == '__main__':
     scheduler = LambdaLR(optim, lambda_lr)
     loss_fn = NLLLoss(ignore_index=vocab.padding_idx)
     use_rl = False
-    best_cider = .0
+    best_val_cider = .0
+    best_test_cider = .0
     patience = 0
     start_epoch = 0
 
