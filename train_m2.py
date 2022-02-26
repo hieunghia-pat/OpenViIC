@@ -78,7 +78,7 @@ def evaluate_metrics(model: Transformer, dataloader: data.DataLoader, vocab: Voc
 def train_xe(model: Transformer, dataloader: data.DataLoader, optim: Adam, vocab: Vocab):
     # Training with cross-entropy loss
     model.train()
-    
+    scheduler.step()
     running_loss = .0
     with tqdm(desc='Epoch %d - Training with cross-entropy loss' % epoch, unit='it', total=len(dataloader)) as pbar:
         for it, (features, _, tokens, shifted_right_tokens) in enumerate(dataloader):
