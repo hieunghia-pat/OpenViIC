@@ -302,14 +302,12 @@ if __name__ == '__main__':
         print("-"*10)
         scores = evaluate_metrics(model, val_dict_dataloader, vocab)
         print("Validation scores", scores)
-        print("-"*10)
         val_cider = scores['CIDEr']
 
         # Test scores
         print("-"*10)
         scores = evaluate_metrics(model, test_dict_dataloader, vocab)
         print("Test scores", scores)
-        print("-"*10)
         test_cider = scores['CIDEr']
 
         # Prepare for next epoch
