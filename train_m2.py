@@ -130,7 +130,6 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
             loss = loss.mean()
             loss.backward()
             optim.step()
-            scheduler_rl.step()
 
             running_loss += loss.item()
             running_reward += reward.mean().item()
@@ -168,42 +167,6 @@ if __name__ == '__main__':
     val_dict_dataset = RegionDictionaryDataset(config.val_json_path, config.feature_path, vocab) # for calculating metrics on validation set
     test_dict_dataset = RegionDictionaryDataset(config.test_json_path, config.feature_path, vocab) # for calculating metrics on test set
 
-    # creating iterable-dataset data loader
-    train_dataloader = data.DataLoader(
-        dataset=train_dataset,
-        batch_size=config.batch_size,
-        shuffle=True,
-        num_workers=config.workers,
-        collate_fn=region_feature_collate_fn
-    )
-    val_dataloader = data.DataLoader(
-        dataset=val_dataset,
-        batch_size=config.batch_size,
-        shuffle=True,
-        num_workers=config.workers,
-        collate_fn=region_feature_collate_fn
-    )
-
-    # creating dictionary iterable-dataset data loader
-    train_dict_dataloader = data.DataLoader(
-        dataset=train_dict_dataset,
-        batch_size=config.batch_size // config.beam_size,
-        shuffle=True,
-        collate_fn=dict_region_feature_collate_fn
-    )
-    val_dict_dataloader = data.DataLoader(
-        dataset=val_dict_dataset,
-        batch_size=config.batch_size // config.beam_size,
-        shuffle=True,
-        collate_fn=dict_region_feature_collate_fn
-    )
-    test_dict_dataloader = data.DataLoader(
-        dataset=test_dict_dataset,
-        batch_size=config.batch_size // config.beam_size,
-        shuffle=True,
-        collate_fn=dict_region_feature_collate_fn
-    )
-
     # Defining the Meshed Memory Transformer method
     encoder = MultiLevelEncoder(N=config.nlayers, padding_idx=vocab.padding_idx, d_model=config.d_model, d_k=config.d_k, d_v=config.d_v,
                                 d_ff=config.d_ff, dropout=config.dropout, attention_module=AugmentedMemoryScaledDotProductAttention)
@@ -215,47 +178,17 @@ if __name__ == '__main__':
     # for evaluating self-critical learning
     cider_train = Cider(PTBTokenizer.tokenize(train_dataset.captions))
 
-    '''
     def lambda_lr(s):
-        warm_up = args.warmup
+        warm_up = config.warmup
         s += 1
         return (model.d_model ** -.5) * min(s ** -.5, s * warm_up ** -1.5)
-    '''
 
-    def lambda_lr(s):
-        if s <= 3:
-            lr = config.xe_base_lr * s / 4
-        elif s <= 10:
-            lr = config.xe_base_lr
-        elif s <= 12:
-            lr = config.xe_base_lr * 0.2
-        else:
-            lr = config.xe_base_lr * 0.2 * 0.2
-        return lr
-    
-    def lambda_lr_rl(s):
-        refine_epoch = config.refine_epoch_rl
-        if s <= refine_epoch:
-            lr = config.rl_base_lr
-        elif s <= refine_epoch + 3:
-            lr = config.rl_base_lr * 0.2
-        elif s <= refine_epoch + 6:
-            lr = config.rl_base_lr * 0.2 * 0.2
-        else:
-            lr = config.rl_base_lr * 0.2 * 0.2 * 0.2
-        return lr
-
-    # optimizers and schedulers
-    optim = Adam(model.parameters(), lr=config.learning_rate, betas=(0.9, 0.98))
+    # Initial conditions
+    optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
     scheduler = LambdaLR(optim, lambda_lr)
-
-    optim_rl = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
-    scheduler_rl = LambdaLR(optim_rl, lambda_lr_rl)
-
     loss_fn = NLLLoss(ignore_index=vocab.padding_idx)
-    use_rl = False # training with cross-entropy first
-    best_val_cider = .0
-    best_test_cider = 0.
+    use_rl = False
+    best_cider = .0
     patience = 0
     start_epoch = 0
 
@@ -278,31 +211,61 @@ if __name__ == '__main__':
             best_test_cider = checkpoint['best_test_cider']
             patience = checkpoint['patience']
             use_rl = checkpoint['use_rl']
-
-            if use_rl:
-                optim.load_state_dict(checkpoint['optimizer'])
-                scheduler.load_state_dict(checkpoint['scheduler'])
-            else:
-                optim_rl.load_state_dict(checkpoint['optimizer'])
-                scheduler_rl.load_state_dict(checkpoint['scheduler'])
+            optim.load_state_dict(checkpoint['optimizer'])
+            scheduler.load_state_dict(checkpoint['scheduler'])
 
             print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
 
     for epoch in range(start_epoch, start_epoch + config.epochs):
+        # creating iterable-dataset data loader
+        train_dataloader = data.DataLoader(
+            dataset=train_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=config.workers,
+            collate_fn=region_feature_collate_fn
+        )
+        val_dataloader = data.DataLoader(
+            dataset=val_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=config.workers,
+            collate_fn=region_feature_collate_fn
+        )
+
+        # creating dictionary iterable-dataset data loader
+        train_dict_dataloader = data.DataLoader(
+            dataset=train_dict_dataset,
+            batch_size=config.batch_size // config.beam_size,
+            shuffle=True,
+            collate_fn=dict_region_feature_collate_fn
+        )
+        val_dict_dataloader = data.DataLoader(
+            dataset=val_dict_dataset,
+            batch_size=config.batch_size // config.beam_size,
+            shuffle=True,
+            collate_fn=dict_region_feature_collate_fn
+        )
+        test_dict_dataloader = data.DataLoader(
+            dataset=test_dict_dataset,
+            batch_size=config.batch_size // config.beam_size,
+            shuffle=True,
+            collate_fn=dict_region_feature_collate_fn
+        )
+
         if not use_rl:
             train_loss = train_xe(model, train_dataloader, optim, vocab)
         else:
-            train_loss, reward, reward_baseline = train_scst(model, train_dict_dataloader, optim_rl, cider_train, vocab=vocab)
+            train_loss, reward, reward_baseline = train_scst(model, train_dict_dataloader, optim, cider_train, vocab=vocab)
 
         val_loss = evaluate_loss(model, val_dataloader, loss_fn, vocab)
 
-        print("-"*10)
+        # val scores
         scores = evaluate_metrics(model, val_dict_dataloader, vocab)
         print("Validation scores", scores)
         val_cider = scores['CIDEr']
 
         # Test scores
-        print("-"*10)
         scores = evaluate_metrics(model, test_dict_dataloader, vocab)
         print("Test scores", scores)
         test_cider = scores['CIDEr']
@@ -325,40 +288,15 @@ if __name__ == '__main__':
         exit_train = False
 
         if patience == 5:
-            if epoch < config.xe_least:   # xe stage train 15 epoches at least 
-                print('special treatment, e = {}'.format(epoch))
-                use_rl = False
-                switch_to_rl = False
-                patience = 0
-            elif not use_rl:
-                use_rl = True
-                switch_to_rl = True
-                patience = 0
-                
-                optim_rl = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
-                scheduler_rl = LambdaLR(optim_rl, lambda_lr_rl)
-                
-                for k in range(epoch-1):
-                    scheduler_rl.step()
-
-                print("Switching to RL")
-            else:
-                print('patience reached.')
-                exit_train = True
-
-        if epoch == config.xe_most:     # xe stage no more than 20 epoches
             if not use_rl:
                 use_rl = True
                 switch_to_rl = True
                 patience = 0
-                
-                optim_rl = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
-                scheduler_rl = LambdaLR(optim_rl, lambda_lr_rl)
-
-                for k in range(epoch-1):
-                    scheduler_rl.step()
-
+                optim = Adam(model.parameters(), lr=5e-6)
                 print("Switching to RL")
+            else:
+                print('patience reached.')
+                exit_train = True
 
         if switch_to_rl and not best:
             checkpoint = torch.load(os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
@@ -379,8 +317,8 @@ if __name__ == '__main__':
             'val_loss': val_loss,
             'val_cider': val_cider,
             'state_dict': model.state_dict(),
-            'optimizer': optim.state_dict() if not use_rl else optim_rl.state_dict(),
-            'scheduler': scheduler.state_dict() if not use_rl else scheduler_rl.state_dict(),
+            'optimizer': optim.state_dict() if not use_rl else optim.state_dict(),
+            'scheduler': scheduler.state_dict() if not use_rl else scheduler.state_dict(),
             'patience': patience,
             'best_val_cider': best_val_cider,
             'best_test_cider': best_test_cider,
@@ -395,4 +333,4 @@ if __name__ == '__main__':
         if exit_train:
             break
 
-        print("="*10)
+        print("+"*10)
