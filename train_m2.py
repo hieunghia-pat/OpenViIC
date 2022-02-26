@@ -36,12 +36,11 @@ def evaluate_loss(model: Transformer, dataloader: data.DataLoader, loss_fn: NLLL
     running_loss = .0
     with tqdm(desc='Epoch %d - Validation' % epoch, unit='it', total=len(dataloader)) as pbar:
         with torch.no_grad():
-            for it, (features, boxes, tokens, shifted_right_tokens) in enumerate(dataloader):
+            for it, (features, _, tokens, shifted_right_tokens) in enumerate(dataloader):
                 features = features.to(device)
-                boxes = boxes.to(device)
                 tokens = tokens.to(device)
                 shifted_right_tokens = shifted_right_tokens.to(device)
-                out = model(features, tokens, boxes=boxes).contiguous()
+                out = model(features, tokens).contiguous()
                 loss = loss_fn(out.view(-1, len(vocab)), shifted_right_tokens.view(-1))
                 this_loss = loss.item()
                 running_loss += this_loss
@@ -58,11 +57,10 @@ def evaluate_metrics(model: Transformer, dataloader: data.DataLoader, vocab: Voc
     gen = {}
     gts = {}
     with tqdm(desc='Epoch %d - Evaluation' % epoch, unit='it', total=len(dataloader)) as pbar:
-        for it, (features, boxes, caps_gt) in enumerate(dataloader):
+        for it, (features, _, caps_gt) in enumerate(dataloader):
             features = features.to(device)
-            boxes = boxes.to(device)
             with torch.no_grad():
-                out, _ = model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
+                out, _ = model.beam_search(features, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
                                             beam_size=config.beam_size, out_size=1)
             caps_gen = vocab.decode_caption(out, join_words=False)
             for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
@@ -83,12 +81,11 @@ def train_xe(model: Transformer, dataloader: data.DataLoader, optim: Adam, vocab
     
     running_loss = .0
     with tqdm(desc='Epoch %d - Training with cross-entropy loss' % epoch, unit='it', total=len(dataloader)) as pbar:
-        for it, (features, boxes, tokens, shifted_right_tokens) in enumerate(dataloader):
+        for it, (features, _, tokens, shifted_right_tokens) in enumerate(dataloader):
             features = features.to(device)
-            boxes = boxes.to(device)
             tokens = tokens.to(device)
             shifted_right_tokens = shifted_right_tokens.to(device)
-            out = model(features, tokens, boxes=boxes).contiguous()
+            out = model(features, tokens).contiguous()
             loss = loss_fn(out.view(-1, len(vocab)), shifted_right_tokens.view(-1))
             loss.backward()
 
@@ -115,10 +112,9 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
     running_loss = .0
 
     with tqdm(desc='Epoch %d - Training with self-critical learning' % epoch, unit='it', total=len(dataloader)) as pbar:
-        for it, (features, boxes, caps_gt) in enumerate(dataloader):
+        for it, (features, _, caps_gt) in enumerate(dataloader):
             features = features.to(device)
-            boxes = boxes.to(device)
-            outs, log_probs = model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+            outs, log_probs = model.beam_search(features, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
                                                 beam_size=config.beam_size, out_size=config.beam_size)
             optim.zero_grad()
 
@@ -227,7 +223,6 @@ if __name__ == '__main__':
     '''
 
     def lambda_lr(s):
-        print("s:", s)
         if s <= 3:
             lr = config.xe_base_lr * s / 4
         elif s <= 10:
@@ -239,8 +234,7 @@ if __name__ == '__main__':
         return lr
     
     def lambda_lr_rl(s):
-        refine_epoch = config.refine_epoch_rl 
-        print("rl_s:", s)
+        refine_epoch = config.refine_epoch_rl
         if s <= refine_epoch:
             lr = config.rl_base_lr
         elif s <= refine_epoch + 3:
