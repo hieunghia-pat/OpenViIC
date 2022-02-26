@@ -89,6 +89,7 @@ def train_xe(model: Transformer, dataloader: data.DataLoader, optim: Adam, vocab
             tokens = tokens.to(device)
             shifted_right_tokens = shifted_right_tokens.to(device)
             out = model(features, tokens, boxes=boxes).contiguous()
+            optim.zero_grad()
             loss = loss_fn(out.view(-1, len(vocab)), shifted_right_tokens.view(-1))
             loss.backward()
 
