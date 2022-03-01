@@ -26,10 +26,11 @@ class DecoderLayer(Module):
 
     def forward(self, input, enc_output, language_signals=None, mask_pad=None, mask_self_att=None, mask_enc_att=None):
         self_att = self.self_attn(input, input, input, attention_mask=mask_self_att)
-        self_att = self_att * mask_pad
+        self_att = self_att.masked_fill(mask_pad, value=0)
 
-        enc_att = self.enc_attn(self_att, enc_output, enc_output, language_signals=language_signals, attention_mask=mask_enc_att) * mask_pad
-        enc_att = enc_att * mask_pad
+        enc_att = self.enc_attn(self_att, enc_output, enc_output, language_signals=language_signals, 
+                                attention_mask=mask_enc_att).masked_fill(mask_pad, value=0)
+        enc_att = enc_att.masked_fill(mask_pad, value=0)
 
         ff = self.pwff(enc_att)
         
@@ -65,12 +66,12 @@ class MeshedDecoderLayer(Module):
         assert enc_output.size(1) == self.N_enc, "total layers of the encoder must equal to total number of the encoder outputs"
         
         self_att = self.self_att(input, input, input, attention_mask=mask_self_att)
-        self_att = self_att * mask_pad
+        self_att = self_att.masked_fill(mask_pad, value=0)
 
         enc_atts = []
         for ith in range(self.N_enc):
             enc_atts.append(self.enc_att(self_att, enc_output[:, ith], enc_output[:, ith], 
-                            language_signals=language_signals, attention_mask=mask_enc_att) * mask_pad)
+                            language_signals=language_signals, attention_mask=mask_enc_att).masked_fill(mask_pad, value=0))
 
         alphas = []
         for fc_alpha, enc_att in zip(self.fc_alphas, enc_atts):
@@ -80,10 +81,10 @@ class MeshedDecoderLayer(Module):
         for alpha, enc_att in zip(alphas, enc_atts):
             attn += enc_att * alpha
         attn = attn / np.sqrt(self.N_enc)
-        enc_att = enc_att * mask_pad
+        enc_att = enc_att.masked_fill(mask_pad, value=0)
 
         ff = self.pwff(attn)
-        ff = ff * mask_pad
+        ff = ff.masked_fill(mask_pad, value=0)
 
         return ff
 
