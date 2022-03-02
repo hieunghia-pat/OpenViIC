@@ -80,7 +80,6 @@ def evaluate_metrics(model: Transformer, dataloader: data.DataLoader, vocab: Voc
 def train_xe(model: Transformer, dataloader: data.DataLoader, optim: Adam, vocab: Vocab):
     # Training with cross-entropy loss
     model.train()
-    scheduler.step()
     running_loss = .0
     with tqdm(desc='Epoch %d - Training with cross-entropy loss' % epoch, unit='it', total=len(dataloader)) as pbar:
         for it, (features, boxes, tokens, shifted_right_tokens) in enumerate(dataloader):
@@ -124,7 +123,7 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
             optim.zero_grad()
 
             # Rewards
-            caps_gen = vocab.decode_caption(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
+            caps_gen = vocab.decode_caption(outs.reshape(-1, vocab.max_caption_length), join_words=True)
             caps_gt = list(itertools.chain(*([c, ] * config.beam_size for c in caps_gt)))
             caps_gen, caps_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [caps_gen, caps_gt])
             reward = cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
