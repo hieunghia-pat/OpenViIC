@@ -9,7 +9,7 @@ rl_base_lr = 5e-6
 refine_epoch_rl = 28
 xe_least = 15
 xe_most = 20
-min_freq = 3
+min_freq = 1
 
 # model configuration
 model_name = "m2-transformer"

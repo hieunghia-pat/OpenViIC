@@ -78,7 +78,6 @@ def evaluate_metrics(model: Transformer, dataloader: data.DataLoader, vocab: Voc
 def train_xe(model: Transformer, dataloader: data.DataLoader, optim: Adam, vocab: Vocab):
     # Training with cross-entropy loss
     model.train()
-    scheduler.step()
     running_loss = .0
     with tqdm(desc='Epoch %d - Training with cross-entropy loss' % epoch, unit='it', total=len(dataloader)) as pbar:
         for it, (features, _, tokens, shifted_right_tokens) in enumerate(dataloader):
@@ -210,7 +209,9 @@ if __name__ == '__main__':
             """
             start_epoch = checkpoint['epoch'] + 1
             best_val_cider = checkpoint['best_val_cider']
+            best_val_avg_bleu = checkpoint['best_val_avg_bleu']
             best_test_cider = checkpoint['best_test_cider']
+            best_test_avg_bleu = checkpoint["best_test_avg_bleu"]
             patience = checkpoint['patience']
             use_rl = checkpoint['use_rl']
             optim.load_state_dict(checkpoint['optimizer'])
@@ -266,25 +267,42 @@ if __name__ == '__main__':
         scores = evaluate_metrics(model, val_dict_dataloader, vocab)
         print("Validation scores", scores)
         val_cider = scores['CIDEr']
+        val_avg_bleu = np.mean(scores["BLEU"])
 
         # Test scores
         scores = evaluate_metrics(model, test_dict_dataloader, vocab)
         print("Test scores", scores)
         test_cider = scores['CIDEr']
+        test_avg_bleu = np.mean(scores["BLEU"])
 
         # Prepare for next epoch
-        best = False
+        # save the best CIDEr ang avg. BLEU score on val set
+        is_best_cider_val = False
         if val_cider >= best_val_cider:
             best_val_cider = val_cider
             patience = 0
-            best = True
+            is_best_cider_val = True
         else:
             patience += 1
 
-        best_test = False
+        is_best_avg_bleu_val = False
+        if val_avg_bleu >= best_val_avg_bleu:
+            best_val_cider = val_avg_bleu
+            patience = 0
+            is_best_avg_bleu_val = True
+        else:
+            patience += 1
+
+        # save the best CIDEr ang avg. BLEU score on test set
+        is_best_cider_test = False
         if test_cider >= best_test_cider:
             best_test_cider = test_cider
-            best_test = True
+            is_best_cider_test = True
+
+        is_best_avg_bleu_test = False
+        if test_avg_bleu >= best_test_avg_bleu:
+            best_test_avg_bleu = test_avg_bleu
+            is_best_avg_bleu_val = True
 
         switch_to_rl = False
         exit_train = False
@@ -300,7 +318,7 @@ if __name__ == '__main__':
                 print('patience reached.')
                 exit_train = True
 
-        if switch_to_rl and not best:
+        if switch_to_rl and not best_val_cider:
             checkpoint = torch.load(os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
             torch.set_rng_state(checkpoint['torch_rng_state'])
             torch.cuda.set_rng_state(checkpoint['cuda_rng_state'])
@@ -318,19 +336,26 @@ if __name__ == '__main__':
             'epoch': epoch,
             'val_loss': val_loss,
             'val_cider': val_cider,
+            "val_avg_bleu": val_avg_bleu,
             'state_dict': model.state_dict(),
             'optimizer': optim.state_dict() if not use_rl else optim.state_dict(),
             'scheduler': scheduler.state_dict() if not use_rl else scheduler.state_dict(),
             'patience': patience,
             'best_val_cider': best_val_cider,
+            'best_val_avg_bleu': best_val_avg_bleu,
             'best_test_cider': best_test_cider,
+            'best_test_avg_bleu': best_test_avg_bleu,
             'use_rl': use_rl,
         }, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
 
-        if best:
-            copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
-        if best_test:
-            copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_test_model.pth"))
+        if best_val_cider:
+            copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_cider_model.pth"))
+        if best_val_avg_bleu:
+            copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_avg_bleu_model.pth"))
+        if best_test_cider:
+            copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_test_cider_model.pth"))
+        if best_test_avg_bleu:
+            copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_test_avg_bleu_model.pth"))
 
         if exit_train:
             break
