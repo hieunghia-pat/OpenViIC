@@ -124,7 +124,7 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
             optim.zero_grad()
 
             # Rewards
-            caps_gen = vocab.decode_caption(outs.view(-1, vocab.max_caption_length), join_words=True)
+            caps_gen = vocab.decode_caption(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
             caps_gt = list(itertools.chain(*([c, ] * config.beam_size for c in caps_gt)))
             caps_gen, caps_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [caps_gen, caps_gt])
             reward = cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
