@@ -174,9 +174,9 @@ if __name__ == '__main__':
 
     # Defining the Object Relation Transformer method
     encoder = Encoder(N=config.nlayers, padding_idx=vocab.padding_idx, d_model=config.d_model, d_k=config.d_k, d_v=config.d_v,
-                                d_ff=config.d_ff, dropout=config.dropout, attention_module=AugmentedGeometryScaledDotProductAttention)
+                                use_aoa=True, d_ff=config.d_ff, dropout=config.dropout, attention_module=AugmentedGeometryScaledDotProductAttention)
     decoder = Decoder(vocab_size=len(vocab), max_len=vocab.max_caption_length, N_dec=config.nlayers, padding_idx=vocab.padding_idx,
-                            d_model=config.d_model, d_k=config.d_k, d_v=config.d_v, d_ff=config.d_ff, dropout=config.dropout,
+                            use_aoa=True, d_model=config.d_model, d_k=config.d_k, d_v=config.d_v, d_ff=config.d_ff, dropout=config.dropout,
                             self_att_module=ScaledDotProductAttention, enc_att_module=ScaledDotProductAttention)
     model = Transformer(vocab.bos_idx, encoder, decoder).to(device)
     # for evaluating self-critical learning

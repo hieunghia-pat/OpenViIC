@@ -1,6 +1,6 @@
-from data_utils.dataset import RegionFeatureDataset, RegionDictionaryDataset
+from data_utils.dataset import GridFeatureDataset, GridDictionaryDataset
 from data_utils.vocab import Vocab
-from data_utils.utils import region_feature_collate_fn, dict_region_feature_collate_fn
+from data_utils.utils import dict_grid_feature_collate_fn
 
 import evaluation
 from evaluation import PTBTokenizer, Cider
@@ -36,12 +36,13 @@ def evaluate_loss(model: Transformer, dataloader: data.DataLoader, loss_fn: NLLL
     running_loss = .0
     with tqdm(desc='Epoch %d - Validation' % epoch, unit='it', total=len(dataloader)) as pbar:
         with torch.no_grad():
-            for it, (features, boxes, tokens, shifted_right_tokens) in enumerate(dataloader):
+            for it, (features, tokens, shifted_right_tokens) in enumerate(dataloader):
+                bs, c, h, w = features.shape
+                features = features.reshape(bs, -1, c)
                 features = features.to(device)
-                boxes = boxes.to(device)
                 tokens = tokens.to(device)
                 shifted_right_tokens = shifted_right_tokens.to(device)
-                out = model(features, tokens, boxes=boxes).contiguous()
+                out = model(features, tokens, grid_size=(h, w)).contiguous()
                 loss = loss_fn(out.view(-1, len(vocab)), shifted_right_tokens.view(-1))
                 this_loss = loss.item()
                 running_loss += this_loss
@@ -58,11 +59,12 @@ def evaluate_metrics(model: Transformer, dataloader: data.DataLoader, vocab: Voc
     gen = {}
     gts = {}
     with tqdm(desc='Epoch %d - Evaluation' % epoch, unit='it', total=len(dataloader)) as pbar:
-        for it, (features, boxes, caps_gt) in enumerate(dataloader):
+        for it, (features, caps_gt) in enumerate(dataloader):
+            bs, c, h, w = features.shape
+            features = features.reshape(bs, -1, c)
             features = features.to(device)
-            boxes = boxes.to(device)
             with torch.no_grad():
-                out, _ = model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
+                out, _ = model.beam_search(features, grid_size=(h, w), max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
                                             beam_size=config.beam_size, out_size=1)
             caps_gen = vocab.decode_caption(out, join_words=False)
             for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
@@ -83,12 +85,13 @@ def train_xe(model: Transformer, dataloader: data.DataLoader, optim: Adam, vocab
     scheduler.step()
     running_loss = .0
     with tqdm(desc='Epoch %d - Training with cross-entropy loss' % epoch, unit='it', total=len(dataloader)) as pbar:
-        for it, (features, boxes, tokens, shifted_right_tokens) in enumerate(dataloader):
+        for it, (features, tokens, shifted_right_tokens) in enumerate(dataloader):
+            bs, c, h, w = features.shape
+            features = features.reshape(bs, -1, c)
             features = features.to(device)
-            boxes = boxes.to(device)
             tokens = tokens.to(device)
             shifted_right_tokens = shifted_right_tokens.to(device)
-            out = model(features, tokens, boxes=boxes).contiguous()
+            out = model(features, tokens, grid_size=(h, w)).contiguous()
             optim.zero_grad()
             loss = loss_fn(out.view(-1, len(vocab)), shifted_right_tokens.view(-1))
             loss.backward()
@@ -116,10 +119,11 @@ def train_scst(model: Transformer, dataloader: data.DataLoader, optim: Adam, cid
     running_loss = .0
 
     with tqdm(desc='Epoch %d - Training with self-critical learning' % epoch, unit='it', total=len(dataloader)) as pbar:
-        for it, (features, boxes, caps_gt) in enumerate(dataloader):
+        for it, (features, caps_gt) in enumerate(dataloader):
+            bs, c, h, w = features.shape
+            features = features.reshape(bs, -1, c)
             features = features.to(device)
-            boxes = boxes.to(device)
-            outs, log_probs = model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+            outs, log_probs = model.beam_search(features, grid_size=(h, w), max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
                                                 beam_size=config.batch_size, out_size=config.beam_size)
             optim.zero_grad()
 
@@ -164,13 +168,13 @@ if __name__ == '__main__':
         vocab = pickle.load(open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "rb"))
 
     # creating iterable dataset
-    train_dataset = RegionFeatureDataset(config.train_json_path, config.feature_path, vocab) # for training with cross-entropy loss
-    val_dataset = RegionFeatureDataset(config.val_json_path, config.feature_path, vocab) # for calculating evaluation loss
+    train_dataset = GridFeatureDataset(config.train_json_path, config.feature_path, vocab) # for training with cross-entropy loss
+    val_dataset = GridFeatureDataset(config.val_json_path, config.feature_path, vocab) # for calculating evaluation loss
 
     # creating dictionary dataset
-    train_dict_dataset = RegionDictionaryDataset(config.train_json_path, config.feature_path, vocab) # for training with self-critical learning
-    val_dict_dataset = RegionDictionaryDataset(config.val_json_path, config.feature_path, vocab) # for calculating metrics on validation set
-    test_dict_dataset = RegionDictionaryDataset(config.test_json_path, config.feature_path, vocab) # for calculating metrics on test set
+    train_dict_dataset = GridDictionaryDataset(config.train_json_path, config.feature_path, vocab) # for training with self-critical learning
+    val_dict_dataset = GridDictionaryDataset(config.val_json_path, config.feature_path, vocab) # for calculating metrics on validation set
+    test_dict_dataset = GridDictionaryDataset(config.test_json_path, config.feature_path, vocab) # for calculating metrics on test set
 
     # Defining the Object Relation Transformer method
     encoder = Encoder(N=config.nlayers, padding_idx=vocab.padding_idx, d_model=config.d_model, d_k=config.d_k, d_v=config.d_v,
@@ -227,15 +231,13 @@ if __name__ == '__main__':
             dataset=train_dataset,
             batch_size=config.batch_size,
             shuffle=True,
-            num_workers=config.workers,
-            collate_fn=region_feature_collate_fn
+            num_workers=config.workers
         )
         val_dataloader = data.DataLoader(
             dataset=val_dataset,
             batch_size=config.batch_size,
             shuffle=True,
-            num_workers=config.workers,
-            collate_fn=region_feature_collate_fn
+            num_workers=config.workers
         )
 
         # creating dictionary iterable-dataset data loader
@@ -243,19 +245,19 @@ if __name__ == '__main__':
             dataset=train_dict_dataset,
             batch_size=config.batch_size // config.beam_size,
             shuffle=True,
-            collate_fn=dict_region_feature_collate_fn
+            collate_fn=dict_grid_feature_collate_fn
         )
         val_dict_dataloader = data.DataLoader(
             dataset=val_dict_dataset,
             batch_size=config.batch_size // config.beam_size,
             shuffle=True,
-            collate_fn=dict_region_feature_collate_fn
+            collate_fn=dict_grid_feature_collate_fn
         )
         test_dict_dataloader = data.DataLoader(
             dataset=test_dict_dataset,
             batch_size=config.batch_size // config.beam_size,
             shuffle=True,
-            collate_fn=dict_region_feature_collate_fn
+            collate_fn=dict_grid_feature_collate_fn
         )
 
         if not use_rl:
