@@ -29,7 +29,7 @@ Built on top of Bottom-up Attention mechanisms, Object Relation Transformer (ORT
 
 ### [Meshed-Memory Transformer](https://arxiv.org/pdf/1912.08226.pdf)
 
-<img src="images/m2/m2.png" width="700>
+<img src="images/m2/m2.png" width="700" />
 
 Built on top of Buttom-up Attention, Meshed-Memory Transformer uses augmented memory to catch internal relation between objects in images. Moreover, Meshed-Memory Transformer is also equipped meshed decoder layers for better language understanding and generating.
 
