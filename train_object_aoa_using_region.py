@@ -251,12 +251,6 @@ if __name__ == '__main__':
             shuffle=True,
             collate_fn=dict_region_feature_collate_fn
         )
-        test_dict_dataloader = data.DataLoader(
-            dataset=test_dict_dataset,
-            batch_size=config.batch_size // config.beam_size,
-            shuffle=True,
-            collate_fn=dict_region_feature_collate_fn
-        )
 
         if not use_rl:
             train_loss = train_xe(model, train_dataloader, optim, vocab)
@@ -270,11 +264,6 @@ if __name__ == '__main__':
         print("Validation scores", scores)
         val_cider = scores['CIDEr']
 
-        # Test scores
-        scores = evaluate_metrics(model, test_dict_dataloader, vocab)
-        print("Test scores", scores)
-        test_cider = scores['CIDEr']
-
         # Prepare for next epoch
         best = False
         if val_cider >= best_val_cider:
@@ -283,11 +272,6 @@ if __name__ == '__main__':
             best = True
         else:
             patience += 1
-
-        best_test = False
-        if test_cider >= best_test_cider:
-            best_test_cider = test_cider
-            best_test = True
 
         switch_to_rl = False
         exit_train = False
@@ -332,8 +316,6 @@ if __name__ == '__main__':
 
         if best:
             copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
-        if best_test:
-            copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_test_model.pth"))
 
         if exit_train:
             break
