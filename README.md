@@ -7,8 +7,8 @@ This is an open-source repository for researching Vietnamese Image Captioning ta
 
 ### Region-based visual feature using [Faster-RCNN](https://arxiv.org/pdf/1506.01497.pdf)
 
-[Bottom-up example 1](images/bottom_up/rcnn_example_1.png)
-[Bottom-up example 1](images/bottom_up/rcnn_example_2.png)
+![Bottom-up example 1](images/bottom_up/rcnn_example_1.png)
+![Bottom-up example 1](images/bottom_up/rcnn_example_2.png)
 
 [Bottom-up and Top-down attention](https://arxiv.org/abs/1707.07998) is an effective way to ignore unnecessary regions of the images, focus the deep learning methods to important regions for better image understanding.
 
@@ -16,7 +16,7 @@ This is an open-source repository for researching Vietnamese Image Captioning ta
 
 ### [Attention on Attention Network](https://arxiv.org/pdf/1908.06954.pdf)
 
-[Attention on Attention](images/AoA/aoa.png)
+![Attention on Attention](images/AoA/aoa.png)
 
 Firstly proposed by [Huang et al.](https://arxiv.org/pdf/1908.06954.pdf) to enhance the correlation between query vector and output vector of the [original transformer](https://arxiv.org/pdf/1706.03762) layer.
 
