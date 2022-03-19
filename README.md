@@ -22,8 +22,8 @@ Firstly proposed by [Huang et al.](https://arxiv.org/pdf/1908.06954.pdf) to enha
 
 ### [Object Relation Transformer](https://arxiv.org/pdf/1906.05963.pdf)
 
-![ORT](images/ORT/ORT.jpg)
-![geometric_attention](images/ORT/geometric_attention.png)
+![ORT](images/ORT/ORT.jpg | width=256)
+![geometric_attention](images/ORT/geometric_attention.png | width=256)
 
 Built on top of Bottom-up Attention mechanisms, Object Relation Transformer (ORT) provides its encoder layers geometric information of objects in image for better understading the image.
 
