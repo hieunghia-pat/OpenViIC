@@ -22,6 +22,11 @@ Firstly proposed by [Huang et al.](https://arxiv.org/pdf/1908.06954.pdf) to enha
 
 ### [Object Relation Transformer](https://arxiv.org/pdf/1906.05963.pdf)
 
+![ORT](images/ORT/ORT.jpg)
+![geometric_attention](images/ORT/geometric_attention.png)
+
+Built on top of Bottom-up Attention mechanisms, Object Relation Transformer (ORT) provides its encoder layers geometric information of objects in image for better understading the image.
+
 ### [Meshed-Memory Transformer](https://arxiv.org/pdf/1912.08226.pdf)
 
 ### [RSTNet](https://openaccess.thecvf.com/content/CVPR2021/papers/Zhang_RSTNet_Captioning_With_Adaptive_Attention_on_Visual_and_Non-Visual_Words_CVPR_2021_paper.pdf)
