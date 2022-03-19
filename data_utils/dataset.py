@@ -10,13 +10,20 @@ import numpy as np
 from typing import Dict, List, Tuple, Union
 
 class GridDictionaryDataset(data.Dataset):
-    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None) -> None:
+    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None, tokenizer: Union[str, None] = None) -> None:
+        '''
+            acceptable tokenizers:
+                + None
+                + "spacy"
+                + "pyvi"
+                + "vncorenlp"
+        '''
         super(GridDictionaryDataset, self).__init__()
         with open(json_path, 'r') as file:
             json_data = json.load(file)
 
         # vocab
-        self.vocab = Vocab([json_path]) if vocab is None else vocab
+        self.vocab = Vocab([json_path], tokenizer=tokenizer) if vocab is None else vocab
 
         # captions
         self.image_ids, self.captions_with_image = self.load_json(json_data)
@@ -37,7 +44,7 @@ class GridDictionaryDataset(data.Dataset):
             examples[image["id"]] = []
 
         for ann in json_data["annotations"]:
-            caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token)
+            caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer)
             caption = " ".join(caption[1:-1]) # ignore <bos> and <eos>
             examples[ann["image_id"]].append(caption)
 
@@ -54,7 +61,7 @@ class GridDictionaryDataset(data.Dataset):
         return [caption for caption in self.captions]
 
     def load_feature(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, "r", allow_pickle=False)[:].copy()
 
         return feature
@@ -70,13 +77,13 @@ class GridDictionaryDataset(data.Dataset):
         return len(self.image_ids)
 
 class RegionDictionaryDataset(data.Dataset):
-    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None) -> None:
+    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None, tokenizer: Union[str, None] = None) -> None:
         super(RegionDictionaryDataset, self).__init__()
         with open(json_path, 'r') as file:
             json_data = json.load(file)
 
         # vocab
-        self.vocab = Vocab([json_path]) if vocab is None else vocab
+        self.vocab = Vocab([json_path], tokenizer=tokenizer) if vocab is None else vocab
 
         # captions
         self.image_ids, self.captions_with_image = self.load_json(json_data)
@@ -97,7 +104,7 @@ class RegionDictionaryDataset(data.Dataset):
             examples[image["id"]] = []
 
         for ann in json_data["annotations"]:
-            caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token)
+            caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer)
             caption = " ".join(caption[1:-1]) # ignore <bos> and <eos>
             examples[ann["image_id"]].append(caption)
 
@@ -114,13 +121,13 @@ class RegionDictionaryDataset(data.Dataset):
         return [caption for caption in self.captions]
 
     def load_feature(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]["features"].copy()
 
         return feature
 
     def load_boxes(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         boxes = np.load(feature_file, allow_pickle=True)[()]["boxes"].copy()
 
         return boxes
@@ -137,13 +144,13 @@ class RegionDictionaryDataset(data.Dataset):
         return len(self.image_ids)
 
 class GridFeatureDataset(data.Dataset):
-    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None) -> None:
+    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None, tokenizer: Union[str, None] = None) -> None:
         super(GridFeatureDataset, self).__init__()
         with open(json_path, 'r') as file:
             json_data = json.load(file)
 
         # vocab
-        self.vocab = Vocab([json_path]) if vocab is None else vocab
+        self.vocab = Vocab([json_path], tokenizer=tokenizer) if vocab is None else vocab
 
         # captions
         self.annotations = self.load_json(json_data)
@@ -164,13 +171,11 @@ class GridFeatureDataset(data.Dataset):
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    annotation = {
-                        "caption": preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token),
+                    annotations.append({
+                        "caption": preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer),
                         "image_id": ann["image_id"]
-                    }
+                    })
                     break
-
-            annotations.append(annotation)
 
         return annotations
     
@@ -179,7 +184,7 @@ class GridFeatureDataset(data.Dataset):
         return [ann["caption"] for ann in self.annotations]
 
     def load_feature(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, "r", allow_pickle=False)[:].copy()
 
         return feature
@@ -194,13 +199,13 @@ class GridFeatureDataset(data.Dataset):
         return len(self.annotations)
 
 class RegionFeatureDataset(data.Dataset):
-    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None) -> None:
+    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None, tokenizer: Union[str, None] = None) -> None:
         super(RegionFeatureDataset, self).__init__()
         with open(json_path, 'r') as file:
             json_data = json.load(file)
 
         # vocab
-        self.vocab = Vocab([json_path]) if vocab is None else vocab
+        self.vocab = Vocab([json_path], tokenizer=tokenizer) if vocab is None else vocab
 
         # captions
         self.annotations = self.load_json(json_data)
@@ -222,7 +227,7 @@ class RegionFeatureDataset(data.Dataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     annotation = {
-                        "caption": preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token),
+                        "caption": preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer),
                         "image_id": ann["image_id"]
                     }
                     break
@@ -236,13 +241,13 @@ class RegionFeatureDataset(data.Dataset):
         return [ann["caption"] for ann in self.annotations]
 
     def load_feature(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]["features"].copy()
 
         return feature
 
     def load_boxes(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join(config.feature_path, f"{image_id}.npy")
+        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         boxes = np.load(feature_file, allow_pickle=True)[()]["boxes"].copy()
 
         return boxes

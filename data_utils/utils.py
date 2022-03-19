@@ -1,8 +1,52 @@
 import torch
 from torchvision import transforms
 import re
+from typing import Union
 
-def preprocess_caption(caption, bos_token, eos_token):
+def get_tokenizer(tokenizer):
+    if callable(tokenizer):
+        return tokenizer
+    elif tokenizer is None:
+        return lambda s: s 
+    elif tokenizer == "pyvi":
+        try:
+            from pyvi import ViTokenizer
+            return ViTokenizer.tokenize
+        except ImportError:
+            print("Please install PyVi package. "
+                  "See the docs at https://github.com/trungtv/pyvi for more information.")
+    elif tokenizer == "spacy":
+        try:
+            from spacy.lang.vi import Vietnamese
+            return Vietnamese()
+        except ImportError:
+            print("Please install SpaCy and the SpaCy Vietnamese tokenizer. "
+                  "See the docs at https://gitlab.com/trungtv/vi_spacy for more information.")
+            raise
+        except AttributeError:
+            print("Please install SpaCy and the SpaCy Vietnamese tokenizer. "
+                  "See the docs at https://gitlab.com/trungtv/vi_spacy for more information.")
+            raise
+    elif tokenizer == "vncorenlp":
+        try:
+            from vncorenlp import VnCoreNLP
+            annotator = VnCoreNLP("vncorenlp/VnCoreNLP-1.1.1.jar", annotators="wseg", max_heap_size='-Xmx500m')
+
+            def tokenize(s: str):
+                words = annotator.tokenize(s)[0]
+                return " ".join(words)
+
+            return tokenize
+        except ImportError:
+            print("Please install VnCoreNLP package. "
+                  "See the docs at https://github.com/vncorenlp/VnCoreNLP for more information.")
+            raise
+        except AttributeError:
+            print("Please install VnCoreNLP package. "
+                  "See the docs at https://github.com/vncorenlp/VnCoreNLP for more information.")
+            raise
+
+def preprocess_caption(caption, bos_token, eos_token, tokenizer: Union[str, None]):
     caption = re.sub(r"[“”]", "\"", caption)
     caption = re.sub(r"!", " ! ", caption)
     caption = re.sub(r"\?", " ? ", caption)
@@ -21,6 +65,8 @@ def preprocess_caption(caption, bos_token, eos_token):
     caption = re.sub(r"\$", " $ ", caption)
     caption = re.sub(r"\&", " & ", caption)
     caption = re.sub(r"\*", " * ", caption)
+    # tokenize the caption
+    caption = get_tokenizer(tokenizer)(caption)
     caption = " ".join(caption.strip().split()) # remove duplicated spaces
     tokens = caption.strip().split()
     
@@ -125,3 +171,15 @@ def dict_region_feature_collate_fn(samples):
     boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
 
     return features, boxes, captions
+
+def dict_grid_feature_collate_fn(samples):
+    features = []
+    captions = []
+    for sample in samples:
+        feature, caption = sample
+        features.append(torch.tensor(feature))
+        captions.append(caption)
+
+    features = torch.cat([feature.unsqueeze_(0) for feature in features], dim=0)
+
+    return features, captions

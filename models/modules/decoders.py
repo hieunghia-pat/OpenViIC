@@ -198,7 +198,7 @@ class MeshedDecoder(Module):
             mask_self_attention = self.running_mask_self_attention
 
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(input.device)  # (b_s, seq_len)
-        seq = seq.masked_fill(mask_queries == False, 0)
+        seq = seq.masked_fill(mask_queries, 0)
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq

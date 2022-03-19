@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from data_utils.typing import *
+from data_utils.types import *
 import copy
 
 def get_batch_size(x: TensorOrSequence) -> int:

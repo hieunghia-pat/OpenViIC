@@ -6,7 +6,7 @@ from collections import defaultdict, Counter
 import logging
 import six
 import json
-from typing import List
+from typing import List, Union
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class Vocab(object):
         itos: A list of token strings indexed by their numerical identifiers.
     """
     def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", eos_token="<eos>", padding_token="<pad>",
-                 unk_token="<unk>", vectors=None, unk_init=unk_init, vectors_cache=None):
+                 unk_token="<unk>", vectors=None, unk_init=unk_init, vectors_cache=None, tokenizer: Union[str, None]=None):
         """Create a Vocab object from a collections.Counter.
         Arguments:
             counter: collections.Counter object holding the frequencies of
@@ -41,6 +41,7 @@ class Vocab(object):
         self.bos_token = bos_token
         self.eos_token = eos_token
         self.unk_token = unk_token
+        self.tokenizer = tokenizer
 
         self.make_vocab(json_dirs)
         counter = self.freqs.copy()
@@ -84,7 +85,7 @@ class Vocab(object):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                caption = preprocess_caption(ann["caption"], self.bos_token, self.eos_token)
+                caption = preprocess_caption(ann["caption"], self.bos_token, self.eos_token, self.tokenizer)
                 self.freqs.update(caption)
                 if len(caption) > self.max_caption_length:
                     self.max_caption_length = len(caption)

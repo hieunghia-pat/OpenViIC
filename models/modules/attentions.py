@@ -397,7 +397,7 @@ class MultiHeadAttention(Module):
         if self.use_aoa:
             aoa_input = torch.cat([queries, out], dim=-1)
             i = self.informative_attention(aoa_input)
-            g = F.sigmoid(self.gated_attention(aoa_input))
+            g = torch.sigmoid(self.gated_attention(aoa_input))
             out = i * g
             
         return out
