@@ -158,7 +158,7 @@ if __name__ == '__main__':
 
     # Creating vocabulary and dataset
     if not os.path.isfile(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl")):
-        vocab = Vocab([config.train_json_path, config.val_json_path, config.test_json_path])
+        vocab = Vocab([config.train_json_path, config.val_json_path])
         pickle.dump(vocab, open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "wb"))
     else:
         vocab = pickle.load(open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "rb"))
