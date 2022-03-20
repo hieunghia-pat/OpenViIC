@@ -12,7 +12,7 @@ xe_most = 20
 min_freq = 1
 
 # model configuration
-model_name = "m2-transformer"
+model_name = "ort_using_region"
 total_memory = 40
 nhead = 8
 nlayers = 3
@@ -25,9 +25,7 @@ dropout = .1
 beam_size = 5
 
 # dataset configuration
-train_json_path = "features/region_features/UIT-ViIC/uitviic_captions_train2017.json"
-val_json_path = "features/region_features/UIT-ViIC/uitviic_captions_val2017.json"
-test_json_path = "features/region_features/UIT-ViIC/uitviic_captions_test2017.json"
-feature_path = "features/region_features/UIT-ViIC/faster_rcnn"
+train_json_path = "features/annotations/vieCap4H/viecap4h_captions_train2017.json"
+val_json_path = "features/annotations/vieCap4H/viecap4h_captions_val2017.json"
 batch_size = 16
 workers = 2
