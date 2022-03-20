@@ -27,5 +27,6 @@ beam_size = 5
 # dataset configuration
 train_json_path = "features/annotations/vieCap4H/viecap4h_captions_train2017.json"
 val_json_path = "features/annotations/vieCap4H/viecap4h_captions_val2017.json"
+feature_path = "features/region_features/UIT-ViIC/faster_rcnn"
 batch_size = 16
 workers = 2
