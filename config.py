@@ -27,6 +27,12 @@ beam_size = 5
 # dataset configuration
 train_json_path = "features/annotations/vieCap4H/viecap4h_captions_train2017.json"
 val_json_path = "features/annotations/vieCap4H/viecap4h_captions_val2017.json"
+public_test_json_path = "features/annotations/vieCap4H/viecap4h_captions_public_test2017.json"
+private_test_json_path = "features/annotations/vieCap4H/viecap4h_captions_private_test2017.json"
 feature_path = "features/region_features/UIT-ViIC/faster_rcnn"
 batch_size = 16
 workers = 2
+
+# sample submission configuration
+sample_public_test_json_data = "sample_public_test_submission.json"
+sample_private_test_json_data = "sample_private_test_submission.json"

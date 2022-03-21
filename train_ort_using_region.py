@@ -10,6 +10,8 @@ from models.modules.attentions import AugmentedGeometryScaledDotProductAttention
 from models.modules.encoders import Encoder
 from models.modules.decoders import Decoder
 
+from result_utils import get_predictions, convert_results
+
 import torch
 from torch.utils import data
 from torch.optim import Adam
@@ -169,7 +171,9 @@ if __name__ == '__main__':
 
     # creating dictionary dataset
     train_dict_dataset = RegionDictionaryDataset(config.train_json_path, config.feature_path, vocab) # for training with self-critical learning
-    val_dict_dataset = RegionDictionaryDataset(config.val_json_path, config.feature_path, vocab) # for calculating metrics on validation set
+    val_dict_dataset = RegionDictionaryDataset(config.val_json_path, config.feature_path, vocab) # for calculating metricsn validation set
+    public_test_dict_dataset = RegionDictionaryDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
+    private_test_dict_dataset = RegionDictionaryDataset(config.private_test_json_path, config.feature_path, vocab=vocab)
 
     # Defining the Object Relation Transformer method
     encoder = Encoder(N=config.nlayers, padding_idx=vocab.padding_idx, d_model=config.d_model, d_k=config.d_k, d_v=config.d_v,
@@ -315,6 +319,10 @@ if __name__ == '__main__':
 
         if best:
             copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
+            public_test_results = get_predictions(model, public_test_dict_dataset, vocab=vocab)
+            convert_results(config.sample_public_test_json_data, public_test_dict_dataset, split="public")
+            private_test_results = get_predictions(model, private_test_dict_dataset, vocab=vocab)
+            convert_results(config.private_test_json_path, private_test_results, split="private")
 
         if exit_train:
             break
