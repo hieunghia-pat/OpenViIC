@@ -34,5 +34,5 @@ batch_size = 16
 workers = 2
 
 # sample submission configuration
-sample_public_test_json_data = "sample_public_test_submission.json"
-sample_private_test_json_data = "sample_private_test_submission.json"
+sample_public_test_json_path = "sample_public_test_submission.json"
+sample_private_test_json_path = "sample_private_test_submission.json"

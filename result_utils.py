@@ -20,16 +20,15 @@ if torch.cuda.is_available():
 else:
     device = "cpu"
 
-def get_predictions(model: Transformer, dataset: data.Dataset, vocab: Vocab):
+def get_predictions_region_feature(model: Transformer, dataset: data.Dataset, vocab: Vocab):
     model.eval()
     results = []
-    with tqdm(desc='Evaluation ', unit='it', total=len(dataset)) as pbar:
-        for it, (image_id, filename, feature, caps_gt) in enumerate(dataset):
-            bs, c, h, w = feature.shape
-            feature = feature.reshape(bs, -1, c)
-            feature = feature.to(device)
+    with tqdm(desc='Evaluating: ', unit='it', total=len(dataset)) as pbar:
+        for it, (image_id, filename, feature, boxes, caps_gt) in enumerate(dataset):
+            feature = torch.tensor(feature).unsqueeze(0).to(device)
+            boxes = torch.tensor(boxes).unsqueeze(0).to(device)
             with torch.no_grad():
-                out, _ = model.beam_search(feature, grid_size=(h, w), max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
+                out, _ = model.beam_search(feature, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
                                             beam_size=config.beam_size, out_size=1)
             caps_gen = vocab.decode_caption(out, join_words=False)
             gens = []
@@ -51,7 +50,7 @@ def get_predictions(model: Transformer, dataset: data.Dataset, vocab: Vocab):
 
 def convert_results(sample_submisison_json, results, split="public"):
     sample_json_data = json.load(open(sample_submisison_json))
-    for sample_item in tqdm(sample_json_data):
+    for sample_item in tqdm(sample_json_data, desc="Converting results: "):
         for item in results:
             if sample_item["id"] == item["filename"]:
                 sample_item["captions"] = item["gen"][0]

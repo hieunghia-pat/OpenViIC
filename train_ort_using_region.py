@@ -10,7 +10,7 @@ from models.modules.attentions import AugmentedGeometryScaledDotProductAttention
 from models.modules.encoders import Encoder
 from models.modules.decoders import Decoder
 
-from result_utils import get_predictions, convert_results
+from result_utils import get_predictions, convert_results, get_predictions_region_feature
 
 import torch
 from torch.utils import data
@@ -319,10 +319,10 @@ if __name__ == '__main__':
 
         if best:
             copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
-            public_test_results = get_predictions(model, public_test_dict_dataset, vocab=vocab)
-            convert_results(config.sample_public_test_json_data, public_test_dict_dataset, split="public")
-            private_test_results = get_predictions(model, private_test_dict_dataset, vocab=vocab)
-            convert_results(config.private_test_json_path, private_test_results, split="private")
+            public_test_results = get_predictions_region_feature(model, public_test_dict_dataset, vocab=vocab)
+            convert_results(config.sample_public_test_json_path, public_test_results, split="public")
+            private_test_results = get_predictions_region_feature(model, private_test_dict_dataset, vocab=vocab)
+            convert_results(config.sample_private_test_json_path, private_test_results, split="private")
 
         if exit_train:
             break

@@ -153,7 +153,7 @@ def dict_region_feature_collate_fn(samples):
     captions = []
     max_seq_len = 0
     for sample in samples:
-        feature, box, caption = sample
+        _, _, feature, box, caption = sample
         if max_seq_len < feature.shape[0]:
             max_seq_len = feature.shape[0]
         features.append(torch.tensor(feature))
@@ -176,7 +176,7 @@ def dict_grid_feature_collate_fn(samples):
     features = []
     captions = []
     for sample in samples:
-        feature, caption = sample
+        _, _, feature, caption = sample
         features.append(torch.tensor(feature))
         captions.append(caption)
 

@@ -26,7 +26,7 @@ class GridDictionaryDataset(data.Dataset):
         self.vocab = Vocab([json_path], tokenizer=tokenizer) if vocab is None else vocab
 
         # captions
-        self.image_ids, self.captions_with_image = self.load_json(json_data)
+        self.image_ids, self.filenames, self.captions_with_image = self.load_json(json_data)
 
         # images
         self.image_features_path = image_features_path
@@ -40,8 +40,10 @@ class GridDictionaryDataset(data.Dataset):
 
     def load_json(self, json_data: Dict) -> List[Dict]:
         examples = {}
+        filenames = {}
         for image in json_data["images"]:
             examples[image["id"]] = []
+            filenames[image["id"]] = image["file_name"]
 
         for ann in json_data["annotations"]:
             caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer)
@@ -54,7 +56,7 @@ class GridDictionaryDataset(data.Dataset):
             image_ids.append(image_id)
             captions_with_image.append(captions)
 
-        return image_ids, captions_with_image
+        return image_ids, list(filenames.values()), captions_with_image
     
     @property
     def captions(self) -> List[str]:
@@ -70,8 +72,9 @@ class GridDictionaryDataset(data.Dataset):
         image_id = self.image_ids[idx]
         features = self.load_feature(image_id)
         captions = self.captions_with_image[idx]
+        filename = self.filenames[idx]
 
-        return features, captions
+        return image_id, filename, features, captions
 
     def __len__(self) -> int:
         return len(self.image_ids)
@@ -86,7 +89,7 @@ class RegionDictionaryDataset(data.Dataset):
         self.vocab = Vocab([json_path], tokenizer=tokenizer) if vocab is None else vocab
 
         # captions
-        self.image_ids, self.captions_with_image = self.load_json(json_data)
+        self.image_ids, self.filenames, self.captions_with_image = self.load_json(json_data)
 
         # images
         self.image_features_path = image_features_path
@@ -100,8 +103,10 @@ class RegionDictionaryDataset(data.Dataset):
 
     def load_json(self, json_data: Dict) -> List[Dict]:
         examples = {}
+        filenames = {}
         for image in json_data["images"]:
             examples[image["id"]] = []
+            filenames[image["id"]] = image["file_name"]
 
         for ann in json_data["annotations"]:
             caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer)
@@ -114,7 +119,7 @@ class RegionDictionaryDataset(data.Dataset):
             image_ids.append(image_id)
             captions_with_image.append(captions)
 
-        return image_ids, captions_with_image
+        return image_ids, list(filenames.values()), captions_with_image
     
     @property
     def captions(self) -> List[str]:
@@ -134,11 +139,12 @@ class RegionDictionaryDataset(data.Dataset):
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, List[str]]:
         image_id = self.image_ids[idx]
+        filename = self.filenames[idx]
         features = self.load_feature(image_id)
         boxes = self.load_boxes(image_id)
         captions = self.captions_with_image[idx]
 
-        return features, boxes, captions
+        return image_id, filename, features, boxes, captions
 
     def __len__(self) -> int:
         return len(self.image_ids)
