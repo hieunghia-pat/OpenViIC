@@ -172,6 +172,8 @@ if __name__ == '__main__':
     # creating dictionary dataset
     train_dict_dataset = RegionDictionaryDataset(config.train_json_path, config.feature_path, vocab) # for training with self-critical learning
     val_dict_dataset = RegionDictionaryDataset(config.val_json_path, config.feature_path, vocab) # for calculating metrics on validation set
+    public_test_dict_dataset = RegionDictionaryDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
+    private_test_dict_dataset = RegionDictionaryDataset(config.private_test_json_path, config.feature_path, vocab=vocab)
 
     # Defining the Object Relation Transformer method
     encoder = Encoder(N=config.nlayers, padding_idx=vocab.padding_idx, d_model=config.d_model, d_k=config.d_k, d_v=config.d_v,
