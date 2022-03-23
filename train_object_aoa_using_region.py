@@ -10,6 +10,8 @@ from models.modules.attentions import AugmentedGeometryScaledDotProductAttention
 from models.modules.encoders import Encoder
 from models.modules.decoders import Decoder
 
+from result_utils import *
+
 import torch
 from torch.utils import data
 from torch.optim import Adam
@@ -166,6 +168,8 @@ if __name__ == '__main__':
     # creating iterable dataset
     train_dataset = RegionFeatureDataset(config.train_json_path, config.feature_path, vocab) # for training with cross-entropy loss
     val_dataset = RegionFeatureDataset(config.val_json_path, config.feature_path, vocab) # for calculating evaluation loss
+    public_test_dict_dataset = RegionDictionaryDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
+    private_test_dict_dataset = RegionDictionaryDataset(config.private_test_json_path, config.feature_path, vocab=vocab)
 
     # creating dictionary dataset
     train_dict_dataset = RegionDictionaryDataset(config.train_json_path, config.feature_path, vocab) # for training with self-critical learning
@@ -316,6 +320,10 @@ if __name__ == '__main__':
 
         if best:
             copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
+            public_test_results = get_predictions_region_feature(model, public_test_dict_dataset, vocab=vocab)
+            convert_results(config.sample_public_test_json_path, public_test_results, split="public")
+            private_test_results = get_predictions_region_feature(model, private_test_dict_dataset, vocab=vocab)
+            convert_results(config.sample_private_test_json_path, private_test_results, split="private")
 
         if exit_train:
             break
