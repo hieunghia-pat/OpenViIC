@@ -285,7 +285,7 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         :param queries: Queries (b_s, nq, d_model)
         :param keys: Keys (b_s, nk, d_model)
         :param values: Values (b_s, nk, d_model)
-        :param language_signals: Language signals (b_s, nq, d_model)
+        :param language_signals: Language signals (b_s, ns, d_model)
         :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
         :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
         :return:
@@ -311,8 +311,6 @@ class AdaptiveScaledDotProductAttention(nn.Module):
 
         combined_attn = torch.cat([attn, language_attn.unsqueeze(-1)], dim=-1)     # (b_s, h, nq, nk + 1)
         combined_attn = [torch.softmax(combined_attn[:, :, i, :].unsqueeze(2), dim=-1) for i in range(nq)] # [ (b_s, h, 1, nk + 1) ]
-        # if use dropout
-        # combined_att = [self.dropout(item) for item in combined_att]
 
         combined_v = [torch.cat([v, s[:, :, i, :].unsqueeze(2)], 2) for i in range(nq)] # [ (b_s, h, nk + 1, d_v) ]
 

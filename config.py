@@ -10,6 +10,11 @@ refine_epoch_rl = 28
 xe_least = 15
 xe_most = 20
 min_freq = 1
+language_model=None # PhoBERT
+                    # BARTPho
+                    # GPT3
+pretrained_language_model = 'bert-base-uncased'
+language_model_hidden_size = 768
 
 # model configuration
 model_name = "ort_using_region"
@@ -29,9 +34,14 @@ train_json_path = "features/annotations/vieCap4H/viecap4h_captions_train2017.jso
 val_json_path = "features/annotations/vieCap4H/viecap4h_captions_val2017.json"
 public_test_json_path = "features/annotations/vieCap4H/viecap4h_captions_public_test2017.json"
 private_test_json_path = "features/annotations/vieCap4H/viecap4h_captions_private_test2017.json"
-feature_path = "features/region_features/UIT-ViIC/faster_rcnn"
+feature_path = "features/region_features/vieCap4H/faster_rcnn"
 batch_size = 16
 workers = 2
+word_embedding = None   # "fasttext.vi.300d"
+                        # "phow2v.syllable.100d"
+                        # "phow2v.syllable.300d"
+                        # "phow2v.word.100d"
+                        # "phow2v.word.300d"
 
 # sample submission configuration
 sample_public_test_json_path = "sample_public_test_submission.json"
