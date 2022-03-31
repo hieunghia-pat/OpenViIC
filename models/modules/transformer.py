@@ -1,13 +1,18 @@
 import torch
 from torch import nn
 from models.captioning_model import CaptioningModel
+from models.modules.embeddings import SinusoidPositionalEmbedding
 
 class Transformer(CaptioningModel):
-    def __init__(self, bos_idx, encoder, decoder):
+    def __init__(self, bos_idx, encoder, decoder, use_img_pos=False):
         super(Transformer, self).__init__()
         self.bos_idx = bos_idx
         self.encoder = encoder
         self.decoder = decoder
+        self.use_img_pos = use_img_pos
+        if self.use_img_pos:
+            self.sinusoid_pos_embedding = SinusoidPositionalEmbedding(decoder.d_model // 2, normalize=True)
+
         self.register_state('enc_output', None)
         self.register_state('mask_enc', None)
         self.init_weights()

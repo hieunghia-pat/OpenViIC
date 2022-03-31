@@ -17,7 +17,9 @@ class EncoderLayer(nn.Module):
                                         attention_module_kwargs=attention_module_kwargs)
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
 
-    def forward(self, queries, keys, values, boxes=None, grid_size=None, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, grid_size=None, positional_emb=None, attention_mask=None, attention_weights=None):
+        queries += positional_emb
+        keys += positional_emb
         att = self.mhatt(queries, keys, values, boxes=boxes, grid_size=grid_size, attention_mask=attention_mask, attention_weights=attention_weights)
         ff = self.pwff(att)
         return ff
@@ -40,14 +42,14 @@ class Encoder(nn.Module):
                                      for _ in range(N)])
         self.padding_idx = padding_idx
 
-    def forward(self, input, boxes=None, grid_size=None, attention_weights=None):
+    def forward(self, input, boxes=None, grid_size=None, positional_emb=None, attention_weights=None):
         # input (b_s, seq_len, d_in)
         attention_mask = (torch.sum(input, -1) == self.padding_idx).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
         out = F.relu(self.fc(input))
         out = self.dropout(out)
         out = self.layer_norm(out)
         for layer in self.layers:
-            out = layer(out, out, out, boxes, grid_size, attention_mask, attention_weights)
+            out = layer(out, out, out, boxes, grid_size, positional_emb, attention_mask, attention_weights)
 
         return out, attention_mask
 
@@ -69,7 +71,7 @@ class MultiLevelEncoder(nn.Module):
                                      for _ in range(N)])
         self.padding_idx = padding_idx
 
-    def forward(self, input, boxes=None, grid_size=None, attention_weights=None):
+    def forward(self, input, boxes=None, grid_size=None, positional_emb=None, attention_weights=None):
         # input (b_s, seq_len, d_in)
         # blank features are added by zero tensors
         attention_mask = (torch.sum(input, -1) == self.padding_idx).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
@@ -79,7 +81,7 @@ class MultiLevelEncoder(nn.Module):
         out = self.dropout(out)
         out = self.layer_norm(out)
         for layer in self.layers:
-            out = layer(out, out, out, boxes, grid_size, attention_mask, attention_weights)
+            out = layer(out, out, out, boxes, grid_size, positional_emb, attention_mask, attention_weights)
             outs.append(out.unsqueeze(1))
 
         outs = torch.cat(outs, dim=1)
