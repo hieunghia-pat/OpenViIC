@@ -245,7 +245,7 @@ class AdaptiveDecoder(Module):
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).byte())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
-    def forward(self, input, encoder_output, mask_encoder, pos):
+    def forward(self, input, encoder_output, mask_encoder):
         # input (b_s, seq_len)
         b_s, seq_len = input.shape[:2]
         mask_queries = (input != self.padding_idx).unsqueeze(-1).float()  # (b_s, seq_len, 1)

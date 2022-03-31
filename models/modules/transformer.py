@@ -11,7 +11,7 @@ class Transformer(CaptioningModel):
         self.decoder = decoder
         self.use_img_pos = use_img_pos
         if self.use_img_pos:
-            self.sinusoid_pos_embedding = SinusoidPositionalEmbedding(decoder.d_model // 2, normalize=True)
+            self.sinusoid_pos_embedding = SinusoidPositionalEmbedding(encoder.d_model, normalize=True)
 
         self.register_state('enc_output', None)
         self.register_state('mask_enc', None)
@@ -27,7 +27,8 @@ class Transformer(CaptioningModel):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, input, tokens, boxes=None, grid_size=None):
-        enc_output, mask_enc = self.encoder(input, boxes, grid_size)
+        pos_emb = self.sinusoid_pos_embedding(input) if self.use_img_pos else None
+        enc_output, mask_enc = self.encoder(input, boxes, grid_size, positional_emb=pos_emb)
         dec_output = self.decoder(tokens, enc_output, mask_encoder=mask_enc)
         return dec_output
 
