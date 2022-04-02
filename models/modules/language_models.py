@@ -16,7 +16,7 @@ class BERTModel(Module):
         self.padding_idx = padding_idx
         self.d_model = d_model
 
-        self.language_model = BertModel.from_pretrained('bert-base-uncased', return_dict=True)
+        self.language_model = BertModel.from_pretrained(pretrained_language_model, return_dict=True)
         self.language_model.config.vocab_size = vocab_size
         self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
 
@@ -60,7 +60,8 @@ class BERTModel(Module):
         language_feature = self.proj_to_caption_model(bert_output.last_hidden_state)
         language_feature = language_feature + self.pos_emb(seq)
 
-        language_feature = self.encoder_layer(language_feature, mask_queries, mask_self_attention)
+        # fine tuning the pretrained BERT-based model
+        language_feature = self.encoder_layer(language_feature, language_feature, language_feature, attention_mask=mask_self_attention)
 
         logits = self.proj_to_vocab(language_feature)
         out = F.log_softmax(logits, dim=-1)
