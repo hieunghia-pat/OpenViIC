@@ -20,13 +20,19 @@ if torch.cuda.is_available():
 else:
     device = "cpu"
 
-def get_predictions_region_feature(model: Transformer, dataset: data.Dataset, vocab: Vocab):
+def get_predictions_region_feature(model: Transformer, dataset: data.Dataset, vocab: Vocab, use_bbox=True):
     model.eval()
     results = []
     with tqdm(desc='Evaluating: ', unit='it', total=len(dataset)) as pbar:
-        for it, (image_id, filename, feature, boxes, caps_gt) in enumerate(dataset):
-            feature = torch.tensor(feature).unsqueeze(0).to(device)
-            boxes = torch.tensor(boxes).unsqueeze(0).to(device)
+        for it, sample in enumerate(dataset):
+            if use_bbox:
+                image_id, filename, feature, boxes, caps_gt = sample
+                feature = torch.tensor(feature).unsqueeze(0).to(device)
+                boxes = torch.tensor(boxes).unsqueeze(0).to(device)
+            else:
+                image_id, filename, feature, _, caps_gt = sample
+                feature = torch.tensor(feature).unsqueeze(0).to(device)
+                boxes = None
             with torch.no_grad():
                 out, _ = model.beam_search(feature, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
                                             beam_size=config.beam_size, out_size=1)
