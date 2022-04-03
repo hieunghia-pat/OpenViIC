@@ -12,7 +12,9 @@ This is an open-source repository for researching Vietnamese Image Captioning ta
 
 [Bottom-up and Top-down attention](https://arxiv.org/abs/1707.07998) is an effective way to ignore unnecessary regions of the images, focus the deep learning methods to important regions for better image understanding.
 
-### Grid-based visual feature
+### [Grid-based visual feature](https://arxiv.org/pdf/2001.03615.pdf)
+
+[Huaizu et al.](https://arxiv.org/pdf/2001.03615.pdf) argued that the region-based features used in Bottom-up Attention requires too much resource to compute but there is no emperical study on the effect of grid-based features compared to region-based features. Hence [Huaizu et al.](https://arxiv.org/pdf/2001.03615.pdf) do experiments on various tasks and architectures to prove that the utilization of grid-based features can have comparable performance to region-based features on various architectures while reduce significantly resource needed to create region-based features, which leads to faster inference.
 
 ### [Attention on Attention Network](https://arxiv.org/pdf/1908.06954.pdf)
 
