@@ -35,7 +35,7 @@ Built on top of Buttom-up Attention, Meshed-Memory Transformer uses augmented me
 
 ### [RSTNet](https://openaccess.thecvf.com/content/CVPR2021/papers/Zhang_RSTNet_Captioning_With_Adaptive_Attention_on_Visual_and_Non-Visual_Words_CVPR_2021_paper.pdf)
 
-<img src="images/rstnet/RSTNet.png" width="700" />
+<img src="images/RSTNet/RSTNet.png" width="700" />
 
 Built on top of the Object Relation Transformer method but using [grid-based features](https://arxiv.org/pdf/2001.03615.pdf) instead of region-based features. Moreover, RSTNet uses an external pretrained language model to make the second attention stage to enhance the correlation between latent objects image with visual/non-visual generated words.
 
