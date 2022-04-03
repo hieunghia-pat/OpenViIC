@@ -47,7 +47,7 @@ class GridDictionaryDataset(data.Dataset):
 
         for ann in json_data["annotations"]:
             caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer)
-            caption = " ".join(caption[1:-1]) # ignore <bos> and <eos>
+            caption = " ".join(caption)
             examples[ann["image_id"]].append(caption)
 
         image_ids = []
@@ -110,7 +110,7 @@ class RegionDictionaryDataset(data.Dataset):
 
         for ann in json_data["annotations"]:
             caption = preprocess_caption(ann["caption"], self.vocab.tokenizer)
-            caption = " ".join(caption[1:-1]) # ignore <bos> and <eos>
+            caption = " ".join(caption)
             examples[ann["image_id"]].append(caption)
 
         image_ids = []
@@ -259,8 +259,9 @@ class RegionFeatureDataset(data.Dataset):
         return boxes
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, str]:
-        caption = self.vocab.encode_caption(self.annotations[idx]["caption"][:-1])
-        shifted_right_caption = self.vocab.encode_caption(self.annotations[idx]["caption"][1:])
+        caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
+        shifted_right_caption = caption[1:]
+        caption = torch.where(caption == self.vocab.eos_idx, self.vocab.padding_idx, caption) # remove eos_token in caption
         visual = self.load_feature(self.annotations[idx]["image_id"])
         boxes = self.load_boxes(self.annotations[idx]["image_id"])
 

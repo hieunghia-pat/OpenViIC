@@ -123,7 +123,7 @@ class Vocab(object):
                 if len(caption) + 2 > self.max_caption_length:
                     self.max_caption_length = len(caption) + 2
 
-    def _encode_caption(self, caption: str) -> torch.Tensor:
+    def _encode_caption(self, caption: List[str]) -> torch.Tensor:
         """ Turn a caption into a vector of indices and a question length """
         vec = torch.ones(self.max_caption_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + caption + [self.eos_token]):
@@ -136,18 +136,20 @@ class Vocab(object):
         '''
         captions = []
         for vec in caption_vecs:
+            caption = " ".join([self.itos[idx] for idx in vec.tolist() if idx not in self.specials])
+            caption = caption.replace("_", " ")
             if join_words:
-                captions.append(" ".join([self.itos[idx] for idx in vec.tolist() 
-                                            if idx not in self.specials]))
+                captions.append(caption)
             else:
-                captions.append([self.itos[idx] for idx in vec.tolist()
-                                            if idx not in self.specials])
+                captions.append(caption.strip().split())
 
         return captions
 
-    def encode_caption(self, caption: str) -> torch.Tensor:
+    def encode_caption(self, caption: List[str]) -> torch.Tensor:
         if self.token_encoder is not None: # use pretrained language model's tokenizer
-            return self.token_encoder(caption, return_tensors="pt", padding=True)["input_ids"]
+            return self.token_encoder(" ".join(caption), padding="max_length", 
+                                        max_length=self.max_caption_length, 
+                                        truncation=True, return_tensors="pt")["input_ids"].squeeze(0)
         else: # use _encode_caption tokenizer
             return self._encode_caption(caption)
 
@@ -156,7 +158,8 @@ class Vocab(object):
             list_captions = caption_vecs.tolist()
             decoded_captions = []
             for caption in list_captions:
-                decoded_caption = self.token_encoder.decode(caption).split()
+                decoded_caption: str = self.token_encoder.decode(caption)
+                decoded_caption = decoded_caption.replace("_", " ").strip().split()
                 decoded_caption = [token for token in decoded_caption if token not in self.specials]
                 if join_words:
                     decoded_caption = " ".join(decoded_caption)
