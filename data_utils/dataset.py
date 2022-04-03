@@ -109,7 +109,7 @@ class RegionDictionaryDataset(data.Dataset):
             filenames[image["id"]] = image["file_name"]
 
         for ann in json_data["annotations"]:
-            caption = preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer)
+            caption = preprocess_caption(ann["caption"], self.vocab.tokenizer)
             caption = " ".join(caption[1:-1]) # ignore <bos> and <eos>
             examples[ann["image_id"]].append(caption)
 
@@ -178,7 +178,7 @@ class GridFeatureDataset(data.Dataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     annotations.append({
-                        "caption": preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer),
+                        "caption": preprocess_caption(ann["caption"], self.vocab.tokenizer),
                         "image_id": ann["image_id"]
                     })
                     break
@@ -233,7 +233,7 @@ class RegionFeatureDataset(data.Dataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     annotation = {
-                        "caption": preprocess_caption(ann["caption"], self.vocab.bos_token, self.vocab.eos_token, self.vocab.tokenizer),
+                        "caption": preprocess_caption(ann["caption"], self.vocab.tokenizer),
                         "image_id": ann["image_id"]
                     }
                     break

@@ -1,12 +1,18 @@
 import torch
+
 from data_utils.vector import Vectors
 from data_utils.vector import pretrained_aliases
 from data_utils.utils import preprocess_caption, unk_init
+
+from transformers import AutoTokenizer
+
 from collections import defaultdict, Counter
 import logging
 import six
 import json
 from typing import List, Union
+
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +26,8 @@ class Vocab(object):
         itos: A list of token strings indexed by their numerical identifiers.
     """
     def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", eos_token="<eos>", padding_token="<pad>",
-                 unk_token="<unk>", vectors=None, unk_init=unk_init, vectors_cache=None, tokenizer: Union[str, None]=None):
+                 pretrained_language_model_name=config.pretrained_language_model_name, unk_token="<unk>", vectors=None, 
+                 unk_init=unk_init, vectors_cache=None, tokenizer: Union[str, None]=config.tokenizer):
         """Create a Vocab object from a collections.Counter.
         Arguments:
             counter: collections.Counter object holding the frequencies of
@@ -36,43 +43,69 @@ class Vocab(object):
                 to zero vectors; can be any function that takes in a Tensor and
                 returns a Tensor of the same size. Default: torch.Tensor.zero_
             vectors_cache: directory for cached vectors. Default: '.vector_cache'
-        """ 
-        self.padding_token = padding_token
-        self.bos_token = bos_token
-        self.eos_token = eos_token
-        self.unk_token = unk_token
+        """
+
         self.tokenizer = tokenizer
+        
+        if pretrained_language_model_name is not None:
+            self.token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
+            self.stoi = self.token_encoder.encoder
+            self.itos = self.token_encoder.decoder
 
-        self.make_vocab(json_dirs)
-        counter = self.freqs.copy()
-        min_freq = max(min_freq, 1)
+            self.padding_token = self.token_encoder.pad_token
+            self.bos_token = self.token_encoder.bos_token
+            self.eos_token = self.token_encoder.eos_token
+            self.unk_token = self.token_encoder.unk_token
 
-        specials = [padding_token, bos_token, eos_token, unk_token]
-        self.itos = specials
-        # frequencies of special tokens are not counted when building vocabulary
-        # in frequency order
-        for tok in specials:
-            del counter[tok]
+            self.max_caption_length = 0
+            for json_dir in json_dirs:
+                json_data = json.load(open(json_dir))
+                for ann in json_data["annotations"]:
+                    caption = preprocess_caption(ann["caption"], self.tokenizer)
+                    if len(caption) + 2 > self.max_caption_length:
+                        self.max_caption_length = len(caption) + 2
 
-        max_size = None if max_size is None else max_size + len(self.itos)
+        else:
+            self.token_encoder = None
 
-        # sort by frequency, then alphabetically
-        words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
-        words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
+            self.padding_token = padding_token
+            self.bos_token = bos_token
+            self.eos_token = eos_token
+            self.unk_token = unk_token
 
-        for word, freq in words_and_frequencies:
-            if freq < min_freq or len(self.itos) == max_size:
-                break
-            self.itos.append(word)
+            self.make_vocab(json_dirs)
+            counter = self.freqs.copy()
+        
+            min_freq = max(min_freq, 1)
 
-        self.stoi = defaultdict()
-        # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+            specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
+            self.itos = specials
+            # frequencies of special tokens are not counted when building vocabulary
+            # in frequency order
+            for tok in specials:
+                del counter[tok]
+
+            max_size = None if max_size is None else max_size + len(self.itos)
+
+            # sort by frequency, then alphabetically
+            words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
+            words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
+
+            for word, freq in words_and_frequencies:
+                if freq < min_freq or len(self.itos) == max_size:
+                    break
+                self.itos.append(word)
+
+            self.stoi = defaultdict()
+            # stoi is simply a reverse dict for itos
+            self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
+
+        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
 
         self.vectors = None
         if vectors is not None:
@@ -85,19 +118,19 @@ class Vocab(object):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                caption = preprocess_caption(ann["caption"], self.bos_token, self.eos_token, self.tokenizer)
+                caption = preprocess_caption(ann["caption"], self.tokenizer)
                 self.freqs.update(caption)
-                if len(caption) > self.max_caption_length:
-                    self.max_caption_length = len(caption)
+                if len(caption) + 2 > self.max_caption_length:
+                    self.max_caption_length = len(caption) + 2
 
-    def encode_caption(self, caption) -> torch.Tensor:
+    def _encode_caption(self, caption: str) -> torch.Tensor:
         """ Turn a caption into a vector of indices and a question length """
         vec = torch.ones(self.max_caption_length).long() * self.padding_idx
-        for i, token in enumerate(caption):
+        for i, token in enumerate([self.bos_token] + caption + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
         return vec
 
-    def decode_caption(self, caption_vecs: torch.Tensor, join_words=True) -> List[str]:
+    def _decode_caption(self, caption_vecs: torch.Tensor, join_words=True) -> List[str]:
         '''
             caption_vecs: (bs, max_length)
         '''
@@ -105,12 +138,34 @@ class Vocab(object):
         for vec in caption_vecs:
             if join_words:
                 captions.append(" ".join([self.itos[idx] for idx in vec.tolist() 
-                                            if idx not in [self.padding_idx, self.bos_idx, self.eos_idx, self.unk_idx]]))
+                                            if idx not in self.specials]))
             else:
-                captions.append([self.itos[idx] for idx in vec.tolist() 
-                                            if idx not in [self.padding_idx, self.bos_idx, self.eos_idx, self.unk_idx]])
+                captions.append([self.itos[idx] for idx in vec.tolist()
+                                            if idx not in self.specials])
 
         return captions
+
+    def encode_caption(self, caption: str) -> torch.Tensor:
+        if self.token_encoder is not None: # use pretrained language model's tokenizer
+            return self.tokenizer(caption, return_tensor="pt", padding=True)["input_ids"]
+        else: # use _encode_caption tokenizer
+            return self._encode_caption(caption)
+
+    def decode_caption(self, caption_vecs: torch.Tensor, join_words=True) -> List[str]:
+        if self.token_encoder is not None: # use pretrained language model's tokenizer
+            list_captions = caption_vecs.tolist()
+            decoded_captions = []
+            for caption in list_captions:
+                decoded_caption = self.tokenizer.decode(caption).split()
+                decoded_caption = [token for token in decoded_caption if token not in self.specials]
+                if join_words:
+                    decoded_caption = " ".join(decoded_caption)
+                
+                decoded_captions.append(decoded_caption)
+        else: # use _encode_caption tokenizer
+            decoded_captions = self._decode_caption(caption_vecs, join_words)
+
+        return decoded_captions
 
     def __eq__(self, other):
         if self.freqs != other.freqs:

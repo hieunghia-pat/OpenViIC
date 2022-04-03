@@ -30,7 +30,7 @@ def get_tokenizer(tokenizer):
     elif tokenizer == "vncorenlp":
         try:
             from vncorenlp import VnCoreNLP
-            annotator = VnCoreNLP("vncorenlp/VnCoreNLP-1.1.1.jar", annotators="wseg", max_heap_size='-Xmx500m')
+            annotator = VnCoreNLP("data_utils/vncorenlp/VnCoreNLP-1.1.1.jar", annotators="wseg", max_heap_size='-Xmx500m')
 
             def tokenize(s: str):
                 words = annotator.tokenize(s)[0]
@@ -46,7 +46,7 @@ def get_tokenizer(tokenizer):
                   "See the docs at https://github.com/vncorenlp/VnCoreNLP for more information.")
             raise
 
-def preprocess_caption(caption, bos_token, eos_token, tokenizer: Union[str, None]):
+def preprocess_caption(caption, tokenizer: Union[str, None]):
     caption = re.sub(r"[“”]", "\"", caption)
     caption = re.sub(r"!", " ! ", caption)
     caption = re.sub(r"\?", " ? ", caption)
@@ -70,7 +70,7 @@ def preprocess_caption(caption, bos_token, eos_token, tokenizer: Union[str, None
     caption = " ".join(caption.strip().split()) # remove duplicated spaces
     tokens = caption.strip().split()
     
-    return [bos_token] + tokens + [eos_token]
+    return tokens
 
 def get_transform(target_size):
     return transforms.Compose([

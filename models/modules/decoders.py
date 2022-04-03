@@ -7,7 +7,6 @@ from models.modules.attentions import AdaptiveScaledDotProductAttention, MultiHe
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.embeddings import Embedding
-from models.modules.language_models import BERTModel
 from models.modules.containers import Module, ModuleList
 
 import os
@@ -230,9 +229,10 @@ class MeshedDecoder(Module):
         return F.log_softmax(out, dim=-1)
 
 class AdaptiveDecoder(Module):
-    def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model=config.pretrained_language_model,
-                    d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, bert_hidden_size=config.language_model_hidden_size, dropout=.1, 
-                    weights=None, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+    def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
+                    pretrained_language_model, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
+                    bert_hidden_size=config.language_model_hidden_size, dropout=.1, weights=None, 
+                    self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
         super(AdaptiveDecoder, self).__init__()
         self.d_model = d_model
         self.word_emb = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
@@ -251,19 +251,19 @@ class AdaptiveDecoder(Module):
         self.fc = nn.Linear(d_model, vocab_size, bias=False)
 
         # load and froze the language model
-        self.language_model = BERTModel(padding_idx=padding_idx, bert_hidden_size=bert_hidden_size, 
-                                            pretrained_language_model=pretrained_language_model,
+        self.language_model = pretrained_language_model(padding_idx=padding_idx, bert_hidden_size=bert_hidden_size, 
+                                            pretrained_language_model_name=pretrained_language_model_name,
                                             vocab_size=vocab_size, max_len=max_len)
         
-        language_model_path = os.path.join(config.checkpoint_path, f"{pretrained_language_model}.pth")
+        language_model_path = os.path.join(config.checkpoint_path, f"{pretrained_language_model_name}.pth")
         # BERT-based model has been pretrained
         if os.path.isfile(language_model_path):
             model_file = torch.load(language_model_path)
             self.language_model.load_state_dict(model_file['state_dict'], strict=False)
         # else fine tuning the BERT-based model in end-to-end way
         
-        for p in self.language_model.parameters():
-            p.requires_grad = False
+        # for p in self.language_model.parameters():
+        #     p.requires_grad = False
 
         self.max_len = max_len
         self.padding_idx = padding_idx
