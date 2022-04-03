@@ -147,7 +147,7 @@ class Vocab(object):
 
     def encode_caption(self, caption: str) -> torch.Tensor:
         if self.token_encoder is not None: # use pretrained language model's tokenizer
-            return self.tokenizer(caption, return_tensor="pt", padding=True)["input_ids"]
+            return self.token_encoder(caption, return_tensor="pt", padding=True)["input_ids"]
         else: # use _encode_caption tokenizer
             return self._encode_caption(caption)
 
@@ -156,7 +156,7 @@ class Vocab(object):
             list_captions = caption_vecs.tolist()
             decoded_captions = []
             for caption in list_captions:
-                decoded_caption = self.tokenizer.decode(caption).split()
+                decoded_caption = self.token_encoder.decode(caption).split()
                 decoded_caption = [token for token in decoded_caption if token not in self.specials]
                 if join_words:
                     decoded_caption = " ".join(decoded_caption)
