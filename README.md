@@ -35,9 +35,15 @@ Built on top of Buttom-up Attention, Meshed-Memory Transformer uses augmented me
 
 ### [RSTNet](https://openaccess.thecvf.com/content/CVPR2021/papers/Zhang_RSTNet_Captioning_With_Adaptive_Attention_on_Visual_and_Non-Visual_Words_CVPR_2021_paper.pdf)
 
+<img src="images/m2/m2.png" width="700" />
+
+Built on top of the Object Relation Transformer method but using [grid-based features](https://arxiv.org/pdf/2001.03615.pdf) instead of region-based features. Moreover, RSTNet uses an external pretrained language model to make the second attention stage to enhance the correlation between latent objects image with visual/non-visual generated words.
+
+In this work, we use [PhoBERT](https://aclanthology.org/2020.findings-emnlp.92.pdf) which is a pretrained language model for Vietnamese instead of [BERT](https://arxiv.org/pdf/1810.04805.pdf).
+
 ## Contact
-This project constructed under the NLP@UIT research group. For more information about the NLP@UIT group or relevant publications, please visit [http://nlp.uit.edu.vn/](http://nlp.uit.edu.vn/).
+This project constructed under instruction of the NLP@UIT research group. For more information about the NLP@UIT group or relevant publications, please visit [http://nlp.uit.edu.vn/](http://nlp.uit.edu.vn/).
 
  - Nghia Hieu Nguyen: [19520178@gm.uit.edu.vn](mailto:19520178@gm.uit.edu.vn)
  - Duong T.D Vo: [19520483@gm.uit.edu.vn](mailto:19520483@gm.uit.edu.vn)
- - Minh Quan Ha: [19522076@gm.uit.edu.vn](mailto:19522076@gm.uit.edu.vn)
+ - Minh-Quan Ha: [19522076@gm.uit.edu.vn](mailto:19522076@gm.uit.edu.vn)
