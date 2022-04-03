@@ -38,7 +38,7 @@ pretrained_language_model_name = "vinai/phobert-base"   # vinai/phobert-base
                                                         # vinai/bartpho-word
                                                         # NlpHUST/gpt-neo-vi-small
 language_model_hidden_size = 768
-tokenizer = "vncorenlp"    # vncorenlp
+tokenizer = None    # vncorenlp
                     # pyvi
                     # spacy
 word_embedding = None   # "fasttext.vi.300d"

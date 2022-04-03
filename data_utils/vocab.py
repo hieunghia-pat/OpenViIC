@@ -147,7 +147,7 @@ class Vocab(object):
 
     def encode_caption(self, caption: str) -> torch.Tensor:
         if self.token_encoder is not None: # use pretrained language model's tokenizer
-            return self.token_encoder(caption, return_tensor="pt", padding=True)["input_ids"]
+            return self.token_encoder(caption, return_tensors="pt", padding=True)["input_ids"]
         else: # use _encode_caption tokenizer
             return self._encode_caption(caption)
 
