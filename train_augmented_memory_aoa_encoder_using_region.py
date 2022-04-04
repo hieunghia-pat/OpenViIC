@@ -315,11 +315,12 @@ if __name__ == '__main__':
         }, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
 
         if best:
-            copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
-            public_test_results = get_predictions_region_feature(model, public_test_dict_dataset, vocab=vocab)
+            public_test_results = get_predictions_region_feature(model, public_test_dict_dataset, vocab=vocab, use_bbox=False)
             convert_results(config.sample_public_test_json_path, public_test_results, split="public")
-            private_test_results = get_predictions_region_feature(model, private_test_dict_dataset, vocab=vocab)
+            private_test_results = get_predictions_region_feature(model, private_test_dict_dataset, vocab=vocab, use_bbox=False)
             convert_results(config.sample_private_test_json_path, private_test_results, split="private")
+            copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
+
 
         if exit_train:
             break
