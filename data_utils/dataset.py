@@ -68,7 +68,7 @@ class GridDictionaryDataset(data.Dataset):
 
         return feature
 
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, List[str]]:
+    def __getitem__(self, idx: int):
         image_id = self.image_ids[idx]
         features = self.load_feature(image_id)
         captions = self.captions_with_image[idx]
@@ -137,7 +137,7 @@ class RegionDictionaryDataset(data.Dataset):
 
         return boxes
 
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, List[str]]:
+    def __getitem__(self, idx: int):
         image_id = self.image_ids[idx]
         filename = self.filenames[idx]
         features = self.load_feature(image_id)
@@ -195,11 +195,14 @@ class GridFeatureDataset(data.Dataset):
 
         return feature
 
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, str]:
+    def __getitem__(self, idx: int):
         caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
+        shifted_right_caption = torch.zeros_like(caption).fill_(self.vocab.padding_idx)
+        shifted_right_caption[:-1] = caption[1:]
+        caption = torch.where(caption == self.vocab.eos_idx, self.vocab.padding_idx, caption) # remove eos_token in caption
         visual = self.load_feature(self.annotations[idx]["image_id"])
 
-        return visual, caption[:-1], caption[1:] # shifted-right output
+        return visual, caption, shifted_right_caption
 
     def __len__(self) -> int:
         return len(self.annotations)
@@ -258,7 +261,7 @@ class RegionFeatureDataset(data.Dataset):
 
         return boxes
 
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, str]:
+    def __getitem__(self, idx: int):
         caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
         shifted_right_caption = torch.zeros_like(caption).fill_(self.vocab.padding_idx)
         shifted_right_caption[:-1] = caption[1:]
