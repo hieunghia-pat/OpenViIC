@@ -260,7 +260,8 @@ class RegionFeatureDataset(data.Dataset):
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, str]:
         caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
-        shifted_right_caption = caption[1:]
+        shifted_right_caption = torch.zeros_like(caption).fill_(self.vocab.padding_idx)
+        shifted_right_caption[:-1] = caption[1:]
         caption = torch.where(caption == self.vocab.eos_idx, self.vocab.padding_idx, caption) # remove eos_token in caption
         visual = self.load_feature(self.annotations[idx]["image_id"])
         boxes = self.load_boxes(self.annotations[idx]["image_id"])
