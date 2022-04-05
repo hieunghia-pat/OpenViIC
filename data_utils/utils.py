@@ -30,7 +30,7 @@ def get_tokenizer(tokenizer):
     elif tokenizer == "vncorenlp":
         try:
             from vncorenlp import VnCoreNLP
-            annotator = VnCoreNLP("data_utils/vncorenlp/VnCoreNLP-1.1.1.jar", annotators="wseg", max_heap_size='-Xmx500m')
+            annotator = VnCoreNLP(r"data_utils/vncorenlp/VnCoreNLP-1.1.1.jar", annotators="wseg", max_heap_size='-Xmx500m')
 
             def tokenize(s: str):
                 words = annotator.tokenize(s)[0]
