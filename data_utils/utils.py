@@ -1,3 +1,4 @@
+from collections import defaultdict
 import torch
 from torchvision import transforms
 import re
@@ -118,68 +119,73 @@ def unk_init(token, dim):
         return torch.ones(dim) * 2
     return torch.ones(dim) * 3
 
-def region_feature_collate_fn(samples):
+def collate_fn(samples):
+    image_ids = []
+    filenames = []
     features = []
     boxes = []
     tokens = []
+    captions = []
     shifted_right_tokens = []
     max_seq_len = 0
     for sample in samples:
-        feature, box, token, shifted_right_token = sample
+        image_id = sample["image_id"]
+        filename = sample["filename"]
+        feature = sample["features"]
+        box = sample["boxes"]
+        token = sample["caption"] # for cross-entropy objective training
+        shifted_right_token = sample["shifted_right_caption"] # for cross-entropy objective training
+        caption = sample["captions"] # for self-critical sequential training
+
         if max_seq_len < feature.shape[0]:
             max_seq_len = feature.shape[0]
+
+        if image_id is not None:
+            image_ids.append(image_id)
+        if filename is not None:
+            filenames.append(filename)
+        if box is not None:
+            boxes.append(torch.tensor(box))
+        if caption is not None:
+            captions.append(caption)
         features.append(torch.tensor(feature))
-        boxes.append(torch.tensor(box))
         tokens.append(token)
         shifted_right_tokens.append(shifted_right_token)
 
     zero_feature = torch.zeros_like(features[-1][-1]).unsqueeze(0) # (1, dim)
-    zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
+    if len(boxes) > 0:
+        zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
+    else:
+        zero_box = None
     for batch_ith in range(len(samples)):
         for ith in range(features[batch_ith].shape[0], max_seq_len):
             features[batch_ith] = torch.cat([features[batch_ith], zero_feature], dim=0)
-            boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
+            if zero_box:
+                boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
 
     features = torch.cat([feature.unsqueeze_(0) for feature in features], dim=0)
-    boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
+
+    if len(image_ids) == 0:
+        image_ids = None
+    if len(filenames) == 0:
+        filenames = None
+    if len(boxes) > 0:
+        boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
+    else:
+        boxes = None
+    if len(captions) == 0:
+        captions = None
+    if len(captions) == 0:
+        captions = None
     tokens = torch.cat([token.unsqueeze_(0) for token in tokens], dim=0)
     shifted_right_tokens = torch.cat([token.unsqueeze_(0) for token in shifted_right_tokens], dim=0)
 
-    return features, boxes, tokens, shifted_right_tokens
-
-def dict_region_feature_collate_fn(samples):
-    features = []
-    boxes = []
-    captions = []
-    max_seq_len = 0
-    for sample in samples:
-        _, _, feature, box, caption = sample
-        if max_seq_len < feature.shape[0]:
-            max_seq_len = feature.shape[0]
-        features.append(torch.tensor(feature))
-        boxes.append(torch.tensor(box))
-        captions.append(caption)
-
-    zero_feature = torch.zeros_like(features[-1][-1]).unsqueeze(0) # (1, dim)
-    zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
-    for batch_ith in range(len(samples)):
-        for ith in range(features[batch_ith].shape[0], max_seq_len):
-            features[batch_ith] = torch.cat([features[batch_ith], zero_feature], dim=0)
-            boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
-
-    features = torch.cat([feature.unsqueeze_(0) for feature in features], dim=0)
-    boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
-
-    return features, boxes, captions
-
-def dict_grid_feature_collate_fn(samples):
-    features = []
-    captions = []
-    for sample in samples:
-        _, _, feature, caption = sample
-        features.append(torch.tensor(feature))
-        captions.append(caption)
-
-    features = torch.cat([feature.unsqueeze_(0) for feature in features], dim=0)
-
-    return features, captions
+    return defaultdict({
+        "image_ids": image_ids,
+        "filenames": filenames,
+        "features": features, 
+        "boxes": boxes, 
+        "tokens": tokens, 
+        "shifted_right_tokens": shifted_right_tokens,
+        "captions": captions
+    })

@@ -10,7 +10,7 @@ from models.modules.attentions import AugmentedGeometryScaledDotProductAttention
 from models.modules.encoders import Encoder
 from models.modules.decoders import Decoder
 
-from result_utils import get_predictions, convert_results, get_predictions_region_feature
+from utils.result_utils import get_predictions, convert_results, get_predictions_region_feature
 
 import torch
 from torch.utils import data
