@@ -26,8 +26,8 @@ class Vocab(object):
         itos: A list of token strings indexed by their numerical identifiers.
     """
     def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", eos_token="<eos>", padding_token="<pad>",
-                 pretrained_language_model_name=config.pretrained_language_model_name, unk_token="<unk>", vectors=None, 
-                 unk_init=unk_init, vectors_cache=None, tokenizer: Union[str, None]=config.tokenizer):
+                 pretrained_language_model_name=None, unk_token="<unk>", vectors=None, 
+                 unk_init=unk_init, vectors_cache=None, tokenizer: Union[str, None]=None):
         """Create a Vocab object from a collections.Counter.
         Arguments:
             counter: collections.Counter object holding the frequencies of

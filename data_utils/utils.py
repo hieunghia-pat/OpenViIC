@@ -160,7 +160,7 @@ def collate_fn(samples):
     for batch_ith in range(len(samples)):
         for ith in range(features[batch_ith].shape[0], max_seq_len):
             features[batch_ith] = torch.cat([features[batch_ith], zero_feature], dim=0)
-            if zero_box:
+            if zero_box is not None:
                 boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
 
     features = torch.cat([feature.unsqueeze_(0) for feature in features], dim=0)
@@ -175,12 +175,10 @@ def collate_fn(samples):
         boxes = None
     if len(captions) == 0:
         captions = None
-    if len(captions) == 0:
-        captions = None
     tokens = torch.cat([token.unsqueeze_(0) for token in tokens], dim=0)
     shifted_right_tokens = torch.cat([token.unsqueeze_(0) for token in shifted_right_tokens], dim=0)
 
-    return defaultdict({
+    return {
         "image_ids": image_ids,
         "filenames": filenames,
         "features": features, 
@@ -188,4 +186,4 @@ def collate_fn(samples):
         "tokens": tokens, 
         "shifted_right_tokens": shifted_right_tokens,
         "captions": captions
-    })
+    }

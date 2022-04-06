@@ -10,7 +10,6 @@ from models.modules.embeddings import Embedding
 from models.modules.containers import Module, ModuleList
 
 import os
-import config
 
 class DecoderLayer(Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
@@ -231,7 +230,7 @@ class MeshedDecoder(Module):
 class AdaptiveDecoder(Module):
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
                     pretrained_language_model, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
-                    bert_hidden_size=config.language_model_hidden_size, dropout=.1, weights=None, 
+                    bert_hidden_size=768, dropout=.1, weights=None, 
                     self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
         super(AdaptiveDecoder, self).__init__()
         self.d_model = d_model
@@ -254,17 +253,6 @@ class AdaptiveDecoder(Module):
         self.language_model = pretrained_language_model(padding_idx=padding_idx, bert_hidden_size=bert_hidden_size, 
                                             pretrained_language_model_name=pretrained_language_model_name,
                                             vocab_size=vocab_size, max_len=max_len)
-        
-        language_model_path = os.path.join(config.checkpoint_path, f"{pretrained_language_model_name}.pth")
-        # BERT-based model has been pretrained
-        if os.path.isfile(language_model_path):
-            model_file = torch.load(language_model_path)
-            self.language_model.load_state_dict(model_file['state_dict'], strict=False)
-        # else fine tuning the BERT-based model in end-to-end way
-        
-        # for p in self.language_model.parameters():
-        #     p.requires_grad = False
-
         self.max_len = max_len
         self.padding_idx = padding_idx
         self.N = N_dec

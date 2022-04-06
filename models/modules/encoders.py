@@ -26,7 +26,7 @@ class EncoderLayer(nn.Module):
         return ff
 
 class Encoder(nn.Module):
-    def __init__(self, N, padding_idx, d_in=config.d_feature, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
+    def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(Encoder, self).__init__()
         
@@ -55,7 +55,7 @@ class Encoder(nn.Module):
         return out, attention_mask
 
 class MultiLevelEncoder(nn.Module):
-    def __init__(self, N, padding_idx, d_in=config.d_feature, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
+    def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(MultiLevelEncoder, self).__init__()
 

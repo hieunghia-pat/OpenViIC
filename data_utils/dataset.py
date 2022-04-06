@@ -76,13 +76,19 @@ class DictionaryDataset(data.Dataset):
         boxes = self.load_boxes(image_id)
         captions = self.captions_with_image[idx]
 
-        return defaultdict({
+        returning_dict = defaultdict(lambda: None)
+        result_dict = {
             "image_id": image_id, 
             "filename": filename, 
             "features": features, 
             "boxes": boxes, 
             "captions": captions
-        })
+        }
+
+        for key, value in result_dict.items():
+            returning_dict[key] = value
+
+        return returning_dict
 
     def __len__(self) -> int:
         return len(self.image_ids)
@@ -131,13 +137,13 @@ class FeatureDataset(data.Dataset):
 
     def load_feature(self, image_id: int) -> np.ndarray:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
-        feature = defaultdict(np.load(feature_file, allow_pickle=True)[()])
+        feature = np.load(feature_file, allow_pickle=True)[()]
 
         return feature["features"]
 
     def load_boxes(self, image_id: int) -> np.ndarray:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
-        feature = defaultdict(np.load(feature_file, allow_pickle=True)[()])
+        feature = np.load(feature_file, allow_pickle=True)[()]
 
         return feature["boxes"]
 
@@ -149,12 +155,18 @@ class FeatureDataset(data.Dataset):
         features = self.load_feature(self.annotations[idx]["image_id"])
         boxes = self.load_boxes(self.annotations[idx]["image_id"])
 
-        return defaultdict({
+        result_dict = {
             "features": features, 
             "boxes": boxes,
             "caption": caption, 
             "shifted_right_caption": shifted_right_caption
-        })
+        }
+
+        returning_dict = defaultdict(lambda: None)
+        for key, value in result_dict.items():
+            returning_dict[key] = value
+
+        return returning_dict
 
     def __len__(self) -> int:
         return len(self.annotations)

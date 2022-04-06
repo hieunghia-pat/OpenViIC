@@ -1,3 +1,4 @@
+from tabnanny import check
 from torch.nn import NLLLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
@@ -14,7 +15,6 @@ import config
 import multiprocessing
 from tqdm import tqdm
 import itertools
-from collections import defaultdict
 from typing import Tuple, Union
 import random
 
@@ -32,6 +32,7 @@ class Trainer:
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
+        
         self.epoch = 0
 
         self.train_dataset, self.train_dict_dataset = train_datasets
@@ -215,8 +216,8 @@ class Trainer:
         step += 1
         return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
-    def load_checkpoint(self, fname) -> defaultdict:
-        if os.path.exists(fname):
+    def load_checkpoint(self, fname) -> dict:
+        if not os.path.exists(fname):
             return None
 
         checkpoint = torch.load(fname)
@@ -232,13 +233,12 @@ class Trainer:
 
         print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
 
-        return defaultdict({
-            "start_epoch": checkpoint['epoch'] + 1,
+        return {
+            "use_rl": checkpoint['use_rl'],
             "best_val_cider": checkpoint['best_val_cider'],
             "best_test_cider": checkpoint['best_test_cider'],
-            "patience": checkpoint['patience'],
-            "use_rl": checkpoint['use_rl']
-        })
+            "patience": checkpoint['patience']
+        }
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
         dict_for_saving = {
@@ -255,5 +255,120 @@ class Trainer:
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
-    def train(self):
-        pass
+    def train(self, checkpoint_filename):
+        while True:
+            checkpoint = self.load_checkpoint(checkpoint_filename)
+            if checkpoint is not None:
+                use_rl = checkpoint["use_rl"]
+                best_val_cider = checkpoint["best_val_cider"]
+                best_test_cider = checkpoint["best_test_cider"]
+                patience = checkpoint["patience"]
+            else:
+                use_rl = False
+                best_val_cider = .0
+                best_test_cider = .0
+                patience = 0
+
+            if not use_rl:
+                train_loss = self.train_xe()
+            else:
+                train_loss, reward, reward_baseline = self.train_scst()
+
+            val_loss = self.evaluate_loss(self.val_dataloader)
+
+            # val scores
+            scores = self.evaluate_metrics(self.val_dict_dataloader)
+            print("Validation scores", scores)
+            val_cider = scores['CIDEr']
+
+            # Prepare for next epoch
+            best = False
+            if val_cider >= best_val_cider:
+                best_val_cider = val_cider
+                patience = 0
+                best = True
+            else:
+                patience += 1
+
+            switch_to_rl = False
+            exit_train = False
+
+            if patience == 5:
+                if not use_rl:
+                    use_rl = True
+                    switch_to_rl = True
+                    patience = 0
+                    self.optim = Adam(self.model.parameters(), lr=5e-6)
+                    print("Switching to RL")
+                else:
+                    print('patience reached.')
+                    exit_train = True
+
+            if switch_to_rl and not best:
+                checkpoint = self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
+                print('Resuming from epoch %d, validation loss %f, best_val_cider %f, and best test_cider %f' % (
+                    checkpoint['epoch'], checkpoint['val_loss'], checkpoint['best_val_cider'], checkpoint['best_test_cider']))
+
+            torch.save({
+                'val_loss': val_loss,
+                'val_cider': val_cider,
+                'patience': patience,
+                'best_val_cider': best_val_cider,
+                'best_test_cider': best_test_cider,
+                'use_rl': use_rl,
+            }, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
+
+            if best:
+                public_test_results = get_predictions_region_feature(model, public_test_dict_dataset, vocab=vocab, use_bbox=False)
+                convert_results(config.sample_public_test_json_path, public_test_results, split="public")
+                private_test_results = get_predictions_region_feature(model, private_test_dict_dataset, vocab=vocab, use_bbox=False)
+                convert_results(config.sample_private_test_json_path, private_test_results, split="private")
+                copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
+
+            if exit_train:
+                break
+
+            print("+"*10)
+
+    def get_predictions_region_feature(self, model: Transformer, dataset: data.Dataset, vocab: Vocab, use_bbox=True):
+        model.eval()
+        results = []
+        with tqdm(desc='Evaluating: ', unit='it', total=len(dataset)) as pbar:
+            for it, sample in enumerate(dataset):
+                if use_bbox:
+                    image_id, filename, feature, boxes, caps_gt = sample
+                    feature = torch.tensor(feature).unsqueeze(0).to(device)
+                    boxes = torch.tensor(boxes).unsqueeze(0).to(device)
+                else:
+                    image_id, filename, feature, _, caps_gt = sample
+                    feature = torch.tensor(feature).unsqueeze(0).to(device)
+                    boxes = None
+                with torch.no_grad():
+                    out, _ = model.beam_search(feature, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
+                                                beam_size=config.beam_size, out_size=1)
+                caps_gen = vocab.decode_caption(out, join_words=False)
+                gens = []
+                gts = []
+                for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
+                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                    gens.append(gen_i)
+                    gts.append(gts_i)
+
+                results.append({
+                    "image_id": image_id,
+                    "filename": filename,
+                    "gen": gens,
+                    "gts": gts
+                })
+                pbar.update()
+
+        return results
+
+    def convert_results(self, sample_submisison_json, results, split="public"):
+        sample_json_data = json.load(open(sample_submisison_json))
+        for sample_item in tqdm(sample_json_data, desc="Converting results: "):
+            for item in results:
+                if sample_item["id"] == item["filename"]:
+                    sample_item["captions"] = item["gen"][0]
+
+        json.dump(sample_json_data, open(os.path.join(config.checkpoint_path, config.model_name, f"{split}_results.json"), "w+"), ensure_ascii=False)
