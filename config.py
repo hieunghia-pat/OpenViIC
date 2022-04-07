@@ -19,7 +19,12 @@ xe_most = 20
 min_freq = 1
 
 # model configuration
-model_name = "ort_using_region"
+model_name = "transformer_using_region"
+encoder_self_attention = ScaledDotProductAttention
+decoder_self_attention = ScaledDotProductAttention
+decoder_enc_attention = ScaledDotProductAttention
+encoder = Encoder
+decoder = Decoder
 total_memory = 40
 nhead = 8
 nlayers = 3
@@ -39,7 +44,7 @@ private_test_json_path = "features/annotations/vieCap4H/viecap4h_captions_privat
 feature_path = "features/region_features/vieCap4H/faster_rcnn"
 batch_size = 16
 workers = 2
-pretrained_language_model_name = "vinai/phobert-base"   # vinai/phobert-base
+pretrained_language_model_name = None                   # vinai/phobert-base
                                                         # vinai/phobert-large
                                                         # vinai/bartpho-syllable
                                                         # vinai/bartpho-word

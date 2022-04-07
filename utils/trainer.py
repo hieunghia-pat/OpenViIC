@@ -245,10 +245,10 @@ class Trainer:
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
-    def train(self, checkpoint_filename):
+    def train(self, checkpoint_filename: str = None):
         while True:
-            checkpoint = self.load_checkpoint(checkpoint_filename)
-            if checkpoint is not None:
+            if checkpoint_filename is not None:
+                checkpoint = self.load_checkpoint(checkpoint_filename)
                 use_rl = checkpoint["use_rl"]
                 best_val_cider = checkpoint["best_val_cider"]
                 best_test_cider = checkpoint["best_test_cider"]
