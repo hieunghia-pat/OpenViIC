@@ -1,4 +1,3 @@
-from tabnanny import check
 from torch.nn import NLLLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
@@ -17,6 +16,7 @@ from tqdm import tqdm
 import itertools
 from typing import Tuple, Union
 import random
+from shutil import copyfile
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -161,10 +161,6 @@ class Trainer:
                 pbar.set_postfix(loss=running_loss / (it + 1))
                 pbar.update()
                 self.scheduler.step()
-
-        loss = running_loss / len(self.train_dataloader)
-
-        return loss
     
     def train_scst(self):
         # Training with self-critical learning
@@ -204,12 +200,6 @@ class Trainer:
                 pbar.set_postfix(loss=running_loss / (it + 1), reward=running_reward / (it + 1),
                                 reward_baseline=running_reward_baseline / (it + 1))
                 pbar.update()
-
-        loss = running_loss / len(self.train_dict_dataloader)
-        reward = running_reward / len(self.train_dict_dataloader)
-        reward_baseline = running_reward_baseline / len(self.train_dict_dataloader)
-
-        return loss, reward, reward_baseline
 
     def lambda_lr(self, step):
         warm_up = config.warmup
@@ -270,9 +260,9 @@ class Trainer:
                 patience = 0
 
             if not use_rl:
-                train_loss = self.train_xe()
+                self.train_xe()
             else:
-                train_loss, reward, reward_baseline = self.train_scst()
+                self.train_scst()
 
             val_loss = self.evaluate_loss(self.val_dataloader)
 
@@ -319,10 +309,6 @@ class Trainer:
             }, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
 
             if best:
-                public_test_results = get_predictions_region_feature(model, public_test_dict_dataset, vocab=vocab, use_bbox=False)
-                convert_results(config.sample_public_test_json_path, public_test_results, split="public")
-                private_test_results = get_predictions_region_feature(model, private_test_dict_dataset, vocab=vocab, use_bbox=False)
-                convert_results(config.sample_private_test_json_path, private_test_results, split="private")
                 copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
 
             if exit_train:
@@ -330,27 +316,24 @@ class Trainer:
 
             print("+"*10)
 
-    def get_predictions_region_feature(self, model: Transformer, dataset: data.Dataset, vocab: Vocab, use_bbox=True):
-        model.eval()
+    def get_predictions(self, dataset: DictionaryDataset):
+        self.model.eval()
         results = []
         with tqdm(desc='Evaluating: ', unit='it', total=len(dataset)) as pbar:
             for it, sample in enumerate(dataset):
-                if use_bbox:
-                    image_id, filename, feature, boxes, caps_gt = sample
-                    feature = torch.tensor(feature).unsqueeze(0).to(device)
-                    boxes = torch.tensor(boxes).unsqueeze(0).to(device)
-                else:
-                    image_id, filename, feature, _, caps_gt = sample
-                    feature = torch.tensor(feature).unsqueeze(0).to(device)
-                    boxes = None
+                image_id = sample["image_id"]
+                filename = sample["filename"]
+                features = sample["features"]
+                boxes = sample["boxes"]
+                caps_gt = sample["captions"]
                 with torch.no_grad():
-                    out, _ = model.beam_search(feature, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx, 
+                    out, _ = self.model.beam_search(features, boxes=boxes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
                                                 beam_size=config.beam_size, out_size=1)
-                caps_gen = vocab.decode_caption(out, join_words=False)
+                caps_gen = self.vocab.decode_caption(out, join_words=False)
                 gens = []
                 gts = []
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
-                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                    gen_i = ' '.join([key for key, group in itertools.groupby(gen_i)])
                     gens.append(gen_i)
                     gts.append(gts_i)
 
