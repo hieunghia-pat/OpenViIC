@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from data_utils.typing import *
+from data_utils.types import *
 import copy
 
 def get_batch_size(x: TensorOrSequence) -> int:
@@ -129,7 +129,7 @@ def box_relational_embedding(f_g, dim_g=64, wave_len=1000, trignometric_embeddin
     position_mat = torch.cat((delta_x, delta_y, delta_w, delta_h), -1)
 
     if trignometric_embedding == True:
-        feat_range = torch.arange(dim_g / 8).cuda()
+        feat_range = torch.arange(dim_g / 8).to(f_g.device)
         dim_mat = feat_range / (dim_g / 8)
         dim_mat = 1. / (torch.pow(wave_len, dim_mat))
 

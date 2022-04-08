@@ -1,5 +1,5 @@
 import torch
-from data_utils.typing import *
+from data_utils.types import *
 from models.utils import get_batch_size, get_device
 
 class BeamSearch(object):
