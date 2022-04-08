@@ -19,12 +19,6 @@ xe_most = 20
 min_freq = 1
 
 # model configuration
-model_name = "transformer_using_region"
-encoder_self_attention = ScaledDotProductAttention
-decoder_self_attention = ScaledDotProductAttention
-decoder_enc_attention = ScaledDotProductAttention
-encoder = Encoder
-decoder = Decoder
 total_memory = 40
 nhead = 8
 nlayers = 3
@@ -35,6 +29,17 @@ d_ff = 2048
 d_feature = 2048
 dropout = .1
 beam_size = 5
+model_name = "transformer_using_region"
+encoder_self_attention = AugmentedMemoryScaledDotProductAttention
+encoder_self_attention_args = {"m": total_memory}
+encoder_args = {}
+decoder_self_attention = ScaledDotProductAttention
+decoder_enc_attention = ScaledDotProductAttention
+decoder_self_attention_args = {}
+decoder_enc_attention_args = {}
+decoder_args = {"N_enc": nlayers}
+encoder = MultiLevelEncoder
+decoder = MeshedDecoder
 
 # dataset configuration
 train_json_path = "features/annotations/vieCap4H/viecap4h_captions_train2017.json"
@@ -60,5 +65,5 @@ word_embedding = None   # "fasttext.vi.300d"
                         # "phow2v.word.300d"
 
 # sample submission configuration
-sample_public_test_json_path = "sample_public_test_submission.json"
-sample_private_test_json_path = "sample_private_test_submission.json"
+sample_public_test_json_path = "features/annotations/vieCap4H/sample_public_test_submission.json"
+sample_private_test_json_path = "features/annotations/vieCap4H/sample_private_test_submission.json"

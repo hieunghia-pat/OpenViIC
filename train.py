@@ -41,12 +41,13 @@ val_dict_dataset = DictionaryDataset(config.val_json_path, config.feature_path, 
 public_test_dict_dataset = DictionaryDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
 private_test_dict_dataset = DictionaryDataset(config.private_test_json_path, config.feature_path, vocab=vocab)
 
- # Defining the Object Relation Transformer method
 encoder = config.encoder(N=config.nlayers, padding_idx=vocab.padding_idx, d_in=config.d_feature, d_model=config.d_model, d_k=config.d_k, d_v=config.d_v,
-                                d_ff=config.d_ff, dropout=config.dropout, attention_module=config.encoder_self_attention)
+                            d_ff=config.d_ff, dropout=config.dropout, attention_module=config.encoder_self_attention,
+                            attention_module_kwargs=config.encoder_self_attention_args, **config.encoder_args)
 decoder = config.decoder(vocab_size=len(vocab), max_len=vocab.max_caption_length, N_dec=config.nlayers, padding_idx=vocab.padding_idx,
                         d_model=config.d_model, d_k=config.d_k, d_v=config.d_v, d_ff=config.d_ff, dropout=config.dropout,
-                        self_att_module=config.decoder_self_attention, enc_att_module=config.decoder_enc_attention)
+                        self_att_module=config.decoder_self_attention, enc_att_module=config.decoder_enc_attention,
+                        self_att_module_kwargs=config.decoder_enc_attention_args, enc_att_module_kwargs=config.decoder_enc_attention_args, **config.decoder_args)
 model = Transformer(vocab.bos_idx, encoder, decoder).to(device)
 
 trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),
