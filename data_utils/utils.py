@@ -124,6 +124,7 @@ def collate_fn(samples):
     filenames = []
     features = []
     boxes = []
+    grid_sizes = []
     tokens = []
     captions = []
     shifted_right_tokens = []
@@ -133,6 +134,7 @@ def collate_fn(samples):
         filename = sample["filename"]
         feature = sample["features"]
         box = sample["boxes"]
+        grid_size = sample["grid_size"]
         token = sample["caption"] # for cross-entropy objective training
         shifted_right_token = sample["shifted_right_caption"] # for cross-entropy objective training
         caption = sample["captions"] # for self-critical sequential training
@@ -146,6 +148,8 @@ def collate_fn(samples):
             filenames.append(filename)
         if box is not None:
             boxes.append(torch.tensor(box))
+        if grid_size is not None:
+            grid_sizes.append(grid_size)
         if caption is not None:
             captions.append(caption)
         if token is not None:
@@ -177,6 +181,9 @@ def collate_fn(samples):
         boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
     else:
         boxes = None
+
+    if len(grid_sizes) == 0:
+        grid_sizes = None
     
     if len(captions) == 0:
         captions = None
@@ -195,7 +202,8 @@ def collate_fn(samples):
         "image_ids": image_ids,
         "filenames": filenames,
         "features": features, 
-        "boxes": boxes, 
+        "boxes": boxes,
+        "grid_sizes": grid_sizes,
         "tokens": tokens, 
         "shifted_right_tokens": shifted_right_tokens,
         "captions": captions

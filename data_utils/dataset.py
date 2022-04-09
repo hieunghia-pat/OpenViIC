@@ -1,4 +1,5 @@
 from email.policy import default
+from matplotlib.pyplot import grid
 import torch
 from torch.utils import data
 
@@ -139,7 +140,12 @@ class FeatureDataset(data.Dataset):
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
 
-        return feature["features"]
+        if "grid_size" in feature:
+            grid_size = feature["grid_size"]
+        else:
+            grid_size = None
+
+        return feature["features"], grid_size
 
     def load_boxes(self, image_id: int) -> np.ndarray:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
@@ -152,12 +158,13 @@ class FeatureDataset(data.Dataset):
         shifted_right_caption = torch.zeros_like(caption).fill_(self.vocab.padding_idx)
         shifted_right_caption[:-1] = caption[1:]
         caption = torch.where(caption == self.vocab.eos_idx, self.vocab.padding_idx, caption) # remove eos_token in caption
-        features = self.load_feature(self.annotations[idx]["image_id"])
+        features, grid_size = self.load_feature(self.annotations[idx]["image_id"])
         boxes = self.load_boxes(self.annotations[idx]["image_id"])
 
         result_dict = {
             "features": features, 
             "boxes": boxes,
+            "grid_size": grid_size,
             "caption": caption, 
             "shifted_right_caption": shifted_right_caption
         }

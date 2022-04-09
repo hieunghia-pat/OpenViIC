@@ -66,6 +66,6 @@ class CaptioningModel(Module):
         return torch.cat(outputs, 1), torch.cat(log_probs, 1)
 
     def beam_search(self, visual: utils.TensorOrSequence, max_len: int, eos_idx: int, beam_size: int, out_size=1, 
-                    boxes: utils.TensorOrNone = None, grid_size: utils.TensorOrNone = None, return_probs=False, **kwargs):
+                    boxes: utils.TensorOrNone = None, grid_sizes: utils.TensorOrNone = None, return_probs=False, **kwargs):
         bs = BeamSearch(self, max_len, eos_idx, beam_size)
-        return bs.apply(visual, boxes, grid_size, out_size, return_probs, **kwargs)
+        return bs.apply(visual, boxes, grid_sizes, out_size, return_probs, **kwargs)

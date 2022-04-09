@@ -9,8 +9,6 @@ from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.embeddings import Embedding
 from models.modules.containers import Module, ModuleList
 
-import os
-
 class DecoderLayer(Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,

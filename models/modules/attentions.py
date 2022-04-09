@@ -41,7 +41,7 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -116,24 +116,26 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, queries, keys, values, boxes=None, grid_size=None, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
             :param keys: Keys (b_s, nk, d_model)
             :param values: Values (b_s, nk, d_model)
             :param boxes: Boxes (b_s, nk, 4). None indicates image is extracted under region-based methods.
-            :param grid_size: Size of the image features. Default value is None if image features is regional features
+            :param grid_sizes: Size of the image features. Default value is None if image features is regional features
             :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
             :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
             :return:
         '''
+
+        assert not (boxes is None and grid_sizes is None), "In AugmentedGeometryScaledDotProductAttention: both boxes and grid_sizes are None"
         
         # embedding geometric information from boxes coordinates
-        if grid_size is not None:
+        if grid_sizes is not None:
             assert boxes is None, "there is no boxe when using grid-based extractor"
             bs, seq_len = queries.shape[:2]
-            boxes = get_grids_position(bs, seq_len, grid_size)
+            boxes = get_grids_position(bs, seq_len, grid_sizes[0])
         else:
             assert boxes is not None, "coordinates of objects are requiered for region-based extractor"
         relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
@@ -205,7 +207,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
         '''
         Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -278,7 +280,7 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_o.bias, 0)
         nn.init.constant_(self.fc_s.bias, 0)
 
-    def forward(self, queries, keys, values, language_signals, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
         '''
         Computes
         :param queries: Queries (b_s, nq, d_model)
@@ -289,6 +291,8 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
         :return:
         '''
+
+        assert language_signals is not None, "In AdaptiveScaledDotProductAttention: language_signals is None"
 
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
@@ -351,7 +355,7 @@ class MultiHeadAttention(Module):
             self.register_state('running_keys', torch.zeros((0, d_model)))
             self.register_state('running_values', torch.zeros((0, d_model)))
 
-    def forward(self, queries, keys, values, boxes=None, grid_size=None, language_signals=None, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
         if self.can_be_stateful and self._is_stateful:
             self.running_keys = torch.cat([self.running_keys, keys], 1)
             keys = self.running_keys
@@ -363,30 +367,11 @@ class MultiHeadAttention(Module):
             queries = self.layer_norm(queries)
             keys = self.layer_norm(keys)
             values = self.layer_norm(values)
-
-            if (boxes is not None) or (grid_size is not None):  
-                # attention with geometry-augmented attention
-                out = self.attention(queries, keys, values, boxes, grid_size, attention_mask, attention_weights)
-            elif language_signals is not None:  
-                # adaptive attention
-                out = self.attention(queries, keys, values, language_signals, attention_mask, attention_weights)
-            else:                   
-                # original attention or memory augmented attention
-                out = self.attention(queries, keys, values, attention_mask, attention_weights)
-            
+            out = self.attention(queries, keys, values, boxes, grid_sizes, language_signals, attention_mask, attention_weights)
             # residual connection after normalizing
             out = queries + self.dropout(torch.relu(out))
         else:
-            if (boxes is not None) or (grid_size is not None):  
-                # attention with geometry-augmented attention
-                out = self.attention(queries, keys, values, boxes, grid_size, attention_mask, attention_weights)
-            elif language_signals is not None:  
-                # adaptive attention
-                out = self.attention(queries, keys, values, language_signals, attention_mask, attention_weights)
-            else:                   
-                # original attention or memory augmented attention
-                out = self.attention(queries, keys, values, attention_mask, attention_weights)
-            
+            out = self.attention(queries, keys, values, boxes, grid_sizes, language_signals, attention_mask, attention_weights)
             # normalization after residual connection
             out = self.dropout(out)
             out = self.layer_norm(queries + out)
