@@ -227,7 +227,8 @@ class Trainer:
             "use_rl": checkpoint['use_rl'],
             "best_val_cider": checkpoint['best_val_cider'],
             "best_test_cider": checkpoint['best_test_cider'],
-            "patience": checkpoint['patience']
+            "patience": checkpoint['patience'],
+            "epoch": checkpoint["epoch"]
         }
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
@@ -255,6 +256,7 @@ class Trainer:
             best_val_cider = checkpoint["best_val_cider"]
             best_test_cider = checkpoint["best_test_cider"]
             patience = checkpoint["patience"]
+            self.epoch = checkpoint["epoch"]
         else:
             use_rl = False
             best_val_cider = .0
