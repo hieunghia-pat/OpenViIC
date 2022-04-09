@@ -245,6 +245,8 @@ class Trainer:
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
+        torch.save(dict_for_saving, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
+
     def train(self, checkpoint_filename: str = None):
         
         if checkpoint_filename is not None:
@@ -307,7 +309,7 @@ class Trainer:
                 'best_val_cider': best_val_cider,
                 'best_test_cider': best_test_cider,
                 'use_rl': use_rl,
-            }, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
+            })
 
             if best:
                 copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
