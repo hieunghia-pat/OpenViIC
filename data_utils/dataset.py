@@ -59,13 +59,13 @@ class DictionaryDataset(data.Dataset):
 
     def load_feature(self, image_id: int) -> np.ndarray:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
-        feature = defaultdict(np.load(feature_file, allow_pickle=True)[()])
+        feature = np.load(feature_file, allow_pickle=True)[()]
 
         return feature["features"]
 
     def load_boxes(self, image_id: int) -> np.ndarray:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
-        feature = defaultdict(np.load(feature_file, allow_pickle=True)[()])
+        feature = np.load(feature_file, allow_pickle=True)[()]
 
         return feature["boxes"]
 
