@@ -256,6 +256,7 @@ class Trainer:
             best_val_cider = checkpoint["best_val_cider"]
             best_test_cider = checkpoint["best_test_cider"]
             patience = checkpoint["patience"]
+            self.epoch = checkpoint["epoch"]
         else:
             use_rl = False
             best_val_cider = .0
