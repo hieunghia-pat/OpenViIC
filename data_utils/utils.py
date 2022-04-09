@@ -148,9 +148,11 @@ def collate_fn(samples):
             boxes.append(torch.tensor(box))
         if caption is not None:
             captions.append(caption)
+        if token is not None:
+            tokens.append(token)
+        if shifted_right_token is not None:
+            shifted_right_tokens.append(shifted_right_token)
         features.append(torch.tensor(feature))
-        tokens.append(token)
-        shifted_right_tokens.append(shifted_right_token)
 
     zero_feature = torch.zeros_like(features[-1][-1]).unsqueeze(0) # (1, dim)
     if len(boxes) > 0:
@@ -167,16 +169,27 @@ def collate_fn(samples):
 
     if len(image_ids) == 0:
         image_ids = None
+    
     if len(filenames) == 0:
         filenames = None
+    
     if len(boxes) > 0:
         boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
     else:
         boxes = None
+    
     if len(captions) == 0:
         captions = None
-    tokens = torch.cat([token.unsqueeze_(0) for token in tokens], dim=0)
-    shifted_right_tokens = torch.cat([token.unsqueeze_(0) for token in shifted_right_tokens], dim=0)
+
+    if len(tokens) > 0:
+        tokens = torch.cat([token.unsqueeze_(0) for token in tokens], dim=0)
+    else:
+        tokens = None
+    
+    if len(shifted_right_tokens) > 0:
+        shifted_right_tokens = torch.cat([token.unsqueeze_(0) for token in shifted_right_tokens], dim=0)
+    else:
+        shifted_right_tokens = None
 
     return {
         "image_ids": image_ids,
