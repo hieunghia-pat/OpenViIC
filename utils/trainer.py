@@ -300,7 +300,7 @@ class Trainer:
                 print('Resuming from epoch %d, validation loss %f, best_val_cider %f, and best test_cider %f' % (
                     checkpoint['epoch'], checkpoint['val_loss'], checkpoint['best_val_cider'], checkpoint['best_test_cider']))
 
-            torch.save({
+            self.save_checkpoint({
                 'val_loss': val_loss,
                 'val_cider': val_cider,
                 'patience': patience,
@@ -310,7 +310,7 @@ class Trainer:
             }, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
 
             if best:
-                copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
+                copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
 
             if exit_train:
                 break
