@@ -298,7 +298,7 @@ class Trainer:
                     exit_train = True
 
             if switch_to_rl and not best:
-                checkpoint = self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_val_model.pth"))
+                checkpoint = self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
                 print('Resuming from epoch %d, validation loss %f, best_val_cider %f, and best test_cider %f' % (
                     checkpoint['epoch'], checkpoint['val_loss'], checkpoint['best_val_cider'], checkpoint['best_test_cider']))
 
