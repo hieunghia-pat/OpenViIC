@@ -4,8 +4,6 @@ from torch.nn import functional as F
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import MultiHeadAttention
 
-import config
-
 class EncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
                  use_aoa=False, attention_module=None, attention_module_kwargs=None):

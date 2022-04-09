@@ -177,7 +177,8 @@ class Trainer:
             for it, sample in enumerate(self.train_dict_dataloader):
                 features = sample["features"].to(device)
                 boxes = sample["boxes"].to(device)
-                outs, log_probs = self.model.beam_search(features, boxes=boxes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+                grid_sizes = sample["grid_sizes"]
+                outs, log_probs = self.model.beam_search(features, boxes=boxes, grid_size=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
                                                     beam_size=config.batch_size, out_size=config.beam_size)
                 self.optim.zero_grad()
 
