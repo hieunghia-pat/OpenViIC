@@ -26,9 +26,9 @@ class Transformer(CaptioningModel):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, input, tokens, boxes=None, grid_size=None):
+    def forward(self, input, tokens, boxes=None, grid_sizes=None):
         pos_emb = self.sinusoid_pos_embedding(input) if self.use_img_pos else None
-        enc_output, mask_enc = self.encoder(input, boxes, grid_size, positional_emb=pos_emb)
+        enc_output, mask_enc = self.encoder(input, boxes, grid_sizes, positional_emb=pos_emb)
         dec_output = self.decoder(tokens, enc_output, mask_encoder=mask_enc, positional_emb=pos_emb)
         return dec_output
 
@@ -36,14 +36,14 @@ class Transformer(CaptioningModel):
         return [torch.zeros((b_s, 0), dtype=torch.long, device=device),
                 None, None]
 
-    def step(self, t, prev_output, visual, boxes=None, grid_size=None, mode='teacher_forcing', **kwargs):
+    def step(self, t, prev_output, visual, boxes=None, grid_sizes=None, mode='teacher_forcing', **kwargs):
         it = None
         if mode == 'teacher_forcing':
             raise NotImplementedError
         elif mode == 'feedback':
             pos_emb = self.sinusoid_pos_embedding(visual) if self.use_img_pos else None
             if t == 0:
-                self.enc_output, self.mask_enc = self.encoder(visual, boxes, grid_size, positional_emb=pos_emb)
+                self.enc_output, self.mask_enc = self.encoder(visual, boxes, grid_sizes, positional_emb=pos_emb)
                 if isinstance(visual, torch.Tensor):
                     it = visual.data.new_full((visual.shape[0], 1), self.bos_idx).long()
                 else:
