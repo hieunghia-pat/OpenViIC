@@ -109,7 +109,7 @@ class Trainer:
                         grid_sizes = grid_sizes.to(device)
                     tokens = sample["tokens"].to(device)
                     shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                    out = self.model(features, tokens, boxes=boxes, grid_size=grid_sizes).contiguous()
+                    out = self.model(features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
                     loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
@@ -136,7 +136,7 @@ class Trainer:
                     grid_sizes = grid_sizes.to(device)
                 caps_gt = sample["captions"]
                 with torch.no_grad():
-                    out, _ = self.model.beam_search(features, boxes=boxes, grid_size=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                    out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
                                                 beam_size=config.beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
