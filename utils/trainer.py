@@ -101,11 +101,15 @@ class Trainer:
             with torch.no_grad():
                 for it, sample in enumerate(dataloader):
                     features = sample["features"].to(device)
-                    boxes = sample["boxes"].to(device)
-                    grid_sizes = sample["grid_sizes"].to(device)
+                    boxes = sample["boxes"]
+                    if boxes is not None:
+                        boxes = boxes.to(device)
+                    grid_sizes = sample["grid_sizes"]
+                    if grid_sizes is not None:
+                        grid_sizes = grid_sizes.to(device)
                     tokens = sample["tokens"].to(device)
                     shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                    out = self.model(features, tokens, boxes=boxes, grid_size=grid_sizes[0]).contiguous()
+                    out = self.model(features, tokens, boxes=boxes, grid_size=grid_sizes).contiguous()
                     loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
@@ -124,11 +128,15 @@ class Trainer:
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
                 features = sample["features"].to(device)
-                boxes = sample["boxes"].to(device)
-                grid_sizes = sample["grid_sizes"].to(device)
+                boxes = sample["boxes"]
+                if boxes is not None:
+                    boxes = boxes.to(device)
+                grid_sizes = sample["grid_sizes"]
+                if grid_sizes is not None:
+                    grid_sizes = grid_sizes.to(device)
                 caps_gt = sample["captions"]
                 with torch.no_grad():
-                    out, _ = self.model.beam_search(features, boxes=boxes, grid_size=grid_sizes[0], max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                    out, _ = self.model.beam_search(features, boxes=boxes, grid_size=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
                                                 beam_size=config.beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
@@ -151,11 +159,15 @@ class Trainer:
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dataloader):
                 features = sample["features"].to(device)
-                boxes = sample["boxes"].to(device)
-                grid_sizes = sample["grid_sizes"].to(device)
+                boxes = sample["boxes"]
+                if boxes is not None:
+                    boxes = boxes.to(device)
+                grid_sizes = sample["grid_sizes"]
+                if grid_sizes is not None:
+                    grid_sizes.to(device)
                 tokens = sample["tokens"].to(device)
                 shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                out = self.model(features, tokens, boxes=boxes, grid_size=grid_sizes[0]).contiguous()
+                out = self.model(features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                 loss.backward()
@@ -182,9 +194,13 @@ class Trainer:
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dict_dataloader):
                 features = sample["features"].to(device)
-                boxes = sample["boxes"].to(device)
+                boxes = sample["boxes"]
+                if boxes is not None:
+                    boxes = boxes.to(device)
                 grid_sizes = sample["grid_sizes"]
-                outs, log_probs = self.model.beam_search(features, boxes=boxes, grid_size=grid_sizes[0], max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+                if grid_sizes is not None:
+                    grid_sizes = grid_sizes.to(device)
+                outs, log_probs = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
                                                     beam_size=config.batch_size, out_size=config.beam_size)
                 self.optim.zero_grad()
 
@@ -335,11 +351,16 @@ class Trainer:
             for it, sample in enumerate(dataset):
                 image_id = sample["image_id"]
                 filename = sample["filename"]
-                features = sample["features"]
+                features = sample["features"].to(device)
                 boxes = sample["boxes"]
+                if boxes is not None:
+                    boxes = boxes.to(device)
+                grid_sizes = sample["grid_sizes"]
+                if grid_sizes is not None:
+                    grid_sizes = grid_sizes.to(device)
                 caps_gt = sample["captions"]
                 with torch.no_grad():
-                    out, _ = self.model.beam_search(features, boxes=boxes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                    out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
                                                 beam_size=config.beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 gens = []
