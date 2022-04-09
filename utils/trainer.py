@@ -246,19 +246,20 @@ class Trainer:
             dict_for_saving[key] = value
 
     def train(self, checkpoint_filename: str = None):
-        while True:
-            if checkpoint_filename is not None:
-                checkpoint = self.load_checkpoint(checkpoint_filename)
-                use_rl = checkpoint["use_rl"]
-                best_val_cider = checkpoint["best_val_cider"]
-                best_test_cider = checkpoint["best_test_cider"]
-                patience = checkpoint["patience"]
-            else:
-                use_rl = False
-                best_val_cider = .0
-                best_test_cider = .0
-                patience = 0
+        
+        if checkpoint_filename is not None:
+            checkpoint = self.load_checkpoint(checkpoint_filename)
+            use_rl = checkpoint["use_rl"]
+            best_val_cider = checkpoint["best_val_cider"]
+            best_test_cider = checkpoint["best_test_cider"]
+            patience = checkpoint["patience"]
+        else:
+            use_rl = False
+            best_val_cider = .0
+            best_test_cider = .0
+            patience = 0
 
+        while True:
             if not use_rl:
                 self.train_xe()
             else:
@@ -314,6 +315,8 @@ class Trainer:
             if exit_train:
                 break
 
+            self.epoch += 1
+            
             print("+"*10)
 
     def get_predictions(self, dataset: DictionaryDataset):
