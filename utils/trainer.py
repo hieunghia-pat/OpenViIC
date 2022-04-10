@@ -91,7 +91,7 @@ class Trainer:
         else:
             self.test_dict_dataloader = None
 
-        self.cider_train = Cider(PTBTokenizer.tokenize(self.train_dataset.captions))
+        self.train_cider = Cider(PTBTokenizer.tokenize(self.train_dataset.captions))
 
     def evaluate_loss(self, dataloader: data.DataLoader):
         # Calculating validation loss
