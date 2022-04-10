@@ -202,7 +202,7 @@ class Trainer:
                     grid_sizes = grid_sizes.to(device)
                 caps_gt = sample["captions"]
                 outs, log_probs = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
-                                                    beam_size=config.batch_size, out_size=config.beam_size)
+                                                    beam_size=config.beam_size, out_size=config.beam_size)
                 self.optim.zero_grad()
 
                 # Rewards
