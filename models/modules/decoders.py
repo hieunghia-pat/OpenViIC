@@ -255,7 +255,7 @@ class AdaptiveDecoder(Module):
         self.padding_idx = padding_idx
         self.N = N_dec
 
-        self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).byte())
+        self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
     def forward(self, input, encoder_output, mask_encoder=None, positional_emb=None):

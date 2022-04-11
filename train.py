@@ -34,12 +34,22 @@ else:
 # creating iterable dataset
 train_dataset = FeatureDataset(config.train_json_path, config.feature_path, vocab) # for training with cross-entropy loss
 val_dataset = FeatureDataset(config.val_json_path, config.feature_path, vocab) # for calculating evaluation loss
+if config.public_test_json_path is not None:
+    public_test_dataset = DictionaryDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
+else:
+    public_test_dataset = None
 
 # creating dictionary dataset
 train_dict_dataset = DictionaryDataset(config.train_json_path, config.feature_path, vocab) # for training with self-critical learning
 val_dict_dataset = DictionaryDataset(config.val_json_path, config.feature_path, vocab) # for calculating metricsn validation set
-public_test_dict_dataset = DictionaryDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
-private_test_dict_dataset = DictionaryDataset(config.private_test_json_path, config.feature_path, vocab=vocab)
+if config.public_test_json_path is not None:
+    public_test_dict_dataset = DictionaryDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
+else:
+    public_test_dict_dataset = None
+if config.private_test_json_path is not None:
+    private_test_dict_dataset = DictionaryDataset(config.private_test_json_path, config.feature_path, vocab=vocab)
+else:
+    private_test_dict_dataset = None
 
 encoder = config.encoder(N=config.nlayers, padding_idx=vocab.padding_idx, d_in=config.d_feature, d_model=config.d_model, d_k=config.d_k, d_v=config.d_v,
                             d_ff=config.d_ff, dropout=config.dropout, attention_module=config.encoder_self_attention,
@@ -48,10 +58,10 @@ decoder = config.decoder(vocab_size=len(vocab), max_len=vocab.max_caption_length
                         d_model=config.d_model, d_k=config.d_k, d_v=config.d_v, d_ff=config.d_ff, dropout=config.dropout,
                         self_att_module=config.decoder_self_attention, enc_att_module=config.decoder_enc_attention,
                         self_att_module_kwargs=config.decoder_enc_attention_args, enc_att_module_kwargs=config.decoder_enc_attention_args, **config.decoder_args)
-model = Transformer(vocab.bos_idx, encoder, decoder).to(device)
+model = Transformer(vocab.bos_idx, encoder, decoder, **config.transformer_args).to(device)
 
 trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),
-                    test_datasets=(None, None), vocab=vocab, collate_fn=collate_fn)
+                    test_datasets=(public_test_dataset, public_test_dict_dataset), vocab=vocab, collate_fn=collate_fn)
 
 if config.start_from:
     trainer.train(os.path.join(config.checkpoint_path, config.model_name, config.start_from))

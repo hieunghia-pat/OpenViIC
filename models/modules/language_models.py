@@ -157,7 +157,7 @@ class PhoBERTModel(Module):
         seq = seq.masked_fill(mask_queries, 0)
 
         if attention_mask is None:
-            attention_mask = torch.ones_like(input_ids).to(bool)
+            attention_mask = torch.ones_like(input_ids).to(torch.bool)
         if token_type_ids is None:
             token_type_ids = torch.zeros_like(input_ids).long()
 

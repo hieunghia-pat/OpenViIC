@@ -30,6 +30,16 @@ d_feature = 2048
 dropout = .1
 beam_size = 5
 model_name = "transformer_using_region"
+pretrained_language_model_name = None                   # vinai/phobert-base
+                                                        # vinai/phobert-large
+                                                        # vinai/bartpho-syllable
+                                                        # vinai/bartpho-word
+                                                        # NlpHUST/gpt-neo-vi-small
+pretrained_language_model = None    # PhoBERTModel
+                                    # BARTPhoModel
+                                    # ViGPTModel
+
+language_model_hidden_size = 768
 encoder_self_attention = AugmentedMemoryScaledDotProductAttention
 encoder_self_attention_args = {"m": total_memory}
 encoder_args = {}
@@ -40,6 +50,7 @@ decoder_enc_attention_args = {}
 decoder_args = {"N_enc": nlayers}
 encoder = MultiLevelEncoder
 decoder = MeshedDecoder
+transformer_args = {}
 
 # dataset configuration
 train_json_path = "features/annotations/vieCap4H/viecap4h_captions_train2017.json"
@@ -49,12 +60,6 @@ private_test_json_path = "features/annotations/vieCap4H/viecap4h_captions_privat
 feature_path = "features/region_features/vieCap4H/faster_rcnn"
 batch_size = 16
 workers = 2
-pretrained_language_model_name = None                   # vinai/phobert-base
-                                                        # vinai/phobert-large
-                                                        # vinai/bartpho-syllable
-                                                        # vinai/bartpho-word
-                                                        # NlpHUST/gpt-neo-vi-small
-language_model_hidden_size = 768
 tokenizer = None    # vncorenlp
                     # pyvi
                     # spacy
