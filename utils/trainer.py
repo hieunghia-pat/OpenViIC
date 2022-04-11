@@ -242,8 +242,6 @@ class Trainer:
         random.setstate(checkpoint['random_rng_state'])
 
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
-        self.optim.load_state_dict(checkpoint['optimizer'])
-        self.scheduler.load_state_dict(checkpoint['scheduler'])
 
         print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
 
@@ -252,7 +250,9 @@ class Trainer:
             "best_val_cider": checkpoint['best_val_cider'],
             "best_test_cider": checkpoint['best_test_cider'],
             "patience": checkpoint['patience'],
-            "epoch": checkpoint["epoch"]
+            "epoch": checkpoint["epoch"],
+            "optimizer": checkpoint["optimizer"],
+            "scheduler": checkpoint["scheduler"]
         }
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
@@ -274,13 +274,15 @@ class Trainer:
 
     def train(self, checkpoint_filename: str = None):
         
-        if checkpoint_filename is not None:
+        if checkpoint_filename is not None and os.path.isfile(checkpoint_filename):
             checkpoint = self.load_checkpoint(checkpoint_filename)
             use_rl = checkpoint["use_rl"]
             best_val_cider = checkpoint["best_val_cider"]
             best_test_cider = checkpoint["best_test_cider"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
+            self.optim.load_state_dict(checkpoint['optimizer'])
+            self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
             use_rl = False
             best_val_cider = .0
@@ -299,6 +301,9 @@ class Trainer:
             scores = self.evaluate_metrics(self.val_dict_dataloader)
             print("Validation scores", scores)
             val_cider = scores['CIDEr']
+
+            if self.test_dict_dataloader is not None:
+                self.evaluate_metrics(self.test_dict_dataloader)
 
             # Prepare for next epoch
             best = False
@@ -325,6 +330,8 @@ class Trainer:
 
             if switch_to_rl and not best:
                 checkpoint = self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
+                self.optim.load_state_dict(checkpoint['optimizer'])
+                self.scheduler.load_state_dict(checkpoint['scheduler'])
 
             self.save_checkpoint({
                 'val_loss': val_loss,
