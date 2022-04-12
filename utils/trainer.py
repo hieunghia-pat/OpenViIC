@@ -358,13 +358,13 @@ class Trainer:
             for it, sample in enumerate(dataset):
                 image_id = sample["image_id"]
                 filename = sample["filename"]
-                features = sample["features"].to(device)
+                features = torch.tensor(sample["features"]).to(device)
                 boxes = sample["boxes"]
                 if boxes is not None:
-                    boxes = boxes.to(device)
+                    boxes = torch.tensor(boxes).to(device)
                 grid_sizes = sample["grid_sizes"]
                 if grid_sizes is not None:
-                    grid_sizes = grid_sizes.to(device)
+                    grid_sizes = torch.tensor(grid_sizes).to(device)
                 caps_gt = sample["captions"]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
