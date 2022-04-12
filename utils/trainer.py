@@ -370,19 +370,25 @@ class Trainer:
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
                                                 beam_size=config.beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
-                gens = []
-                gts = []
+                gens = {}
+                gts = {}
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
-                    gen_i = ' '.join([key for key, group in itertools.groupby(gen_i)])
-                    gens.append(gen_i)
-                    gts.append(gts_i)
+                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                    gen['%d_%d' % (it, i)] = [gen_i, ]
+                    gts['%d_%d' % (it, i)] = gts_i
+
+                gts = evaluation.PTBTokenizer.tokenize(gts)
+                gen = evaluation.PTBTokenizer.tokenize(gen)
+                scores, _ = evaluation.compute_scores(gts, gen)
 
                 results.append({
                     "image_id": image_id,
                     "filename": filename,
                     "gen": gens,
-                    "gts": gts
+                    "gts": gts,
+                    "scores": scores
                 })
+
                 pbar.update()
 
         return results
