@@ -330,8 +330,6 @@ class Trainer:
 
             if switch_to_rl and not best:
                 checkpoint = self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
-                self.optim.load_state_dict(checkpoint['optimizer'])
-                self.scheduler.load_state_dict(checkpoint['scheduler'])
 
             self.save_checkpoint({
                 'val_loss': val_loss,
