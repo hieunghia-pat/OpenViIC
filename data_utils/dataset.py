@@ -1,5 +1,3 @@
-from email.policy import default
-from matplotlib.pyplot import grid
 import torch
 from torch.utils import data
 
@@ -62,19 +60,21 @@ class DictionaryDataset(data.Dataset):
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
 
-        return feature["features"]
+        if "boxes" in feature:
+            boxes = feature["boxes"]
+        else:
+            boxes = None
+        if "grid_size" in feature:
+            grid_size = feature["grid_size"]
+        else:
+            grid_size = None
 
-    def load_boxes(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
-        feature = np.load(feature_file, allow_pickle=True)[()]
-
-        return feature["boxes"]
+        return feature["features"], boxes, grid_size
 
     def __getitem__(self, idx: int):
         image_id = self.image_ids[idx]
         filename = self.filenames[idx]
-        features = self.load_feature(image_id)
-        boxes = self.load_boxes(image_id)
+        features, boxes, grid_size = self.load_feature(image_id)
         captions = self.captions_with_image[idx]
 
         returning_dict = defaultdict(lambda: None)
@@ -82,7 +82,8 @@ class DictionaryDataset(data.Dataset):
             "image_id": image_id, 
             "filename": filename, 
             "features": features, 
-            "boxes": boxes, 
+            "boxes": boxes,
+            "grid_size": grid_size, 
             "captions": captions
         }
 
@@ -140,26 +141,24 @@ class FeatureDataset(data.Dataset):
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
 
+        if "boxes" in feature:
+            boxes = feature["boxes"]
+        else:
+            boxes = None
+
         if "grid_size" in feature:
             grid_size = feature["grid_size"]
         else:
             grid_size = None
 
-        return feature["features"], grid_size
-
-    def load_boxes(self, image_id: int) -> np.ndarray:
-        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
-        feature = np.load(feature_file, allow_pickle=True)[()]
-
-        return feature["boxes"]
+        return feature["features"], boxes, grid_size
 
     def __getitem__(self, idx: int):
         caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
         shifted_right_caption = torch.zeros_like(caption).fill_(self.vocab.padding_idx)
         shifted_right_caption[:-1] = caption[1:]
         caption = torch.where(caption == self.vocab.eos_idx, self.vocab.padding_idx, caption) # remove eos_token in caption
-        features, grid_size = self.load_feature(self.annotations[idx]["image_id"])
-        boxes = self.load_boxes(self.annotations[idx]["image_id"])
+        features, boxes, grid_size = self.load_feature(self.annotations[idx]["image_id"])
 
         result_dict = {
             "features": features, 
