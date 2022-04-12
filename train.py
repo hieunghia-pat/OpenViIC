@@ -35,7 +35,7 @@ else:
 train_dataset = FeatureDataset(config.train_json_path, config.feature_path, vocab) # for training with cross-entropy loss
 val_dataset = FeatureDataset(config.val_json_path, config.feature_path, vocab) # for calculating evaluation loss
 if config.public_test_json_path is not None:
-    public_test_dataset = DictionaryDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
+    public_test_dataset = FeatureDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
 else:
     public_test_dataset = None
 
