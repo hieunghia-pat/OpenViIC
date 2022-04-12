@@ -303,7 +303,8 @@ class Trainer:
             val_cider = scores['CIDEr']
 
             if self.test_dict_dataloader is not None:
-                self.evaluate_metrics(self.test_dict_dataloader)
+                scores = self.evaluate_metrics(self.test_dict_dataloader)
+                print("Evaluation scores", scores)
 
             # Prepare for next epoch
             best = False
@@ -329,7 +330,7 @@ class Trainer:
                     exit_train = True
 
             if switch_to_rl and not best:
-                checkpoint = self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
+                self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
 
             self.save_checkpoint({
                 'val_loss': val_loss,
