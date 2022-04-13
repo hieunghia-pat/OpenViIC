@@ -289,75 +289,75 @@ class Trainer:
             best_test_cider = .0
             patience = 0
 
-        # while True:
-        #     if not use_rl:
-        #         self.train_xe()
-        #     else:
-        #         self.train_scst()
+        while True:
+            if not use_rl:
+                self.train_xe()
+            else:
+                self.train_scst()
 
-        #     val_loss = self.evaluate_loss(self.val_dataloader)
+            val_loss = self.evaluate_loss(self.val_dataloader)
 
-        #     # val scores
-        #     scores = self.evaluate_metrics(self.val_dict_dataloader)
-        #     print("Validation scores", scores)
-        #     val_cider = scores['CIDEr']
+            # val scores
+            scores = self.evaluate_metrics(self.val_dict_dataloader)
+            print("Validation scores", scores)
+            val_cider = scores['CIDEr']
 
-        #     if self.test_dict_dataloader is not None:
-        #         scores = self.evaluate_metrics(self.test_dict_dataloader)
-        #         print("Evaluation scores", scores)
+            if self.test_dict_dataloader is not None:
+                scores = self.evaluate_metrics(self.test_dict_dataloader)
+                print("Evaluation scores", scores)
 
-        #     # Prepare for next epoch
-        #     best = False
-        #     if val_cider >= best_val_cider:
-        #         best_val_cider = val_cider
-        #         patience = 0
-        #         best = True
-        #     else:
-        #         patience += 1
+            # Prepare for next epoch
+            best = False
+            if val_cider >= best_val_cider:
+                best_val_cider = val_cider
+                patience = 0
+                best = True
+            else:
+                patience += 1
 
-        #     switch_to_rl = False
-        #     exit_train = False
+            switch_to_rl = False
+            exit_train = False
 
-        #     if patience == 5:
-        #         if not use_rl:
-        #             use_rl = True
-        #             switch_to_rl = True
-        #             patience = 0
-        #             self.optim = Adam(self.model.parameters(), lr=5e-6)
-        #             print("Switching to RL")
-        #         else:
-        #             print('patience reached.')
-        #             exit_train = True
+            if patience == 5:
+                if not use_rl:
+                    use_rl = True
+                    switch_to_rl = True
+                    patience = 0
+                    self.optim = Adam(self.model.parameters(), lr=5e-6)
+                    print("Switching to RL")
+                else:
+                    print('patience reached.')
+                    exit_train = True
 
-        #     if switch_to_rl and not best:
-        #         self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
+            if switch_to_rl and not best:
+                self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
 
-        #     self.save_checkpoint({
-        #         'val_loss': val_loss,
-        #         'val_cider': val_cider,
-        #         'patience': patience,
-        #         'best_val_cider': best_val_cider,
-        #         'best_test_cider': best_test_cider,
-        #         'use_rl': use_rl,
-        #     })
+            self.save_checkpoint({
+                'val_loss': val_loss,
+                'val_cider': val_cider,
+                'patience': patience,
+                'best_val_cider': best_val_cider,
+                'best_test_cider': best_test_cider,
+                'use_rl': use_rl,
+            })
 
-        #     if best:
-        #         copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
+            if best:
+                copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
 
-        #     if exit_train:
-        #         break
+            if exit_train:
+                break
 
-        #     self.epoch += 1
+            self.epoch += 1
             
-        #     print("+"*10)
+            print("+"*10)
 
     def get_predictions(self, dataset: DictionaryDataset, get_scores=True):
         self.model.eval()
         results = []
         with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
             for it, sample in enumerate(dataset):
-                image_id = sample["image_id"]
-                filename = sample["filename"]
+                image_id = sample["image_ids"]
+                filename = sample["filenames"]
                 features = torch.tensor(sample["features"]).unsqueeze(0).to(device)
                 boxes = sample["boxes"]
                 if boxes is not None:
@@ -365,18 +365,18 @@ class Trainer:
                 grid_sizes = sample["grid_sizes"]
                 if grid_sizes is not None:
                     grid_sizes = torch.tensor(grid_sizes).unsqueeze(0).to(device)
-                caps_gt = sample["captions"]
+                caps_gt = [sample["captions"]]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
                                                 beam_size=config.beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 gts = {}
                 gens = {}
-                for i, (gt_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
+                for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
-                    gts['%d_%d' % (it, i)] = gt_i
-
+                    gts['%d_%d' % (it, i)] = gts_i
+                    
                 gts = evaluation.PTBTokenizer.tokenize(gts)
                 gens = evaluation.PTBTokenizer.tokenize(gens)
                 if get_scores:
@@ -403,5 +403,6 @@ class Trainer:
                 if sample_item["id"] == item["filename"]:
                     generated_captions = list(item["gens"].values())
                     sample_item["captions"] = generated_captions[0]
+                    break
 
         json.dump(sample_json_data, open(os.path.join(config.checkpoint_path, config.model_name, f"{split}_results.json"), "w+"), ensure_ascii=False)
