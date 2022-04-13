@@ -3,7 +3,7 @@ import os
 import pickle
 import numpy as np
 import random
-import config
+import json
 
 from utils.trainer import Trainer
 from data_utils.vocab import Vocab
@@ -70,8 +70,10 @@ else:
 
 if config.sample_public_test_json_path is not None:
     public_results = trainer.get_predictions(public_test_dict_dataset)
+    json.dump(public_results, open("scored_public_results.json"), ensure_ascii=False)
     trainer.convert_results(config.sample_public_test_json_path, public_results, split="public")
 
 if config.sample_private_test_json_path is not None:
     private_results = trainer.get_predictions(private_test_dict_dataset)
+    json.dump(private_results, open("scored_private_results.json"), ensure_ascii=False)
     trainer.convert_results(config.sample_private_test_json_path, private_results, split="private")
