@@ -401,6 +401,7 @@ class Trainer:
         for sample_item in tqdm(sample_json_data, desc="Converting results: "):
             for item in results:
                 if sample_item["id"] == item["filename"]:
-                    sample_item["captions"] = item["gens"].values()[0]
+                    generated_captions = list(item["gens"].values())
+                    sample_item["captions"] = generated_captions[0]
 
         json.dump(sample_json_data, open(os.path.join(config.checkpoint_path, config.model_name, f"{split}_results.json"), "w+"), ensure_ascii=False)
