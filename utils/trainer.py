@@ -354,17 +354,17 @@ class Trainer:
     def get_predictions(self, dataset: DictionaryDataset):
         self.model.eval()
         results = []
-        with tqdm(desc='Evaluating: ', unit='it', total=len(dataset)) as pbar:
+        with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
             for it, sample in enumerate(dataset):
                 image_id = sample["image_id"]
                 filename = sample["filename"]
-                features = torch.tensor(sample["features"]).to(device)
+                features = torch.tensor(sample["features"]).unsqueeze(0).to(device)
                 boxes = sample["boxes"]
                 if boxes is not None:
-                    boxes = torch.tensor(boxes).to(device)
+                    boxes = torch.tensor(boxes).unsqueeze(0).to(device)
                 grid_sizes = sample["grid_sizes"]
                 if grid_sizes is not None:
-                    grid_sizes = torch.tensor(grid_sizes).to(device)
+                    grid_sizes = torch.tensor(grid_sizes).unsqueeze(0).to(device)
                 caps_gt = sample["captions"]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
