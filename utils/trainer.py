@@ -374,7 +374,7 @@ class Trainer:
                 gts = {}
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gen['%d_%d' % (it, i)] = [gen_i, ]
+                    gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
 
                 gts = evaluation.PTBTokenizer.tokenize(gts)
