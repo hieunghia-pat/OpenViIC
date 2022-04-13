@@ -356,8 +356,8 @@ class Trainer:
         results = []
         with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
             for it, sample in enumerate(dataset):
-                image_id = sample["image_ids"]
-                filename = sample["filenames"]
+                image_id = sample["image_id"]
+                filename = sample["filename"]
                 features = torch.tensor(sample["features"]).unsqueeze(0).to(device)
                 boxes = sample["boxes"]
                 if boxes is not None:
