@@ -289,75 +289,75 @@ class Trainer:
             best_test_cider = .0
             patience = 0
 
-        # while True:
-        #     if not use_rl:
-        #         self.train_xe()
-        #     else:
-        #         self.train_scst()
+        while True:
+            if not use_rl:
+                self.train_xe()
+            else:
+                self.train_scst()
 
-        #     val_loss = self.evaluate_loss(self.val_dataloader)
+            val_loss = self.evaluate_loss(self.val_dataloader)
 
-        #     # val scores
-        #     scores = self.evaluate_metrics(self.val_dict_dataloader)
-        #     print("Validation scores", scores)
-        #     val_cider = scores['CIDEr']
+            # val scores
+            scores = self.evaluate_metrics(self.val_dict_dataloader)
+            print("Validation scores", scores)
+            val_cider = scores['CIDEr']
 
-        #     if self.test_dict_dataloader is not None:
-        #         scores = self.evaluate_metrics(self.test_dict_dataloader)
-        #         print("Evaluation scores", scores)
+            if self.test_dict_dataloader is not None:
+                scores = self.evaluate_metrics(self.test_dict_dataloader)
+                print("Evaluation scores", scores)
 
-        #     # Prepare for next epoch
-        #     best = False
-        #     if val_cider >= best_val_cider:
-        #         best_val_cider = val_cider
-        #         patience = 0
-        #         best = True
-        #     else:
-        #         patience += 1
+            # Prepare for next epoch
+            best = False
+            if val_cider >= best_val_cider:
+                best_val_cider = val_cider
+                patience = 0
+                best = True
+            else:
+                patience += 1
 
-        #     switch_to_rl = False
-        #     exit_train = False
+            switch_to_rl = False
+            exit_train = False
 
-        #     if patience == 5:
-        #         if not use_rl:
-        #             use_rl = True
-        #             switch_to_rl = True
-        #             patience = 0
-        #             self.optim = Adam(self.model.parameters(), lr=5e-6)
-        #             print("Switching to RL")
-        #         else:
-        #             print('patience reached.')
-        #             exit_train = True
+            if patience == 5:
+                if not use_rl:
+                    use_rl = True
+                    switch_to_rl = True
+                    patience = 0
+                    self.optim = Adam(self.model.parameters(), lr=5e-6)
+                    print("Switching to RL")
+                else:
+                    print('patience reached.')
+                    exit_train = True
 
-        #     if switch_to_rl and not best:
-        #         self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
+            if switch_to_rl and not best:
+                self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
 
-        #     self.save_checkpoint({
-        #         'val_loss': val_loss,
-        #         'val_cider': val_cider,
-        #         'patience': patience,
-        #         'best_val_cider': best_val_cider,
-        #         'best_test_cider': best_test_cider,
-        #         'use_rl': use_rl,
-        #     })
+            self.save_checkpoint({
+                'val_loss': val_loss,
+                'val_cider': val_cider,
+                'patience': patience,
+                'best_val_cider': best_val_cider,
+                'best_test_cider': best_test_cider,
+                'use_rl': use_rl,
+            })
 
-        #     if best:
-        #         copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
+            if best:
+                copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
 
-        #     if exit_train:
-        #         break
+            if exit_train:
+                break
 
-        #     self.epoch += 1
+            self.epoch += 1
             
-        #     print("+"*10)
+            print("+"*10)
 
     def get_predictions(self, dataset: DictionaryDataset, get_scores=True):
         self.model.eval()
         results = []
         with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
             for it, sample in enumerate(dataset):
-                image_id = sample["image_ids"]
-                filename = sample["filenames"]
+                image_id = sample["image_id"]
+                filename = sample["filename"]
                 features = torch.tensor(sample["features"]).unsqueeze(0).to(device)
                 boxes = sample["boxes"]
                 if boxes is not None:
