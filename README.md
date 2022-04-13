@@ -1,10 +1,10 @@
 OpenViIC - Open Vietnamese Image Captioning
 ====
 
-This is an open-source repository for researching Vietnamese Image Captioning tasks. This repo implements most recent transformer-based state-of-the-art methods on the MS COCO Image Captioning datataset to evaluate them on the first two Vietnamese Image Captioning dataset [UIT-ViIC](https://arxiv.org/pdf/2002.00175.pdf) and [vieCap4H](https://people.cs.umu.se/sonvx/files/VieCap4H_VLSP21.pdf).
+This is an open-source repository for researching Vietnamese Image Captioning task. This repo implements most recent transformer-based state-of-the-art methods on the MS COCO Image Captioning datataset to evaluate them on the first two Vietnamese Image Captioning datasets [UIT-ViIC](https://arxiv.org/pdf/2002.00175.pdf) and [vieCap4H](https://people.cs.umu.se/sonvx/files/VieCap4H_VLSP21.pdf).
 
 ## Implemented modules
-We implemented most recent state-of-the-art (SOTA) transformer-based methods for image captioning on the MS-COCO image captioning dataset. For more detail, in this repo we conducted various encoder and decoder modules which are proposed by recent SOTA methods and you can compose properly together to get an novel method for experiments. For example, you can combine the encoder module equipped AugmentedGeometryScaledDotProductAttention together with the decoder equipped ScaleDotProductAttention the get the [Object Relation Transformer](https://arxiv.org/pdf/1906.05963.pdf) method.
+We implemented most recent state-of-the-art (SOTA) transformer-based methods for image captioning on the MS-COCO image captioning dataset. For more detail, in this repo we conducted various encoder and decoder modules which are proposed by recent SOTA methods and you can compose properly together to get a novel method for experiments. For example, you can combine the encoder module equipped AugmentedGeometryScaledDotProductAttention together with the decoder equipped ScaleDotProductAttention the get the [Object Relation Transformer](https://arxiv.org/pdf/1906.05963.pdf) method.
 
 Specifically, our repo have implemented the following attention-based modules:
 - [ScaledDotProductAttention]()
@@ -21,7 +21,7 @@ For decoder modules, we have implemented:
 - [Transformer-based MeshedDecoder](https://arxiv.org/pdf/1912.08226.pdf) module
 
 ## Configuring the training process
-All configurations of training process are defined in [config.py](config.py). To conducted any transformer-based method, you must defined the encoder_self_attention module for the encoder and its additional arguments, defined the decoder_self_attention and decoder_enc_attention for the decoder module and also specify its additional arguments. For example, when you want to conduct the Meshed-Memory Transformer, you have to conduct the model in the configuration file as follow:
+All configurations of training process are defined in [config.py](config.py). To conducted any transformer-based method, you must defined the encoder_self_attention module for the encoder and its additional arguments, defined the decoder_self_attention and decoder_enc_attention for the decoder module and also specify its additional arguments. For example, when you want to conduct the [Meshed-Memory Transformer](https://arxiv.org/pdf/1912.08226.pdf), you have to conduct the model in the configuration file as follow:
 
 ```python
 encoder_self_attention = AugmentedMemoryScaledDotProductAttention
