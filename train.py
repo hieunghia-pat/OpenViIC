@@ -3,6 +3,7 @@ import os
 import pickle
 import numpy as np
 import random
+import json
 import config
 
 from utils.trainer import Trainer
@@ -11,8 +12,6 @@ from data_utils.dataset import FeatureDataset, DictionaryDataset
 from data_utils.utils import collate_fn
 
 from models.modules.transformer import Transformer
-
-import config
 
 random.seed(13)
 torch.manual_seed(13)
@@ -70,8 +69,10 @@ else:
 
 if config.sample_public_test_json_path is not None:
     public_results = trainer.get_predictions(public_test_dict_dataset)
+    json.dump(public_results, open(os.path.join(config.checkpoint_path, config.model_name, "scored_public_results.json")), ensure_ascii=False)
     trainer.convert_results(config.sample_public_test_json_path, public_results, split="public")
 
 if config.sample_private_test_json_path is not None:
     private_results = trainer.get_predictions(private_test_dict_dataset)
+    json.dump(private_results, open(os.path.join(config.checkpoint_path, config.model_name, "scored_private_results.json")), ensure_ascii=False)
     trainer.convert_results(config.sample_private_test_json_path, private_results, split="private")
