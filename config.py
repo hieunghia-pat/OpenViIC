@@ -17,6 +17,7 @@ refine_epoch_rl = 28
 xe_least = 15
 xe_most = 20
 min_freq = 1
+get_scores = False
 
 # model configuration
 total_memory = 40
