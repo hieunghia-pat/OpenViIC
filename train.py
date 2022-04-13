@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 import random
 import json
+import config
 
 from utils.trainer import Trainer
 from data_utils.vocab import Vocab
@@ -11,8 +12,6 @@ from data_utils.dataset import FeatureDataset, DictionaryDataset
 from data_utils.utils import collate_fn
 
 from models.modules.transformer import Transformer
-
-import config
 
 random.seed(13)
 torch.manual_seed(13)
