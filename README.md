@@ -3,45 +3,59 @@ OpenViIC - Open Vietnamese Image Captioning
 
 This is an open-source repository for researching Vietnamese Image Captioning tasks. This repo implements most recent transformer-based state-of-the-art methods on the MS COCO Image Captioning datataset to evaluate them on the first two Vietnamese Image Captioning dataset [UIT-ViIC](https://arxiv.org/pdf/2002.00175.pdf) and [vieCap4H](https://people.cs.umu.se/sonvx/files/VieCap4H_VLSP21.pdf).
 
+## Implemented modules
+We implemented most recent state-of-the-art (SOTA) transformer-based methods for image captioning on the MS-COCO image captioning dataset. For more detail, in this repo we conducted various encoder and decoder modules which are proposed by recent SOTA methods and you can compose properly together to get an novel method for experiments. For example, you can combine the encoder module equipped AugmentedGeometryScaledDotProductAttention together with the decoder equipped ScaleDotProductAttention the get the [Object Relation Transformer](https://arxiv.org/pdf/1906.05963.pdf) method.
+
+Specifically, our repo have implemented the following attention-based modules:
+- [ScaledDotProductAttention]()
+- [AugmentedGeometryScaledDotProductAttention]()
+- [AugmentedMemoryScaledDotProductAttention]()
+- [AdaptiveScaledDotProductAttention]()
+
+For encoder modules, we have implemented:
+- [Transformer-based Encoder](https://arxiv.org/pdf/1706.03762.pdf) module
+- [Transformer-based MultiLevelEncoder](https://arxiv.org/pdf/1912.08226.pdf) module
+
+For decoder modules, we have implemented:
+- [Transformer-based Decoder](https://arxiv.org/pdf/1706.03762.pdf) module
+- [Transformer-based MeshedDecoder](https://arxiv.org/pdf/1912.08226.pdf) module
+
+## Configuring the training process
+All configurations of training process are defined in [config.py](config.py). To conducted any transformer-based method, you must defined the encoder_self_attention module for the encoder and its additional arguments, defined the decoder_self_attention and decoder_enc_attention for the decoder module and also specify its additional arguments. For example, when you want to conduct the Meshed-Memory Transformer, you have to conduct the model in the configuration file as follow:
+
+```python
+encoder_self_attention = AugmentedMemoryScaledDotProductAttention
+encoder_self_attention_args = {"m": total_memory}
+encoder_args = {}
+decoder_self_attention = ScaledDotProductAttention
+decoder_enc_attention = ScaledDotProductAttention
+decoder_self_attention_args = {}
+decoder_enc_attention_args = {}
+decoder_args = {"N_enc": nlayers}
+encoder = MultiLevelEncoder
+decoder = MeshedDecoder
+transformer_args = {}
+```
+
+For more information about the architecture and arguments of each module, please visit [models/modules](models/modules/) directory.
+
 ## Current approaches used in this project
 
-### Region-based visual feature using [Faster-RCNN](https://arxiv.org/pdf/1506.01497.pdf)
+### Feature Representation
 
-![Bottom-up example 1](images/bottom_up/rcnn_example_1.png)
-![Bottom-up example 1](images/bottom_up/rcnn_example_2.png)
+#### Region-based visual feature using [Faster-RCNN](https://arxiv.org/pdf/1506.01497.pdf)
 
-[Bottom-up and Top-down attention](https://arxiv.org/abs/1707.07998) is an effective way to ignore unnecessary regions of the images, focus the deep learning methods to important regions for better image understanding.
+#### [Grid-based visual feature](https://arxiv.org/pdf/2001.03615.pdf)
 
-### [Grid-based visual feature](https://arxiv.org/pdf/2001.03615.pdf)
+### Transformer-based methods
 
-[Huaizu et al.](https://arxiv.org/pdf/2001.03615.pdf) argued that the region-based features used in Bottom-up Attention requires too much resource to compute but there is no emperical study on the effect of grid-based features compared to region-based features. Hence [Huaizu et al.](https://arxiv.org/pdf/2001.03615.pdf) do experiments on various tasks and architectures to prove that the utilization of grid-based features can have comparable performance to region-based features on various architectures while reduce significantly resource needed to create region-based features, which leads to faster inference.
+#### [Attention on Attention Network](https://arxiv.org/pdf/1908.06954.pdf)
 
-### [Attention on Attention Network](https://arxiv.org/pdf/1908.06954.pdf)
+#### [Object Relation Transformer](https://arxiv.org/pdf/1906.05963.pdf)
 
-![Attention on Attention](images/AoA/aoa.png)
+#### [Meshed-Memory Transformer](https://arxiv.org/pdf/1912.08226.pdf)
 
-Firstly proposed by [Huang et al.](https://arxiv.org/pdf/1908.06954.pdf) to enhance the correlation between query vector and output vector of the [original transformer](https://arxiv.org/pdf/1706.03762) layer.
-
-### [Object Relation Transformer](https://arxiv.org/pdf/1906.05963.pdf)
-
-<img src="images/ORT/ORT.jpg" width="700">
-<img src="images/ORT/geometric_attention.png" width="700">
-
-Built on top of Bottom-up Attention mechanisms, Object Relation Transformer (ORT) provides its encoder layers geometric information of objects in image for better understading the image.
-
-### [Meshed-Memory Transformer](https://arxiv.org/pdf/1912.08226.pdf)
-
-<img src="images/m2/m2.png" width="700" />
-
-Built on top of Buttom-up Attention, Meshed-Memory Transformer uses augmented memory to catch internal relation between objects in images. Moreover, Meshed-Memory Transformer is also equipped meshed decoder layers for better language understanding and generating.
-
-### [RSTNet](https://openaccess.thecvf.com/content/CVPR2021/papers/Zhang_RSTNet_Captioning_With_Adaptive_Attention_on_Visual_and_Non-Visual_Words_CVPR_2021_paper.pdf)
-
-<img src="images/RSTNet/RSTNet.png" width="700" />
-
-Built on top of the Object Relation Transformer method but using [grid-based features](https://arxiv.org/pdf/2001.03615.pdf) instead of region-based features. Moreover, RSTNet uses an external pretrained language model to make the second attention stage to enhance the correlation between latent objects in image with visual/non-visual generated words.
-
-In this work, we use [PhoBERT](https://aclanthology.org/2020.findings-emnlp.92.pdf) which is a pretrained language model for Vietnamese instead of [BERT](https://arxiv.org/pdf/1810.04805.pdf).
+#### [RSTNet](https://openaccess.thecvf.com/content/CVPR2021/papers/Zhang_RSTNet_Captioning_With_Adaptive_Attention_on_Visual_and_Non-Visual_Words_CVPR_2021_paper.pdf)
 
 ## Contact
 This project constructed under instruction of the NLP@UIT research group. For more information about the NLP@UIT group or relevant publications, please visit [http://nlp.uit.edu.vn/](http://nlp.uit.edu.vn/).
