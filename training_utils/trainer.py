@@ -343,7 +343,10 @@ class Trainer:
             
             print("+"*10)
 
-    def get_predictions(self, dataset: DictionaryDataset, get_scores=True):
+    def get_predictions(self, dataset: DictionaryDataset, checkpoint_filename: str=None, get_scores=True):
+        if checkpoint_filename is not None and os.path.isfile(checkpoint_filename):
+            self.load_checkpoint(checkpoint_filename)
+            
         self.model.eval()
         results = []
         with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
