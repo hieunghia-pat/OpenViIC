@@ -67,12 +67,16 @@ if config.start_from:
 else:
     trainer.train()
 
-if config.sample_public_test_json_path is not None:
+if public_test_dict_dataset is not None:
     public_results = trainer.get_predictions(public_test_dict_dataset, get_scores=config.get_scores)
     json.dump(public_results, open(os.path.join(config.checkpoint_path, config.model_name, "scored_public_results.json"), "w+"), ensure_ascii=False)
+
+if private_test_dict_dataset is not None:
+    private_results = trainer.get_predictions(private_test_dict_dataset, get_scores=config.get_scores)
+    json.dump(private_results, open(os.path.join(config.checkpoint_path, config.model_name, "scored_private_results.json"), "w+"), ensure_ascii=False)
+
+if config.sample_public_test_json_path is not None:
     trainer.convert_results(config.sample_public_test_json_path, public_results, split="public")
 
 if config.sample_private_test_json_path is not None:
-    private_results = trainer.get_predictions(private_test_dict_dataset, get_scores=config.get_scores)
-    json.dump(private_results, open(os.path.join(config.checkpoint_path, config.model_name, "scored_private_results.json"), "w+"), ensure_ascii=False)
     trainer.convert_results(config.sample_private_test_json_path, private_results, split="private")
