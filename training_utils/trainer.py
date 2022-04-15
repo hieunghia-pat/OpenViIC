@@ -357,7 +357,7 @@ class Trainer:
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = torch.tensor(boxes).unsqueeze(0).to(device)
-                grid_sizes = sample["grid_sizes"]
+                grid_sizes = sample["grid_size"]
                 caps_gt = [sample["captions"]]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
