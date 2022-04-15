@@ -64,6 +64,7 @@ class DictionaryDataset(data.Dataset):
             boxes = feature["boxes"]
         else:
             boxes = None
+
         if "grid_size" in feature:
             grid_size = feature["grid_size"]
         else:
