@@ -149,7 +149,7 @@ class AoADecoderLayer(Module):
                                             attention_module=self_att_module,
                                             attention_module_kwargs=self_att_module_kwargs)
 
-    def forward(self, input, enc_output, language_signals=None, mask_pad=None, mask_self_att=None, positional_emb=None):
+    def forward(self, input, enc_output, language_signals=None, positional_emb=None, mask_pad=None, mask_self_att=None, mask_enc_att=None):
         if positional_emb is not None:
             key = enc_output + positional_emb
         else:
