@@ -140,7 +140,7 @@ class AoADecoderLayer(Module):
                     use_aoa=False, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
         super(AoADecoderLayer, self).__init__()
 
-        self.lstm = nn.LSTM(input_size=d_model+d_model, hidden_size=d_model, batch_first=True, dropout=dropout)
+        self.lstm = nn.LSTM(input_size=d_model+d_model, hidden_size=d_model, batch_first=True)
 
         if self_att_module is None:
             self_att_module = ScaledDotProductAttention
