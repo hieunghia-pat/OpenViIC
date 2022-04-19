@@ -137,7 +137,7 @@ class AdaptiveDecoderLayer(Module):
 
 class AoADecoderLayer(Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                 enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                    use_aoa=False, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
         super(AoADecoderLayer, self).__init__()
 
         self.lstm = nn.LSTM(input_size=d_model+d_model, hidden_size=d_model, batch_first=True, dropout=dropout)
@@ -145,7 +145,7 @@ class AoADecoderLayer(Module):
         if self_att_module is None:
             self_att_module = ScaledDotProductAttention
         self.self_attn = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=True,
-                                            use_aoa=True,
+                                            use_aoa=use_aoa,
                                             attention_module=self_att_module,
                                             attention_module_kwargs=self_att_module_kwargs)
 
