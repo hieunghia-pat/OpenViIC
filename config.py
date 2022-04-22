@@ -7,7 +7,7 @@ from models.modules.decoders import *
 
 # training configuration
 checkpoint_path = "saved_models"
-start_from = "best_model.pth"
+start_from = None
 learning_rate = 1.
 epochs = 20
 warmup = 10000
@@ -41,7 +41,7 @@ pretrained_language_model = None    # PhoBERTModel
                                     # ViGPTModel
 
 language_model_hidden_size = 768
-encoder_self_attention = AugmentedGeometryScaledDotProductAttention
+encoder_self_attention = ScaledDotProductAttention
 encoder_self_attention_args = {}
 encoder_args = {}
 decoder_self_attention = ScaledDotProductAttention
