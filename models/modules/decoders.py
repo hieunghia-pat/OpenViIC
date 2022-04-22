@@ -104,18 +104,18 @@ class MeshedDecoderLayer(Module):
 
 class AdaptiveDecoderLayer(Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                 enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                 use_aoa=False, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
         super(AdaptiveDecoderLayer, self).__init__()
         if self_att_module is None:
             self_att_module = ScaledDotProductAttention
         self.self_attn = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=True,
-                                           attention_module=self_att_module,
-                                           attention_module_kwargs=self_att_module_kwargs)
+                                            use_aoa=use_aoa, attention_module=self_att_module,
+                                            attention_module_kwargs=self_att_module_kwargs)
 
         if enc_att_module is None:
             enc_att_module = AdaptiveScaledDotProductAttention
         self.enc_attn = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=False, 
-                                            attention_module=enc_att_module, 
+                                            use_aoa=use_aoa, attention_module=enc_att_module, 
                                             attention_module_kwargs=enc_att_module_kwargs)
 
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
@@ -134,43 +134,6 @@ class AdaptiveDecoderLayer(Module):
         ff = self.pwff(enc_att)
         ff = ff.masked_fill(mask_pad, value=0)
         return ff
-
-class AoADecoderLayer(Module):
-    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                    use_aoa=False, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
-        super(AoADecoderLayer, self).__init__()
-
-        self.lstm = nn.LSTM(input_size=d_model+d_model, hidden_size=d_model, batch_first=True)
-
-        if self_att_module is None:
-            self_att_module = ScaledDotProductAttention
-        self.self_attn = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=True,
-                                            use_aoa=use_aoa,
-                                            attention_module=self_att_module,
-                                            attention_module_kwargs=self_att_module_kwargs)
-
-    def forward(self, input, enc_output, language_signals=None, positional_emb=None, mask_pad=None, mask_self_att=None, mask_enc_att=None):
-        if positional_emb is not None:
-            key = enc_output + positional_emb
-        else:
-            key = enc_output
-        
-        bs, enc_len, d_model = enc_output.shape
-        _, seq_len, _ = input.shape
-        attended_vector = torch.sum(enc_output, dim=-2) / enc_len
-        
-        context_vector = torch.zeros_like(attended_vector)
-        hidden_state = torch.zeros_like(attended_vector)
-        cell_state = torch.zeros_like(attended_vector)
-        enc_attn = torch.zeros(bs, seq_len, d_model).to(input.device)
-        for ith in range(seq_len):
-            x = torch.cat([input[:, ith, :], attended_vector], dim=-1).unsqueeze(dim=-2)
-            _, (hidden_state, cell_state) = self.lstm(x, (hidden_state, cell_state))
-            context_vector = self.self_attn(hidden_state.unsqueeze(-2), key, enc_output, language_signals=language_signals,
-                                                attention_mask=mask_self_att).squeeze(dim=-2)
-            enc_attn[:, ith, :] = context_vector
-        
-        return enc_attn
 
 class Decoder(Module):
     "Generic N layer decoder with masking."
@@ -264,7 +227,7 @@ class MeshedDecoder(Module):
 
 class AdaptiveDecoder(Module):
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
-                    pretrained_language_model, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
+                    pretrained_language_model, use_aoa=False, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
                     bert_hidden_size=768, dropout=.1, weights=None, 
                     self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
         super(AdaptiveDecoder, self).__init__()
@@ -272,11 +235,11 @@ class AdaptiveDecoder(Module):
         self.word_emb = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
         self.layers = ModuleList(
-            [   DecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, self_att_module=self_att_module, 
+            [   DecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa, self_att_module=self_att_module, 
                                 enc_att_module=enc_att_module, self_att_module_kwargs=self_att_module_kwargs, 
                                 enc_att_module_kwargs=enc_att_module_kwargs) 
             if i < N_dec else 
-                AdaptiveDecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, 
+                AdaptiveDecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa,
                                         self_att_module=self_att_module, enc_att_module=enc_att_module, 
                                         self_att_module_kwargs=self_att_module_kwargs, 
                                         enc_att_module_kwargs=enc_att_module_kwargs) for i in range(N_dec + 1)
@@ -330,52 +293,6 @@ class AdaptiveDecoder(Module):
                         mask_self_att=mask_self_attention, mask_enc_att=mask_encoder, positional_emb=positional_emb)
             else:
                 out = layer(out, encoder_output, language_signals=language_feature, mask_pad=mask_queries.unsqueeze(-1),
-                        mask_self_att=mask_self_attention, mask_enc_att=mask_encoder, positional_emb=positional_emb)
-
-        out = self.fc(out)
-        return F.log_softmax(out, dim=-1)
-
-class AoADecoder(Module):
-    "Generic N layer decoder with masking."
-    def __init__(self, vocab_size, max_len, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
-                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
-        super(AoADecoder, self).__init__()
-        
-        self.d_model = d_model
-        self.word_emb = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
-        self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
-        self.layers = ModuleList(
-            [AoADecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, self_att_module=self_att_module, use_aoa=use_aoa,
-                                enc_att_module=enc_att_module, self_att_module_kwargs=self_att_module_kwargs,
-                                enc_att_module_kwargs=enc_att_module_kwargs) for _ in range(N_dec)])
-        self.fc = nn.Linear(d_model, vocab_size, bias=False)
-        self.max_len = max_len
-        self.padding_idx = padding_idx
-        self.N = N_dec
-
-        self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
-        self.register_state('running_seq', torch.zeros((1,)).long())
-
-    def forward(self, input, encoder_output, mask_encoder=None, positional_emb=None):
-        # input (b_s, seq_len)
-        b_s, seq_len = input.shape[:2]
-        mask_queries = generate_padding_mask(input, self.padding_idx).to(input.device)  # (b_s, seq_len)
-        mask_self_attention = generate_sequential_mask(seq_len).to(input.device)
-        mask_self_attention = mask_self_attention.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
-        mask_self_attention = torch.logical_or(mask_self_attention, mask_queries.unsqueeze(1).unsqueeze(1))
-        if self._is_stateful:
-            self.running_mask_self_attention = torch.cat([self.running_mask_self_attention, mask_self_attention], -1)
-            mask_self_attention = self.running_mask_self_attention
-
-        seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(input.device)  # (b_s, seq_len)
-        seq = seq.masked_fill(mask_queries, 0)
-        if self._is_stateful:
-            self.running_seq.add_(1)
-            seq = self.running_seq
-
-        out = self.word_emb(input) + self.pos_emb(seq)
-        for layer in self.layers:
-            out = layer(out, encoder_output, mask_pad=mask_queries.unsqueeze(-1), 
                         mask_self_att=mask_self_attention, mask_enc_att=mask_encoder, positional_emb=positional_emb)
 
         out = self.fc(out)
