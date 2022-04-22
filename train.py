@@ -25,7 +25,7 @@ if not os.path.isdir(os.path.join(config.checkpoint_path, config.model_name)):
 
 # Creating vocabulary and dataset
 if not os.path.isfile(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl")):
-    vocab = Vocab([config.train_json_path, config.val_json_path])
+    vocab = Vocab([config.train_json_path, config.val_json_path], tokenizer=config.tokenizer)
     pickle.dump(vocab, open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "wb"))
 else:
     vocab = pickle.load(open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "rb"))
@@ -68,11 +68,15 @@ else:
     trainer.train()
 
 if public_test_dict_dataset is not None:
-    public_results = trainer.get_predictions(public_test_dict_dataset, get_scores=config.get_scores)
+    public_results = trainer.get_predictions(public_test_dict_dataset,
+                                                checkpoint_filename=os.path.join(config.checkpoint_path, config.model_name, config.start_from),
+                                                get_scores=config.get_scores)
     json.dump(public_results, open(os.path.join(config.checkpoint_path, config.model_name, "scored_public_results.json"), "w+"), ensure_ascii=False)
 
 if private_test_dict_dataset is not None:
-    private_results = trainer.get_predictions(private_test_dict_dataset, get_scores=config.get_scores)
+    private_results = trainer.get_predictions(private_test_dict_dataset,
+                                                checkpoint_filename=os.path.join(config.checkpoint_path, config.model_name, config.start_from),
+                                                get_scores=config.get_scores)
     json.dump(private_results, open(os.path.join(config.checkpoint_path, config.model_name, "scored_private_results.json"), "w+"), ensure_ascii=False)
 
 if config.sample_public_test_json_path is not None:
