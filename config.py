@@ -30,7 +30,7 @@ d_ff = 2048
 d_feature = 2048
 dropout = .1
 beam_size = 5
-model_name = "ort_using_grid"
+model_name = "ort_using_region"
 pretrained_language_model_name = None                   # vinai/phobert-base
                                                         # vinai/phobert-large
                                                         # vinai/bartpho-syllable
