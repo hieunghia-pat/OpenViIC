@@ -1,7 +1,7 @@
 import torch
 from torchvision import transforms
 import re
-from typing import Callable, Union
+from typing import Callable
 
 def get_tokenizer(tokenizer):
     if callable(tokenizer):

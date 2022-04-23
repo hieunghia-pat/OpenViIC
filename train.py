@@ -4,7 +4,7 @@ import dill as pickle
 import numpy as np
 import random
 import json
-import config
+import configuration
 
 from training_utils.trainer import Trainer
 from data_utils.vocab import Vocab
@@ -16,6 +16,11 @@ from models.modules.transformer import Transformer
 random.seed(13)
 torch.manual_seed(13)
 np.random.seed(13)
+
+if not os.path.isfile(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl")):
+    pickle.dump(configuration, open(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl"), "wb"))
+
+config: configuration = pickle.load(open(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl"), "rb"))
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -61,7 +66,7 @@ decoder = config.decoder(vocab_size=len(vocab), max_len=vocab.max_caption_length
 model = Transformer(vocab.bos_idx, encoder, decoder, **config.transformer_args).to(device)
 
 trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),
-                    test_datasets=(public_test_dataset, public_test_dict_dataset), vocab=vocab, collate_fn=collate_fn)
+                    test_datasets=(public_test_dataset, public_test_dict_dataset), vocab=vocab, config=config, collate_fn=collate_fn)
 
 if config.start_from:
     trainer.train(os.path.join(config.checkpoint_path, config.model_name, config.start_from))
