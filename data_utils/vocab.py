@@ -2,7 +2,7 @@ import torch
 
 from data_utils.vector import Vectors
 from data_utils.vector import pretrained_aliases
-from data_utils.utils import preprocess_caption, unk_init
+from data_utils.utils import get_tokenizer, preprocess_caption, unk_init
 
 from transformers import AutoTokenizer
 
@@ -11,8 +11,6 @@ import logging
 import six
 import json
 from typing import List, Union
-
-import config
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +25,7 @@ class Vocab(object):
     """
     def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", eos_token="<eos>", padding_token="<pad>",
                  pretrained_language_model_name=None, unk_token="<unk>", vectors=None, 
-                 unk_init=unk_init, vectors_cache=None, tokenizer: Union[str, None]=None):
+                 unk_init=unk_init, vectors_cache=None, tokenizer_name: Union[str, None]=None):
         """Create a Vocab object from a collections.Counter.
         Arguments:
             counter: collections.Counter object holding the frequencies of
@@ -45,7 +43,7 @@ class Vocab(object):
             vectors_cache: directory for cached vectors. Default: '.vector_cache'
         """
 
-        self.tokenizer = tokenizer
+        self.tokenizer = get_tokenizer(tokenizer_name)
         
         if pretrained_language_model_name is not None:
             self.token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
