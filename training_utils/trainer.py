@@ -29,8 +29,13 @@ class Trainer:
                         collate_fn=collate_fn):
         self.model = model
         self.vocab = vocab
+
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
+
+        self.optim_rl = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
+        self.scheduler_rl = LambdaLR(self.optim_rl, self.lambda_lr_rl)
+        
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
         
         self.epoch = 0
@@ -133,7 +138,7 @@ class Trainer:
                 caps_gt = sample["captions"]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                beam_size=config.beam_size, out_size=1)
+                                                beam_size=config.evaluating_beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -194,8 +199,8 @@ class Trainer:
                 grid_sizes = sample["grid_sizes"]
                 caps_gt = sample["captions"]
                 outs, log_probs = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
-                                                    beam_size=config.beam_size, out_size=config.beam_size)
-                self.optim.zero_grad()
+                                                    beam_size=config.training_beam_size, out_size=config.training_beam_size)
+                self.optim_rl.zero_grad()
 
                 # Rewards
                 caps_gen = vocab.decode_caption(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
@@ -208,7 +213,8 @@ class Trainer:
 
                 loss = loss.mean()
                 loss.backward()
-                self.optim.step()
+                self.optim_rl.step()
+                self.scheduler_rl.step()
 
                 running_loss += loss.item()
                 running_reward += reward.mean().item()
@@ -217,10 +223,30 @@ class Trainer:
                                 reward_baseline=running_reward_baseline / (it + 1))
                 pbar.update()
 
-    def lambda_lr(self, step):
-        warm_up = config.warmup
-        step += 1
-        return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
+    def lambda_lr(self, s):
+        if s <= 3:
+            lr = config.xe_base_lr * s / 4
+        elif s <= 10:
+            lr = config.xe_base_lr
+        elif s <= 12:
+            lr = config.xe_base_lr * 0.2
+        else:
+            lr = config.xe_base_lr * 0.2 * 0.2
+        
+        return lr
+    
+    def lambda_lr_rl(self, s):
+        refine_epoch = config.refine_epoch_rl 
+        if s <= refine_epoch:
+            lr = config.rl_base_lr
+        elif s <= refine_epoch + 3:
+            lr = config.rl_base_lr * 0.2
+        elif s <= refine_epoch + 6:
+            lr = config.rl_base_lr * 0.2 * 0.2
+        else:
+            lr = config.rl_base_lr * 0.2 * 0.2 * 0.2
+        
+        return lr
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):
@@ -233,6 +259,15 @@ class Trainer:
         np.random.set_state(checkpoint['numpy_rng_state'])
         random.setstate(checkpoint['random_rng_state'])
 
+        use_rl = checkpoint["use_rl"]
+
+        if not use_rl:
+            self.optim.load_state_dict(checkpoint['optimizer'])
+            self.scheduler.load_state_dict(checkpoint['scheduler'])
+        else:
+            self.optim_rl.load_state_dict(checkpoint['optimizer'])
+            self.scheduler_rl.load_state_dict(checkpoint['scheduler'])
+
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
         print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
@@ -242,9 +277,7 @@ class Trainer:
             "best_val_cider": checkpoint['best_val_cider'],
             "best_test_cider": checkpoint['best_test_cider'],
             "patience": checkpoint['patience'],
-            "epoch": checkpoint["epoch"],
-            "optimizer": checkpoint["optimizer"],
-            "scheduler": checkpoint["scheduler"]
+            "epoch": checkpoint["epoch"]
         }
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
@@ -254,13 +287,20 @@ class Trainer:
             'numpy_rng_state': np.random.get_state(),
             'random_rng_state': random.getstate(),
             'epoch': self.epoch,
-            'state_dict': self.model.state_dict(),
-            'optimizer': self.optim.state_dict(),
-            'scheduler': self.scheduler.state_dict()
+            'state_dict': self.model.state_dict()
         }
 
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
+
+        use_rl = dict_for_saving["use_rl"]
+
+        if use_rl:
+            dict_for_saving["optimizer"] = self.optim_rl.state_dict()
+            dict_for_saving["scheduler"] = self.scheduler_rl.state_dict()
+        else:
+            dict_for_saving["optimizer"] = self.optim.state_dict()
+            dict_for_saving["scheduler"] = self.scheduler.state_dict()
 
         torch.save(dict_for_saving, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
 
@@ -273,8 +313,6 @@ class Trainer:
             best_test_cider = checkpoint["best_test_cider"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
-            self.optim.load_state_dict(checkpoint['optimizer'])
-            self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
             use_rl = False
             best_val_cider = .0
