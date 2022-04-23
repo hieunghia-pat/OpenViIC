@@ -25,7 +25,8 @@ if not os.path.isdir(os.path.join(config.checkpoint_path, config.model_name)):
 
 # Creating vocabulary and dataset
 if not os.path.isfile(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl")):
-    vocab = Vocab([config.train_json_path, config.val_json_path], tokenizer=config.tokenizer)
+    vocab = Vocab([config.train_json_path, config.val_json_path], tokenizer=config.tokenizer, 
+                    pretrained_language_model_name=config.pretrained_language_model_name)
     pickle.dump(vocab, open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "wb"))
 else:
     vocab = pickle.load(open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "rb"))
