@@ -7,8 +7,6 @@ from models.modules.encoders import EncoderLayer
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
 from models.modules.containers import Module
 
-import config
-
 # class BERTModel(Module):
 #     def __init__(self, padding_idx=0, bert_hidden_size=768, vocab_size=10201, pretrained_language_model=config.pretrained_language_model,
 #                     d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, max_len=54, dropout=.1):

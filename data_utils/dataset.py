@@ -11,13 +11,13 @@ from typing import Dict, List, Union
 from collections import defaultdict
 
 class DictionaryDataset(data.Dataset):
-    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None, tokenizer: Union[str, None] = None) -> None:
+    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
         super(DictionaryDataset, self).__init__()
         with open(json_path, 'r') as file:
             json_data = json.load(file)
 
         # vocab
-        self.vocab = Vocab([json_path], tokenizer=tokenizer) if vocab is None else vocab
+        self.vocab = Vocab([json_path], tokenizer_name=tokenizer_name) if vocab is None else vocab
 
         # captions
         self.image_ids, self.filenames, self.captions_with_image = self.load_json(json_data)
@@ -97,13 +97,13 @@ class DictionaryDataset(data.Dataset):
         return len(self.image_ids)
 
 class FeatureDataset(data.Dataset):
-    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None, tokenizer: Union[str, None] = None) -> None:
+    def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
         super(FeatureDataset, self).__init__()
         with open(json_path, 'r') as file:
             json_data = json.load(file)
 
         # vocab
-        self.vocab = Vocab([json_path], tokenizer=tokenizer) if vocab is None else vocab
+        self.vocab = Vocab([json_path], tokenizer_name=tokenizer_name) if vocab is None else vocab
 
         # captions
         self.annotations = self.load_json(json_data)

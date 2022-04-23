@@ -1,8 +1,7 @@
-from collections import defaultdict
 import torch
 from torchvision import transforms
 import re
-from typing import Union
+from typing import Callable
 
 def get_tokenizer(tokenizer):
     if callable(tokenizer):
@@ -32,6 +31,7 @@ def get_tokenizer(tokenizer):
         try:
             from vncorenlp import VnCoreNLP
             annotator = VnCoreNLP(r"data_utils/vncorenlp/VnCoreNLP-1.1.1.jar", port=9000, annotators="wseg", max_heap_size='-Xmx500m')
+            # annotator = VnCoreNLP(address="http://127.0.0.1", port=9000, max_heap_size='-Xmx500m')
 
             def tokenize(s: str):
                 words = annotator.tokenize(s)[0]
@@ -47,7 +47,7 @@ def get_tokenizer(tokenizer):
                   "See the docs at https://github.com/vncorenlp/VnCoreNLP for more information.")
             raise
 
-def preprocess_caption(caption, tokenizer: Union[str, None]):
+def preprocess_caption(caption, tokenizer: Callable):
     caption = re.sub(r"[“”]", "\"", caption)
     caption = re.sub(r"!", " ! ", caption)
     caption = re.sub(r"\?", " ? ", caption)
@@ -67,7 +67,7 @@ def preprocess_caption(caption, tokenizer: Union[str, None]):
     caption = re.sub(r"\&", " & ", caption)
     caption = re.sub(r"\*", " * ", caption)
     # tokenize the caption
-    caption = get_tokenizer(tokenizer)(caption)
+    caption = tokenizer(caption)
     caption = " ".join(caption.strip().split()) # remove duplicated spaces
     tokens = caption.strip().split()
     
