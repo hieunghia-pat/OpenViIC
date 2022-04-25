@@ -64,13 +64,13 @@ class Trainer:
         # creating dictionary iterable-dataset data loader
         self.train_dict_dataloader = data.DataLoader(
             dataset=self.train_dict_dataset,
-            batch_size=self.config.batch_size // self.config.beam_size,
+            batch_size=self.config.batch_size // self.config.training_beam_size,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.val_dict_dataloader = data.DataLoader(
             dataset=self.val_dict_dataset,
-            batch_size=self.config.batch_size // self.config.beam_size,
+            batch_size=self.config.batch_size // self.config.training_beam_size,
             shuffle=True,
             collate_fn=collate_fn
         )
@@ -91,7 +91,7 @@ class Trainer:
         if self.test_dict_dataset is not None:
             self.test_dict_dataloader = data.DataLoader(
                 dataset=self.test_dict_dataset,
-                batch_size=self.config.batch_size // self.config.beam_size,
+                batch_size=self.config.batch_size // self.config.training_beam_size,
                 shuffle=True,
                 collate_fn=collate_fn
             )
@@ -206,10 +206,10 @@ class Trainer:
 
                 # Rewards
                 caps_gen = vocab.decode_caption(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
-                caps_gt = list(itertools.chain(*([c, ] * self.config.beam_size for c in caps_gt)))
+                caps_gt = list(itertools.chain(*([c, ] * self.config.training_beam_size for c in caps_gt)))
                 caps_gen, caps_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [caps_gen, caps_gt])
                 reward = self.train_cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
-                reward = torch.from_numpy(reward).to(device).view(features.shape[0], self.config.beam_size)
+                reward = torch.from_numpy(reward).to(device).view(features.shape[0], self.config.training_beam_size)
                 reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
                 loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
 
@@ -403,7 +403,7 @@ class Trainer:
                 caps_gt = [sample["captions"]]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                beam_size=self.config.beam_size, out_size=1)
+                                                beam_size=self.config.evaluating_beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 gts = {}
                 gens = {}

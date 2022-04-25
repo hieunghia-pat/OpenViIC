@@ -11,6 +11,7 @@ import logging
 import six
 import json
 from typing import List, Union
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,6 @@ class Vocab(object):
         captions = []
         for vec in caption_vecs:
             caption = " ".join([self.itos[idx] for idx in vec.tolist() if self.itos[idx] not in self.specials])
-            caption = caption.replace("_", " ")
             if join_words:
                 captions.append(caption)
             else:
@@ -157,7 +157,7 @@ class Vocab(object):
             decoded_captions = []
             for caption in list_captions:
                 decoded_caption: str = self.token_encoder.decode(caption)
-                decoded_caption = decoded_caption.replace("_", " ").strip().split()
+                decoded_caption = re.sub("\.", " .", decoded_caption).strip().split()
                 decoded_caption = [token for token in decoded_caption if token not in self.specials]
                 if join_words:
                     decoded_caption = " ".join(decoded_caption)
