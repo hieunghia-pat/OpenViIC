@@ -85,7 +85,7 @@ class BERTModel(Module):
             
         self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
 
-        self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
+        self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
         self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
         self.proj_to_vocab = nn.Linear(d_model, vocab_size)
 
@@ -98,7 +98,7 @@ class BERTModel(Module):
         mask_self_attention = generate_sequential_mask(seq_len).to(input_ids.device)
         mask_self_attention = mask_self_attention.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
         mask_self_attention = torch.logical_or(mask_self_attention, mask_queries.unsqueeze(1).unsqueeze(1))
-                
+
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(input_ids.device)  # (b_s, seq_len)
         seq = seq.masked_fill(mask_queries, 0)
 
@@ -123,7 +123,7 @@ class BERTModel(Module):
         return out, language_feature
 
 class PhoBERTModel(Module):
-    def __init__(self, pretrained_language_model_name, padding_idx=0, bert_hidden_size=768, vocab_size=10201,
+    def __init__(self, pretrained_language_model_name, padding_idx=1, bert_hidden_size=768, vocab_size=10201,
                     d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, max_len=54, dropout=.1):
         super(PhoBERTModel, self).__init__()
         self.padding_idx = padding_idx
@@ -137,7 +137,7 @@ class PhoBERTModel(Module):
             
         self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
 
-        self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
+        self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
         self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
         self.proj_to_vocab = nn.Linear(d_model, vocab_size)
 

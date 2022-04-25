@@ -276,7 +276,7 @@ class AdaptiveDecoder(Module):
             seq = self.running_seq
 
         out = self.word_emb(input) + self.pos_emb(seq)
-        _, language_feature = self.language_model(input)
+        _, language_feature = self.language_model(input, attention_mask=torch.logical_not(mask_queries))
 
         # special process for the beam search of inference
         if encoder_output.shape[0] > positional_emb.shape[0]:
