@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from transformers import BertModel, RobertaModel
-from models.modules.decoders import Decoder
+from models.modules.decoders import Decoder, AdaptiveLanguageDecoder
 
 from models.modules.encoders import EncoderLayer
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
@@ -151,7 +151,7 @@ class AdaptiveBERTModel(Module):
         self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
-        self.decoder = Decoder(vocab_size=vocab_size, max_len=max_len, N_dec=N_dec, padding_idx=padding_idx, 
+        self.decoder = AdaptiveLanguageDecoder(vocab_size=vocab_size, max_len=max_len, N_dec=N_dec, padding_idx=padding_idx, 
                                 use_aoa=use_aoa, d_model=d_model, d_k=d_k, d_v=d_v, h=h, d_ff=d_ff, dropout=dropout,
                                 self_att_module=self_att_module, enc_att_module=enc_att_module, 
                                 self_att_module_kwargs=self_att_module_kwargs, enc_att_module_kwargs=enc_att_module_kwargs)
@@ -183,7 +183,7 @@ class AdaptiveBERTModel(Module):
         language_feature = language_feature + self.pos_emb(seq)
 
         # fine tuning the pretrained BERT-based model
-        out = self.decoder(language_feature, encoder_output, mask_encoder=mask_encoder, positional_emb=positional_emb)
+        out = self.decoder(language_feature, encoder_output, mask_pad_language=mask_queries, mask_encoder=mask_encoder, positional_emb=positional_emb)
 
         return out
 
@@ -205,7 +205,7 @@ class AdaptivePhoBERTModel(Module):
         self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
-        self.decoder = Decoder(vocab_size=vocab_size, max_len=max_len, N_dec=N_dec, padding_idx=padding_idx, 
+        self.decoder = AdaptiveLanguageDecoder(vocab_size=vocab_size, max_len=max_len, N_dec=N_dec, padding_idx=padding_idx, 
                                 use_aoa=use_aoa, d_model=d_model, d_k=d_k, d_v=d_v, h=h, d_ff=d_ff, dropout=dropout,
                                 self_att_module=self_att_module, enc_att_module=enc_att_module, 
                                 self_att_module_kwargs=self_att_module_kwargs, enc_att_module_kwargs=enc_att_module_kwargs)
@@ -237,6 +237,6 @@ class AdaptivePhoBERTModel(Module):
         language_feature = language_feature + self.pos_emb(seq)
 
         # fine tuning the pretrained BERT-based model
-        out = self.decoder(language_feature, encoder_output, mask_encoder=mask_encoder, positional_emb=positional_emb)
+        out = self.decoder(language_feature, encoder_output, mask_pad_language=mask_queries, mask_encoder=mask_encoder, positional_emb=positional_emb)
 
         return out
