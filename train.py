@@ -17,6 +17,9 @@ random.seed(13)
 torch.manual_seed(13)
 np.random.seed(13)
 
+if not os.path.isdir(os.path.join(configuration.checkpoint_path, configuration.model_name)):
+    os.makedirs(os.path.join(configuration.checkpoint_path, configuration.model_name))
+
 if not os.path.isfile(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl")):
     pickle.dump(configuration, open(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl"), "wb"))
 
