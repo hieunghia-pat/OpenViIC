@@ -139,7 +139,7 @@ class Decoder(Module):
     "Generic N layer decoder with masking."
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
                  use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
-                 enc_att_module_kwargs=None, language_model_kwargs=None):
+                 enc_att_module_kwargs=None):
         super(Decoder, self).__init__()
         
         self.d_model = d_model
@@ -195,7 +195,7 @@ class Decoder(Module):
 class MeshedDecoder(Module):
     def __init__(self, vocab_size, max_len, N_enc, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
                  use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
-                 enc_att_module_kwargs=None, language_model_kwargs=None):
+                 enc_att_module_kwargs=None):
         super(MeshedDecoder, self).__init__()
         self.d_model = d_model
         self.word_emb = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
@@ -252,7 +252,7 @@ class AdaptiveDecoder(Module):
                     pretrained_language_model, use_aoa=False, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
                     bert_hidden_size=768, dropout=.1, weights=None, 
                     self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
-                    enc_att_module_kwargs=None, language_model_kwargs=None):
+                    enc_att_module_kwargs=None):
         super(AdaptiveDecoder, self).__init__()
         self.d_model = d_model
         self.word_emb = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
@@ -265,8 +265,7 @@ class AdaptiveDecoder(Module):
                 AdaptiveDecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa,
                                         self_att_module=self_att_module, enc_att_module=enc_att_module, 
                                         self_att_module_kwargs=self_att_module_kwargs, 
-                                        enc_att_module_kwargs=enc_att_module_kwargs,
-                                        language_mode_kwargs=language_model_kwargs) for i in range(N_dec + 1)
+                                        enc_att_module_kwargs=enc_att_module_kwargs) for i in range(N_dec + 1)
             ]
         )
         self.fc = nn.Linear(d_model, vocab_size, bias=False)
@@ -274,7 +273,7 @@ class AdaptiveDecoder(Module):
         # load and froze the language model
         self.language_model = pretrained_language_model(padding_idx=padding_idx, bert_hidden_size=bert_hidden_size, 
                                             pretrained_language_model_name=pretrained_language_model_name,
-                                            vocab_size=vocab_size, max_len=max_len, **language_model_kwargs)
+                                            vocab_size=vocab_size, max_len=max_len)
         self.max_len = max_len
         self.padding_idx = padding_idx
         self.N = N_dec
@@ -300,7 +299,7 @@ class AdaptiveDecoder(Module):
             seq = self.running_seq
 
         out = self.word_emb(input) + self.pos_emb(seq)
-        _, language_feature = self.language_model(input)
+        _, language_feature = self.language_model(input, attention_mask=torch.logical_not(mask_queries))
 
         # special process for the beam search of inference
         if positional_emb is not None and encoder_output.shape[0] > positional_emb.shape[0]:

@@ -1,10 +1,10 @@
 import torch
 import os
-import pickle
+import dill as pickle
 import numpy as np
 import random
 import json
-import config
+import configuration
 
 from training_utils.trainer import Trainer
 from data_utils.vocab import Vocab
@@ -17,6 +17,11 @@ random.seed(13)
 torch.manual_seed(13)
 np.random.seed(13)
 
+if not os.path.isfile(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl")):
+    pickle.dump(configuration, open(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl"), "wb"))
+
+config: configuration = pickle.load(open(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl"), "rb"))
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # creating checkpoint directory
@@ -25,7 +30,8 @@ if not os.path.isdir(os.path.join(config.checkpoint_path, config.model_name)):
 
 # Creating vocabulary and dataset
 if not os.path.isfile(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl")):
-    vocab = Vocab([config.train_json_path, config.val_json_path])
+    vocab = Vocab([config.train_json_path, config.val_json_path], tokenizer_name=config.tokenizer, 
+                    pretrained_language_model_name=config.pretrained_language_model_name)
     pickle.dump(vocab, open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "wb"))
 else:
     vocab = pickle.load(open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "rb"))
@@ -60,7 +66,7 @@ decoder = config.decoder(vocab_size=len(vocab), max_len=vocab.max_caption_length
 model = Transformer(vocab.bos_idx, encoder, decoder, **config.transformer_args).to(device)
 
 trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),
-                    test_datasets=(public_test_dataset, public_test_dict_dataset), vocab=vocab, collate_fn=collate_fn)
+                    test_datasets=(public_test_dataset, public_test_dict_dataset), vocab=vocab, config=config, collate_fn=collate_fn)
 
 if config.start_from:
     trainer.train(os.path.join(config.checkpoint_path, config.model_name, config.start_from))
@@ -68,11 +74,15 @@ else:
     trainer.train()
 
 if public_test_dict_dataset is not None:
-    public_results = trainer.get_predictions(public_test_dict_dataset, get_scores=config.get_scores)
+    public_results = trainer.get_predictions(public_test_dict_dataset,
+                                                checkpoint_filename=os.path.join(config.checkpoint_path, config.model_name, config.start_from),
+                                                get_scores=config.get_scores)
     json.dump(public_results, open(os.path.join(config.checkpoint_path, config.model_name, "scored_public_results.json"), "w+"), ensure_ascii=False)
 
 if private_test_dict_dataset is not None:
-    private_results = trainer.get_predictions(private_test_dict_dataset, get_scores=config.get_scores)
+    private_results = trainer.get_predictions(private_test_dict_dataset,
+                                                checkpoint_filename=os.path.join(config.checkpoint_path, config.model_name, config.start_from),
+                                                get_scores=config.get_scores)
     json.dump(private_results, open(os.path.join(config.checkpoint_path, config.model_name, "scored_private_results.json"), "w+"), ensure_ascii=False)
 
 if config.sample_public_test_json_path is not None:
