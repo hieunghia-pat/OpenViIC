@@ -36,11 +36,12 @@ pretrained_language_model_name = None                   # vinai/phobert-base
                                                         # vinai/bartpho-syllable
                                                         # vinai/bartpho-word
                                                         # NlpHUST/gpt-neo-vi-small
-pretrained_language_model = None    # PhoBERTModel
-                                    # BARTPhoModel
-                                    # ViGPTModel
+pretrained_language_model = None    # AdaptivePhoBERTModel
+                                    # AdaptiveBARTPhoModel
+                                    # AdaptiveViGPTModel
 
 language_model_hidden_size = 768
+language_model_args = {}
 encoder_self_attention = ScaledDotProductAttention
 encoder_self_attention_args = {}
 encoder_args = {}
@@ -48,7 +49,9 @@ decoder_self_attention = ScaledDotProductAttention
 decoder_enc_attention = ScaledDotProductAttention
 decoder_self_attention_args = {}
 decoder_enc_attention_args = {}
-decoder_args = {}
+decoder_args = {
+    "language_model_kwargs": language_model_args
+}
 encoder = Encoder
 decoder = Decoder
 transformer_args = {}
