@@ -138,7 +138,8 @@ class AdaptiveDecoderLayer(Module):
 class Decoder(Module):
     "Generic N layer decoder with masking."
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
-                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
+                 enc_att_module_kwargs=None):
         super(Decoder, self).__init__()
         
         self.d_model = d_model
@@ -174,6 +175,16 @@ class Decoder(Module):
             seq = self.running_seq
 
         out = self.word_emb(input) + self.pos_emb(seq)
+
+        # special process for the beam search of inference
+        if positional_emb is not None and encoder_output.shape[0] > positional_emb.shape[0]:
+            assert encoder_output.shape[0] % positional_emb.shape[0] == 0
+            beam_size = int(encoder_output.shape[0] / positional_emb.shape[0])
+            positional_emb = positional_emb.unsqueeze(1)  # (bs, 1, seq_len, d_model)
+            positional_emb = positional_emb.expand(positional_emb.shape[0], positional_emb.shape[1]*beam_size, 
+                                                    positional_emb.shape[2], positional_emb.shape[3])  # (bs, beam_size, seq_len, d_model)
+            positional_emb = positional_emb.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
+
         for layer in self.layers:
             out = layer(out, encoder_output, mask_pad=mask_queries.unsqueeze(-1), 
                         mask_self_att=mask_self_attention, mask_enc_att=mask_encoder, positional_emb=positional_emb)
@@ -183,7 +194,8 @@ class Decoder(Module):
 
 class MeshedDecoder(Module):
     def __init__(self, vocab_size, max_len, N_enc, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
-                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
+                 enc_att_module_kwargs=None):
         super(MeshedDecoder, self).__init__()
         self.d_model = d_model
         self.word_emb = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
@@ -218,6 +230,16 @@ class MeshedDecoder(Module):
             seq = self.running_seq
 
         out = self.word_emb(input) + self.pos_emb(seq)
+
+        # special process for the beam search of inference
+        if positional_emb is not None and encoder_output.shape[0] > positional_emb.shape[0]:
+            assert encoder_output.shape[0] % positional_emb.shape[0] == 0
+            beam_size = int(encoder_output.shape[0] / positional_emb.shape[0])
+            positional_emb = positional_emb.unsqueeze(1)  # (bs, 1, seq_len, d_model)
+            positional_emb = positional_emb.expand(positional_emb.shape[0], positional_emb.shape[1]*beam_size, 
+                                                    positional_emb.shape[2], positional_emb.shape[3])  # (bs, beam_size, seq_len, d_model)
+            positional_emb = positional_emb.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
+
         for layer in self.layers:
             out = layer(out, encoder_output, mask_pad=mask_queries.unsqueeze(-1), 
                         mask_self_att=mask_self_attention, mask_enc_att=mask_encoder, positional_emb=positional_emb)
@@ -229,7 +251,8 @@ class AdaptiveDecoder(Module):
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
                     pretrained_language_model, use_aoa=False, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
                     bert_hidden_size=768, dropout=.1, weights=None, 
-                    self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                    self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
+                    enc_att_module_kwargs=None):
         super(AdaptiveDecoder, self).__init__()
         self.d_model = d_model
         self.word_emb = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
@@ -276,10 +299,10 @@ class AdaptiveDecoder(Module):
             seq = self.running_seq
 
         out = self.word_emb(input) + self.pos_emb(seq)
-        _, language_feature = self.language_model(input)
+        _, language_feature = self.language_model(input, attention_mask=torch.logical_not(mask_queries))
 
         # special process for the beam search of inference
-        if encoder_output.shape[0] > positional_emb.shape[0]:
+        if positional_emb is not None and encoder_output.shape[0] > positional_emb.shape[0]:
             assert encoder_output.shape[0] % positional_emb.shape[0] == 0
             beam_size = int(encoder_output.shape[0] / positional_emb.shape[0])
             positional_emb = positional_emb.unsqueeze(1)  # (bs, 1, seq_len, d_model)
@@ -293,6 +316,62 @@ class AdaptiveDecoder(Module):
                         mask_self_att=mask_self_attention, mask_enc_att=mask_encoder, positional_emb=positional_emb)
             else:
                 out = layer(out, encoder_output, language_signals=language_feature, mask_pad=mask_queries.unsqueeze(-1),
+                        mask_self_att=mask_self_attention, mask_enc_att=mask_encoder, positional_emb=positional_emb)
+
+        out = self.fc(out)
+        return F.log_softmax(out, dim=-1)
+
+class AdaptiveLanguageDecoder(Module):
+    "Generic N layer decoder with masking."
+    def __init__(self, vocab_size, max_len, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
+                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
+                 enc_att_module_kwargs=None):
+        super(AdaptiveLanguageDecoder, self).__init__()
+        
+        self.d_model = d_model
+        self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
+        self.layers = ModuleList(
+            [DecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, self_att_module=self_att_module, use_aoa=use_aoa,
+                                enc_att_module=enc_att_module, self_att_module_kwargs=self_att_module_kwargs,
+                                enc_att_module_kwargs=enc_att_module_kwargs) for _ in range(N_dec)])
+        self.fc = nn.Linear(d_model, vocab_size, bias=False)
+        self.max_len = max_len
+        self.padding_idx = padding_idx
+        self.N = N_dec
+
+        self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
+        self.register_state('running_seq', torch.zeros((1,)).long())
+
+    def forward(self, language_features, encoder_output, mask_pad_language, mask_encoder=None, positional_emb=None):
+        # input (b_s, seq_len)
+        b_s, seq_len = language_features.shape[:2]
+        mask_queries = mask_pad_language  # (b_s, seq_len)
+        mask_self_attention = generate_sequential_mask(seq_len).to(language_features.device)
+        mask_self_attention = mask_self_attention.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
+        mask_self_attention = torch.logical_or(mask_self_attention, mask_queries.unsqueeze(1).unsqueeze(1))
+        if self._is_stateful:
+            self.running_mask_self_attention = torch.cat([self.running_mask_self_attention, mask_self_attention], -1)
+            mask_self_attention = self.running_mask_self_attention
+
+        seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(language_features.device)  # (b_s, seq_len)
+        seq = seq.masked_fill(mask_queries, 0)
+        if self._is_stateful:
+            self.running_seq.add_(1)
+            seq = self.running_seq
+
+        out = language_features + self.pos_emb(seq)
+
+        # special process for the beam search of inference
+        if positional_emb is not None and encoder_output.shape[0] > positional_emb.shape[0]:
+            assert encoder_output.shape[0] % positional_emb.shape[0] == 0
+            beam_size = int(encoder_output.shape[0] / positional_emb.shape[0])
+            positional_emb = positional_emb.unsqueeze(1)  # (bs, 1, seq_len, d_model)
+            positional_emb = positional_emb.expand(positional_emb.shape[0], positional_emb.shape[1]*beam_size, 
+                                                    positional_emb.shape[2], positional_emb.shape[3])  # (bs, beam_size, seq_len, d_model)
+            positional_emb = positional_emb.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
+
+        for layer in self.layers:
+            out = layer(out, encoder_output, mask_pad=mask_queries.unsqueeze(-1), 
                         mask_self_att=mask_self_attention, mask_enc_att=mask_encoder, positional_emb=positional_emb)
 
         out = self.fc(out)
