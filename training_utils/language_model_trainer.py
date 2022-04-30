@@ -22,9 +22,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Trainer:
     def __init__(self,  model: Transformer, 
-                        train_datasets: Tuple[FeatureDataset, DictionaryDataset],
-                        val_datasets: Tuple[FeatureDataset, DictionaryDataset],
-                        test_datasets: Tuple[Union[FeatureDataset, None], Union[DictionaryDataset, None]],
+                        train_dataset: FeatureDataset,
+                        val_dataset: FeatureDataset,
+                        test_dataset: Union[FeatureDataset, None],
                         vocab: Vocab,
                         config: configuration,
                         collate_fn=collate_fn):
@@ -39,8 +39,8 @@ class Trainer:
         
         self.epoch = 0
 
-        self.train_dataset, self.train_dict_dataset = train_datasets
-        self.val_dataset, self.val_dict_dataset = val_datasets
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
 
         # creating iterable-dataset data loader
         self.train_dataloader = data.DataLoader(
@@ -57,22 +57,8 @@ class Trainer:
             num_workers=self.config.workers,
             collate_fn=collate_fn
         )
-
-        # creating dictionary iterable-dataset data loader
-        self.train_dict_dataloader = data.DataLoader(
-            dataset=self.train_dict_dataset,
-            batch_size=self.config.batch_size // self.config.training_beam_size,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
-        self.val_dict_dataloader = data.DataLoader(
-            dataset=self.val_dict_dataset,
-            batch_size=self.config.batch_size // self.config.training_beam_size,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
         
-        self.test_dataset, self.test_dict_dataset = test_datasets
+        self.test_dataset = test_dataset
 
         if self.test_dataset is not None:
             self.test_dataloader = data.DataLoader(
@@ -84,18 +70,6 @@ class Trainer:
             )
         else:
             self.test_dataloader = None
-
-        if self.test_dict_dataset is not None:
-            self.test_dict_dataloader = data.DataLoader(
-                dataset=self.test_dict_dataset,
-                batch_size=self.config.batch_size // self.config.training_beam_size,
-                shuffle=True,
-                collate_fn=collate_fn
-            )
-        else:
-            self.test_dict_dataloader = None
-
-        self.train_cider = Cider(PTBTokenizer.tokenize(self.train_dataset.captions))
 
     def evaluate_loss(self, dataloader: data.DataLoader):
         # Calculating validation loss
@@ -131,7 +105,7 @@ class Trainer:
                     out = out.argmax(dim=-1).contiguous()
                 bs, seq_len = shifted_right_tokens.shape[:2]
                 total_tokens += float(bs * seq_len)
-                total_matched_tokens += (out == shifted_right_tokens).sum()
+                total_matched_tokens += (out == shifted_right_tokens).sum().item()
                 
                 pbar.update()
 
@@ -218,7 +192,7 @@ class Trainer:
         dict_for_saving["optimizer"] = self.optim.state_dict()
         dict_for_saving["scheduler"] = self.scheduler.state_dict()
 
-        torch.save(dict_for_saving, os.path.join(self.config.checkpoint_path, self.config.model_name, "last_model.pth"))
+        torch.save(dict_for_saving, os.path.join(self.config.checkpoint_path, self.config.model_name, "last_language_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
         
@@ -239,12 +213,12 @@ class Trainer:
             val_loss = self.evaluate_loss(self.val_dataloader)
 
             # val scores
-            scores = self.evaluate_metrics(self.val_dict_dataloader)
+            scores = self.evaluate_metrics(self.val_dataloader)
             print("Validation scores", scores)
             val_acc = scores['accuracy']
 
-            if self.test_dict_dataloader is not None:
-                scores = self.evaluate_metrics(self.test_dict_dataloader)
+            if self.test_dataloader is not None:
+                scores = self.evaluate_metrics(self.test_dataloader)
                 print("Evaluation scores", scores)
 
             # Prepare for next epoch

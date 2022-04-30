@@ -47,10 +47,10 @@ else:
 
 model = config.pretrained_language_model(config.pretrained_language_model_name, padding_idx=vocab.padding_idx, bert_hidden_size=config.language_model_hidden_size, 
                         vocab_size=len(vocab), d_model=config.d_model, d_k=config.d_k, d_v=config.d_v, h=config.nhead, d_ff=config.d_ff,
-                        max_len=vocab.max_caption_length, dropout=config.dropout)
+                        max_len=vocab.max_caption_length, dropout=config.dropout).to(device)
 
-trainer = Trainer(model=model, train_datasets=(train_dataset, None), val_datasets=(val_dataset, None),
-                    test_datasets=(public_test_dataset, None), vocab=vocab, config=config, collate_fn=collate_fn)
+trainer = Trainer(model=model, train_dataset=train_dataset, val_dataset=val_dataset,
+                    test_dataset=public_test_dataset, vocab=vocab, config=config, collate_fn=collate_fn)
 
 if config.start_from:
     trainer.train(os.path.join(config.checkpoint_path, config.model_name, config.start_from))
