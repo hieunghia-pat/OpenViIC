@@ -6,7 +6,7 @@ import random
 import json
 import configuration
 
-from training_utils.trainer import Trainer
+from training_utils.captioning_model_trainer import Trainer
 from data_utils.vocab import Vocab
 from data_utils.dataset import FeatureDataset, DictionaryDataset
 from data_utils.utils import collate_fn

@@ -29,7 +29,7 @@ d_feature = 2048
 dropout = .1
 training_beam_size = 5
 evaluating_beam_size = 3
-model_name = "lat_using_region"
+model_name = "rstnet_using_region"
 pretrained_language_model_name = "vinai/phobert-base"                   # vinai/phobert-base
                                                         # vinai/phobert-large
                                                         # vinai/bartpho-syllable
@@ -48,10 +48,11 @@ decoder_enc_attention = ScaledDotProductAttention
 decoder_self_attention_args = {}
 decoder_enc_attention_args = {}
 decoder_args = {
-    "pretrained_language_model_name": pretrained_language_model_name
+    "pretrained_language_model_name": pretrained_language_model_name,
+    "pretrained_language_model": pretrained_language_model
 }
 encoder = Encoder
-decoder = AdaptivePhoBERTModel
+decoder = AdaptiveDecoder
 transformer_args = {"use_img_pos": True}
 
 # dataset configuration
@@ -60,9 +61,9 @@ val_json_path = "features/annotations/UIT-ViIC/uitviic_captions_val2017.json"
 public_test_json_path = "features/annotations/UIT-ViIC/uitviic_captions_test2017.json"
 private_test_json_path = None
 feature_path = "features/region_features/UIT-ViIC/faster_rcnn"
-batch_size = 16
+batch_size = 32
 workers = 2
-tokenizer = None    # vncorenlp
+tokenizer = "vncorenlp"    # vncorenlp
                     # pyvi
                     # spacy
 word_embedding = None   # "fasttext.vi.300d"
