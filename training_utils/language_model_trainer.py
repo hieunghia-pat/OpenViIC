@@ -105,7 +105,7 @@ class Trainer:
                     out = out.argmax(dim=-1).contiguous()
                 bs, seq_len = shifted_right_tokens.shape[:2]
                 total_tokens += float(bs * seq_len)
-                total_matched_tokens += (out == shifted_right_tokens).sum()
+                total_matched_tokens += (out == shifted_right_tokens).sum().item()
                 
                 pbar.update()
 
@@ -192,7 +192,7 @@ class Trainer:
         dict_for_saving["optimizer"] = self.optim.state_dict()
         dict_for_saving["scheduler"] = self.scheduler.state_dict()
 
-        torch.save(dict_for_saving, os.path.join(self.config.checkpoint_path, self.config.model_name, "last_model.pth"))
+        torch.save(dict_for_saving, os.path.join(self.config.checkpoint_path, self.config.model_name, "last_language_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
         
@@ -213,12 +213,12 @@ class Trainer:
             val_loss = self.evaluate_loss(self.val_dataloader)
 
             # val scores
-            scores = self.evaluate_metrics(self.val_dict_dataloader)
+            scores = self.evaluate_metrics(self.val_dataloader)
             print("Validation scores", scores)
             val_acc = scores['accuracy']
 
-            if self.test_dict_dataloader is not None:
-                scores = self.evaluate_metrics(self.test_dict_dataloader)
+            if self.test_dataloader is not None:
+                scores = self.evaluate_metrics(self.test_dataloader)
                 print("Evaluation scores", scores)
 
             # Prepare for next epoch
