@@ -50,7 +50,7 @@ model = config.pretrained_language_model(config.pretrained_language_model_name, 
                         max_len=vocab.max_caption_length, dropout=config.dropout)
 
 trainer = Trainer(model=model, train_datasets=(train_dataset, None), val_datasets=(val_dataset, None),
-                    test_datasets=(public_test_dataset, NOne), vocab=vocab, config=config, collate_fn=collate_fn)
+                    test_datasets=(public_test_dataset, None), vocab=vocab, config=config, collate_fn=collate_fn)
 
 if config.start_from:
     trainer.train(os.path.join(config.checkpoint_path, config.model_name, config.start_from))
