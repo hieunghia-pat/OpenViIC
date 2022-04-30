@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from transformers import BertModel, RobertaModel
-from models.modules.decoders import Decoder, AdaptiveLanguageDecoder
 
 from models.modules.encoders import EncoderLayer
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
