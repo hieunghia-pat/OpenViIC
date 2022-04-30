@@ -106,7 +106,7 @@ class Trainer:
                 for it, sample in enumerate(dataloader):
                     tokens = sample["tokens"].to(device)
                     shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                    out, _ = self.model(tokens).contiguous()
+                    out, _ = self.model(tokens)
                     loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
@@ -127,7 +127,7 @@ class Trainer:
                 tokens = sample["tokens"].to(device)
                 shifted_right_tokens = sample["shifted_right_tokens"].to(device)
                 with torch.no_grad():
-                    out, _ = self.model(tokens).contiguous()
+                    out, _ = self.model(tokens)
                     out = out.argmax(dim=-1).contiguous()
                 bs, seq_len = shifted_right_tokens.shape[:2]
                 total_tokens += float(bs * seq_len)
@@ -152,7 +152,7 @@ class Trainer:
             for it, sample in enumerate(self.train_dataloader):
                 tokens = sample["tokens"].to(device)
                 shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                out, _ = self.model(tokens).contiguous()
+                out, _ = self.model(tokens)
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                 loss.backward()

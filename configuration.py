@@ -35,7 +35,7 @@ pretrained_language_model_name = "vinai/phobert-base"                   # vinai/
                                                         # vinai/bartpho-syllable
                                                         # vinai/bartpho-word
                                                         # NlpHUST/gpt-neo-vi-small
-pretrained_language_model = None    # PhoBERTModel
+pretrained_language_model = PhoBERTModel    # PhoBERTModel
                                     # BARTPhoModel
                                     # ViGPTModel
 
@@ -52,7 +52,7 @@ decoder_args = {
     "pretrained_language_model": pretrained_language_model
 }
 encoder = Encoder
-decoder = AdaptiveDecoder
+decoder = Decoder
 transformer_args = {"use_img_pos": True}
 
 # dataset configuration
