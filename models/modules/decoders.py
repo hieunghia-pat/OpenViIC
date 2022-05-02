@@ -9,6 +9,8 @@ from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.embeddings import Embedding
 from models.modules.containers import Module, ModuleList
 
+import os
+
 class DecoderLayer(Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
@@ -249,7 +251,7 @@ class MeshedDecoder(Module):
 
 class AdaptiveDecoder(Module):
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
-                    pretrained_language_model, use_aoa=False, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
+                    pretrained_language_model, pretrained_language_model_path: str=None, use_aoa=False, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
                     bert_hidden_size=768, dropout=.1, weights=None, 
                     self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
                     enc_att_module_kwargs=None):
@@ -274,6 +276,14 @@ class AdaptiveDecoder(Module):
         self.language_model = pretrained_language_model(padding_idx=padding_idx, bert_hidden_size=bert_hidden_size, 
                                             pretrained_language_model_name=pretrained_language_model_name,
                                             vocab_size=vocab_size, max_len=max_len)
+
+        if os.path.isfile(pretrained_language_model_path):
+            language_model_checkpoint = torch.load(pretrained_language_model_path)
+            self.language_model.load_state_dict(language_model_checkpoint["state_dict"])
+            # frozen the language model
+            for param in self.language_model.parameters():
+                param.requires_grad = False
+
         self.max_len = max_len
         self.padding_idx = padding_idx
         self.N = N_dec
