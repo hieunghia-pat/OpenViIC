@@ -11,9 +11,9 @@ start_from = None
 learning_rate = 1.
 epochs = 20
 warmup = 10000
-xe_base_lr = 1e-4
-rl_base_lr = 5e-6
-refine_epoch_rl = 28
+# xe_base_lr = 1e-4
+# rl_base_lr = 5e-6
+# refine_epoch_rl = 28
 min_freq = 1
 get_scores = False
 

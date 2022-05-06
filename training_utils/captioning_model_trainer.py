@@ -9,7 +9,7 @@ from data_utils.dataset import *
 import evaluation
 from evaluation import Cider, PTBTokenizer
 
-import configuration
+import config
 
 import multiprocessing
 from tqdm import tqdm
@@ -26,17 +26,12 @@ class Trainer:
                         val_datasets: Tuple[FeatureDataset, DictionaryDataset],
                         test_datasets: Tuple[Union[FeatureDataset, None], Union[DictionaryDataset, None]],
                         vocab: Vocab,
-                        config: configuration,
                         collate_fn=collate_fn):
         self.model = model
         self.vocab = vocab
-        self.config = config
 
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
-
-        self.optim_rl = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
-        self.scheduler_rl = LambdaLR(self.optim_rl, self.lambda_lr_rl)
         
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
         
@@ -48,29 +43,29 @@ class Trainer:
         # creating iterable-dataset data loader
         self.train_dataloader = data.DataLoader(
             dataset=self.train_dataset,
-            batch_size=self.config.batch_size,
+            batch_size=config.batch_size,
             shuffle=True,
-            num_workers=self.config.workers,
+            num_workers=config.workers,
             collate_fn=collate_fn
         )
         self.val_dataloader = data.DataLoader(
             dataset=self.val_dataset,
-            batch_size=self.config.batch_size,
+            batch_size=config.batch_size,
             shuffle=True,
-            num_workers=self.config.workers,
+            num_workers=config.workers,
             collate_fn=collate_fn
         )
 
         # creating dictionary iterable-dataset data loader
         self.train_dict_dataloader = data.DataLoader(
             dataset=self.train_dict_dataset,
-            batch_size=self.config.batch_size // self.config.training_beam_size,
+            batch_size=config.batch_size // config.training_beam_size,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.val_dict_dataloader = data.DataLoader(
             dataset=self.val_dict_dataset,
-            batch_size=self.config.batch_size // self.config.training_beam_size,
+            batch_size=config.batch_size // config.training_beam_size,
             shuffle=True,
             collate_fn=collate_fn
         )
@@ -80,9 +75,9 @@ class Trainer:
         if self.test_dataset is not None:
             self.test_dataloader = data.DataLoader(
                 dataset=self.test_dataset,
-                batch_size=self.config.batch_size,
+                batch_size=config.batch_size,
                 shuffle=True,
-                num_workers=self.config.workers,
+                num_workers=config.workers,
                 collate_fn=collate_fn
             )
         else:
@@ -91,7 +86,7 @@ class Trainer:
         if self.test_dict_dataset is not None:
             self.test_dict_dataloader = data.DataLoader(
                 dataset=self.test_dict_dataset,
-                batch_size=self.config.batch_size // self.config.training_beam_size,
+                batch_size=config.batch_size // config.training_beam_size,
                 shuffle=True,
                 collate_fn=collate_fn
             )
@@ -140,7 +135,7 @@ class Trainer:
                 caps_gt = sample["captions"]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                beam_size=self.config.evaluating_beam_size, out_size=1)
+                                                beam_size=config.evaluating_beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -201,22 +196,21 @@ class Trainer:
                 grid_sizes = sample["grid_sizes"]
                 caps_gt = sample["captions"]
                 outs, log_probs = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
-                                                    beam_size=self.config.training_beam_size, out_size=self.config.training_beam_size)
-                self.optim_rl.zero_grad()
+                                                    beam_size=config.training_beam_size, out_size=config.training_beam_size)
+                self.optim.zero_grad()
 
                 # Rewards
                 caps_gen = vocab.decode_caption(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
-                caps_gt = list(itertools.chain(*([c, ] * self.config.training_beam_size for c in caps_gt)))
+                caps_gt = list(itertools.chain(*([c, ] * config.training_beam_size for c in caps_gt)))
                 caps_gen, caps_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [caps_gen, caps_gt])
                 reward = self.train_cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
-                reward = torch.from_numpy(reward).to(device).view(features.shape[0], self.config.training_beam_size)
+                reward = torch.from_numpy(reward).to(device).view(features.shape[0], config.training_beam_size)
                 reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
                 loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
 
                 loss = loss.mean()
                 loss.backward()
-                self.optim_rl.step()
-                self.scheduler_rl.step()
+                self.optim.step()
 
                 running_loss += loss.item()
                 running_reward += reward.mean().item()
@@ -225,30 +219,10 @@ class Trainer:
                                 reward_baseline=running_reward_baseline / (it + 1))
                 pbar.update()
 
-    def lambda_lr(self, s):
-        if s <= 3:
-            lr = self.config.xe_base_lr * s / 4
-        elif s <= 10:
-            lr = self.config.xe_base_lr
-        elif s <= 12:
-            lr = self.config.xe_base_lr * 0.2
-        else:
-            lr = self.config.xe_base_lr * 0.2 * 0.2
-        
-        return lr
-    
-    def lambda_lr_rl(self, s):
-        refine_epoch = self.config.refine_epoch_rl 
-        if s <= refine_epoch:
-            lr = self.config.rl_base_lr
-        elif s <= refine_epoch + 3:
-            lr = self.config.rl_base_lr * 0.2
-        elif s <= refine_epoch + 6:
-            lr = self.config.rl_base_lr * 0.2 * 0.2
-        else:
-            lr = self.config.rl_base_lr * 0.2 * 0.2 * 0.2
-        
-        return lr
+    def lambda_lr(self, step):
+        warm_up = config.warmup
+        step += 1
+        return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):
@@ -261,15 +235,6 @@ class Trainer:
         np.random.set_state(checkpoint['numpy_rng_state'])
         random.setstate(checkpoint['random_rng_state'])
 
-        use_rl = checkpoint["use_rl"]
-
-        if not use_rl:
-            self.optim.load_state_dict(checkpoint['optimizer'])
-            self.scheduler.load_state_dict(checkpoint['scheduler'])
-        else:
-            self.optim_rl.load_state_dict(checkpoint['optimizer'])
-            self.scheduler_rl.load_state_dict(checkpoint['scheduler'])
-
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
         print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
@@ -279,7 +244,9 @@ class Trainer:
             "best_val_cider": checkpoint['best_val_cider'],
             "best_test_cider": checkpoint['best_test_cider'],
             "patience": checkpoint['patience'],
-            "epoch": checkpoint["epoch"]
+            "epoch": checkpoint["epoch"],
+            "optimizer": checkpoint["optimizer"],
+            "scheduler": checkpoint["scheduler"]
         }
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
@@ -289,22 +256,15 @@ class Trainer:
             'numpy_rng_state': np.random.get_state(),
             'random_rng_state': random.getstate(),
             'epoch': self.epoch,
-            'state_dict': self.model.state_dict()
+            'state_dict': self.model.state_dict(),
+            'optimizer': self.optim.state_dict(),
+            'scheduler': self.scheduler.state_dict()
         }
 
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
-        use_rl = dict_for_saving["use_rl"]
-
-        if use_rl:
-            dict_for_saving["optimizer"] = self.optim_rl.state_dict()
-            dict_for_saving["scheduler"] = self.scheduler_rl.state_dict()
-        else:
-            dict_for_saving["optimizer"] = self.optim.state_dict()
-            dict_for_saving["scheduler"] = self.scheduler.state_dict()
-
-        torch.save(dict_for_saving, os.path.join(self.config.checkpoint_path, self.config.model_name, "last_model.pth"))
+        torch.save(dict_for_saving, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
         
@@ -315,6 +275,8 @@ class Trainer:
             best_test_cider = checkpoint["best_test_cider"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
+            self.optim.load_state_dict(checkpoint['optimizer'])
+            self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
             use_rl = False
             best_val_cider = .0
@@ -362,7 +324,7 @@ class Trainer:
                     exit_train = True
 
             if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(self.config.checkpoint_path, self.config.model_name, "best_model.pth"))
+                self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
 
             self.save_checkpoint({
                 'val_loss': val_loss,
@@ -374,7 +336,7 @@ class Trainer:
             })
 
             if best:
-                copyfile(os.path.join(self.config.checkpoint_path, self.config.model_name, "last_model.pth"), os.path.join(self.config.checkpoint_path, self.config.model_name, "best_model.pth"))
+                copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
 
             if exit_train:
                 break
@@ -397,13 +359,11 @@ class Trainer:
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = torch.tensor(boxes).unsqueeze(0).to(device)
-                grid_sizes = sample["grid_size"]
-                if grid_sizes is not None:
-                    grid_sizes = [grid_sizes]
+                grid_sizes = [sample["grid_size"]]
                 caps_gt = [sample["captions"]]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                beam_size=self.config.evaluating_beam_size, out_size=1)
+                                                beam_size=self.conf, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 gts = {}
                 gens = {}
@@ -440,4 +400,4 @@ class Trainer:
                     sample_item["captions"] = generated_captions[0][0]
                     break
 
-        json.dump(sample_json_data, open(os.path.join(self.config.checkpoint_path, self.config.model_name, f"{split}_results.json"), "w+"), ensure_ascii=False)
+        json.dump(sample_json_data, open(os.path.join(config.checkpoint_path, config.model_name, f"{split}_results.json"), "w+"), ensure_ascii=False)
