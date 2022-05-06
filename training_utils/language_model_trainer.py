@@ -9,7 +9,7 @@ from data_utils.dataset import *
 import evaluation
 from evaluation import Cider, PTBTokenizer
 
-import configuration
+import config
 
 import multiprocessing
 from tqdm import tqdm
@@ -26,11 +26,9 @@ class Trainer:
                         val_dataset: FeatureDataset,
                         test_dataset: Union[FeatureDataset, None],
                         vocab: Vocab,
-                        config: configuration,
                         collate_fn=collate_fn):
         self.model = model
         self.vocab = vocab
-        self.config = config
 
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
@@ -45,16 +43,16 @@ class Trainer:
         # creating iterable-dataset data loader
         self.train_dataloader = data.DataLoader(
             dataset=self.train_dataset,
-            batch_size=self.config.batch_size,
+            batch_size=config.batch_size,
             shuffle=True,
-            num_workers=self.config.workers,
+            num_workers=config.workers,
             collate_fn=collate_fn
         )
         self.val_dataloader = data.DataLoader(
             dataset=self.val_dataset,
-            batch_size=self.config.batch_size,
+            batch_size=config.batch_size,
             shuffle=True,
-            num_workers=self.config.workers,
+            num_workers=config.workers,
             collate_fn=collate_fn
         )
         
@@ -63,9 +61,9 @@ class Trainer:
         if self.test_dataset is not None:
             self.test_dataloader = data.DataLoader(
                 dataset=self.test_dataset,
-                batch_size=self.config.batch_size,
+                batch_size=config.batch_size,
                 shuffle=True,
-                num_workers=self.config.workers,
+                num_workers=config.workers,
                 collate_fn=collate_fn
             )
         else:
@@ -140,7 +138,7 @@ class Trainer:
                 self.scheduler.step()
 
     def lambda_lr(self, s):
-        warm_up = self.config.warmup
+        warm_up = config.warmup
         s += 1
         return (self.model.d_model ** -.5) * min(s ** -.5, s * warm_up ** -1.5)
 
@@ -185,7 +183,7 @@ class Trainer:
         dict_for_saving["optimizer"] = self.optim.state_dict()
         dict_for_saving["scheduler"] = self.scheduler.state_dict()
 
-        torch.save(dict_for_saving, os.path.join(self.config.checkpoint_path, self.config.model_name, "last_language_model.pth"))
+        torch.save(dict_for_saving, os.path.join(config.checkpoint_path, config.model_name, "last_language_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
         
@@ -238,7 +236,7 @@ class Trainer:
             })
 
             if best:
-                copyfile(os.path.join(self.config.checkpoint_path, self.config.model_name, "last_language_model.pth"), os.path.join(self.config.checkpoint_path, self.config.model_name, "best_language_model.pth"))
+                copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_language_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_language_model.pth"))
 
             if exit_train:
                 break

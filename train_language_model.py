@@ -3,8 +3,7 @@ import os
 import dill as pickle
 import numpy as np
 import random
-import json
-import configuration
+import config
 
 from training_utils.language_model_trainer import Trainer
 from data_utils.vocab import Vocab
@@ -16,16 +15,11 @@ torch.manual_seed(13)
 np.random.seed(13)
 
 # creating checkpoint directory
-if not os.path.isdir(os.path.join(configuration.checkpoint_path, configuration.model_name)):
-    os.makedirs(os.path.join(configuration.checkpoint_path, configuration.model_name))
+if not os.path.isdir(os.path.join(config.checkpoint_path, config.model_name)):
+    os.makedirs(os.path.join(config.checkpoint_path, config.model_name))
 
-if not os.path.isdir(os.path.join(configuration.checkpoint_path, configuration.model_name)):
-    os.makedirs(os.path.join(configuration.checkpoint_path, configuration.model_name))
-
-if not os.path.isfile(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl")):
-    pickle.dump(configuration, open(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl"), "wb"))
-
-config: configuration = pickle.load(open(os.path.join(configuration.checkpoint_path, configuration.model_name, "configuration.pkl"), "rb"))
+if not os.path.isdir(os.path.join(config.checkpoint_path, config.model_name)):
+    os.makedirs(os.path.join(config.checkpoint_path, config.model_name))
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
