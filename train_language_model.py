@@ -44,7 +44,7 @@ model = config.pretrained_language_model(config.pretrained_language_model_name, 
                         max_len=vocab.max_caption_length, dropout=config.dropout).to(device)
 
 trainer = Trainer(model=model, train_dataset=train_dataset, val_dataset=val_dataset,
-                    test_dataset=public_test_dataset, vocab=vocab, config=config, collate_fn=collate_fn)
+                    test_dataset=public_test_dataset, vocab=vocab, collate_fn=collate_fn)
 
 if config.start_from:
     trainer.train(os.path.join(config.checkpoint_path, config.model_name, config.start_from))
