@@ -278,6 +278,7 @@ class AdaptiveDecoder(Module):
                                             vocab_size=vocab_size, max_len=max_len)
 
         if os.path.isfile(pretrained_language_model_path):
+            print("Loading pretrained language model ...")
             language_model_checkpoint = torch.load(pretrained_language_model_path)
             self.language_model.load_state_dict(language_model_checkpoint["state_dict"])
             # frozen the language model
