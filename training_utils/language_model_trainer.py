@@ -140,16 +140,9 @@ class Trainer:
                 self.scheduler.step()
 
     def lambda_lr(self, s):
-        if s <= 3:
-            lr = self.config.xe_base_lr * s / 4
-        elif s <= 10:
-            lr = self.config.xe_base_lr
-        elif s <= 12:
-            lr = self.config.xe_base_lr * 0.2
-        else:
-            lr = self.config.xe_base_lr * 0.2 * 0.2
-        
-        return lr
+        warm_up = self.config.warmup
+        s += 1
+        return (self.model.d_model ** -.5) * min(s ** -.5, s * warm_up ** -1.5)
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):
