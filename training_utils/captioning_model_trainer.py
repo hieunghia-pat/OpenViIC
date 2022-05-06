@@ -213,7 +213,6 @@ class Trainer:
                 loss = loss.mean()
                 loss.backward()
                 self.optim.step()
-                self.scheduler.step()
 
                 running_loss += loss.item()
                 running_reward += reward.mean().item()
@@ -222,10 +221,10 @@ class Trainer:
                                 reward_baseline=running_reward_baseline / (it + 1))
                 pbar.update()
 
-    def lambda_lr(self, s):
+    def lambda_lr(self, step):
         warm_up = self.config.warmup
-        s += 1
-        return (self.model.d_model ** -.5) * min(s ** -.5, s * warm_up ** -1.5)
+        step += 1
+        return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):
@@ -238,11 +237,6 @@ class Trainer:
         np.random.set_state(checkpoint['numpy_rng_state'])
         random.setstate(checkpoint['random_rng_state'])
 
-        use_rl = checkpoint["use_rl"]
-
-        self.optim.load_state_dict(checkpoint['optimizer'])
-        self.scheduler.load_state_dict(checkpoint['scheduler'])
-
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
         print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
@@ -252,7 +246,9 @@ class Trainer:
             "best_val_cider": checkpoint['best_val_cider'],
             "best_test_cider": checkpoint['best_test_cider'],
             "patience": checkpoint['patience'],
-            "epoch": checkpoint["epoch"]
+            "epoch": checkpoint["epoch"],
+            "optimizer": checkpoint["optimizer"],
+            "scheduler": checkpoint["scheduler"]
         }
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
@@ -262,16 +258,13 @@ class Trainer:
             'numpy_rng_state': np.random.get_state(),
             'random_rng_state': random.getstate(),
             'epoch': self.epoch,
-            'state_dict': self.model.state_dict()
+            'state_dict': self.model.state_dict(),
+            'optimizer': self.optim.state_dict(),
+            'scheduler': self.scheduler.state_dict()
         }
 
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
-
-        use_rl = dict_for_saving["use_rl"]
-        
-        dict_for_saving["optimizer"] = self.optim.state_dict()
-        dict_for_saving["scheduler"] = self.scheduler.state_dict()
 
         torch.save(dict_for_saving, os.path.join(self.config.checkpoint_path, self.config.model_name, "last_model.pth"))
 
@@ -284,6 +277,8 @@ class Trainer:
             best_test_cider = checkpoint["best_test_cider"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
+            self.optim.load_state_dict(checkpoint['optimizer'])
+            self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
             use_rl = False
             best_val_cider = .0
@@ -366,13 +361,11 @@ class Trainer:
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = torch.tensor(boxes).unsqueeze(0).to(device)
-                grid_sizes = sample["grid_size"]
-                if grid_sizes is not None:
-                    grid_sizes = [grid_sizes]
+                grid_sizes = [sample["grid_size"]]
                 caps_gt = [sample["captions"]]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                beam_size=self.config.evaluating_beam_size, out_size=1)
+                                                beam_size=self.conf, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 gts = {}
                 gens = {}
