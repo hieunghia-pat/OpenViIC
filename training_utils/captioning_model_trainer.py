@@ -34,9 +34,6 @@ class Trainer:
 
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
-
-        self.optim_rl = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
-        self.scheduler_rl = LambdaLR(self.optim_rl, self.lambda_lr_rl)
         
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
         
@@ -202,7 +199,7 @@ class Trainer:
                 caps_gt = sample["captions"]
                 outs, log_probs = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
                                                     beam_size=self.config.training_beam_size, out_size=self.config.training_beam_size)
-                self.optim_rl.zero_grad()
+                self.optim.zero_grad()
 
                 # Rewards
                 caps_gen = vocab.decode_caption(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
@@ -215,8 +212,8 @@ class Trainer:
 
                 loss = loss.mean()
                 loss.backward()
-                self.optim_rl.step()
-                self.scheduler_rl.step()
+                self.optim.step()
+                self.scheduler.step()
 
                 running_loss += loss.item()
                 running_reward += reward.mean().item()
@@ -226,29 +223,9 @@ class Trainer:
                 pbar.update()
 
     def lambda_lr(self, s):
-        if s <= 3:
-            lr = self.config.xe_base_lr * s / 4
-        elif s <= 10:
-            lr = self.config.xe_base_lr
-        elif s <= 12:
-            lr = self.config.xe_base_lr * 0.2
-        else:
-            lr = self.config.xe_base_lr * 0.2 * 0.2
-        
-        return lr
-    
-    def lambda_lr_rl(self, s):
-        refine_epoch = self.config.refine_epoch_rl 
-        if s <= refine_epoch:
-            lr = self.config.rl_base_lr
-        elif s <= refine_epoch + 3:
-            lr = self.config.rl_base_lr * 0.2
-        elif s <= refine_epoch + 6:
-            lr = self.config.rl_base_lr * 0.2 * 0.2
-        else:
-            lr = self.config.rl_base_lr * 0.2 * 0.2 * 0.2
-        
-        return lr
+        warm_up = self.config.warmup
+        s += 1
+        return (self.model.d_model ** -.5) * min(s ** -.5, s * warm_up ** -1.5)
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):
@@ -263,12 +240,8 @@ class Trainer:
 
         use_rl = checkpoint["use_rl"]
 
-        if not use_rl:
-            self.optim.load_state_dict(checkpoint['optimizer'])
-            self.scheduler.load_state_dict(checkpoint['scheduler'])
-        else:
-            self.optim_rl.load_state_dict(checkpoint['optimizer'])
-            self.scheduler_rl.load_state_dict(checkpoint['scheduler'])
+        self.optim.load_state_dict(checkpoint['optimizer'])
+        self.scheduler.load_state_dict(checkpoint['scheduler'])
 
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
@@ -296,13 +269,9 @@ class Trainer:
             dict_for_saving[key] = value
 
         use_rl = dict_for_saving["use_rl"]
-
-        if use_rl:
-            dict_for_saving["optimizer"] = self.optim_rl.state_dict()
-            dict_for_saving["scheduler"] = self.scheduler_rl.state_dict()
-        else:
-            dict_for_saving["optimizer"] = self.optim.state_dict()
-            dict_for_saving["scheduler"] = self.scheduler.state_dict()
+        
+        dict_for_saving["optimizer"] = self.optim.state_dict()
+        dict_for_saving["scheduler"] = self.scheduler.state_dict()
 
         torch.save(dict_for_saving, os.path.join(self.config.checkpoint_path, self.config.model_name, "last_model.pth"))
 
