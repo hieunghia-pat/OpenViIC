@@ -363,7 +363,7 @@ class Trainer:
                 caps_gt = [sample["captions"]]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                beam_size=self.conf, out_size=1)
+                                                beam_size=config.evaluating_beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 gts = {}
                 gens = {}

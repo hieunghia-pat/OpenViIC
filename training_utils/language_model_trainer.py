@@ -138,11 +138,7 @@ class Trainer:
                 self.scheduler.step()
 
     def lambda_lr(self, s):
-<<<<<<< HEAD
         warm_up = config.warmup
-=======
-        warm_up = self.config.warmup
->>>>>>> 4ac11b6e35b13282a5719995862b46b375b736c2
         s += 1
         return (self.model.d_model ** -.5) * min(s ** -.5, s * warm_up ** -1.5)
 
