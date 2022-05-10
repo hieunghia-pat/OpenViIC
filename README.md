@@ -1,7 +1,7 @@
-OpenViIC - Open Vietnamese Image Captioning
+UIT-OpenIC - UIT Open Image Captioning
 ====
 
-This is an open-source repository for researching Vietnamese Image Captioning task. This repo implements most recent transformer-based state-of-the-art methods on the MS COCO Image Captioning datataset to evaluate them on the first two Vietnamese Image Captioning datasets [UIT-ViIC](https://arxiv.org/pdf/2002.00175.pdf) and [vieCap4H](https://people.cs.umu.se/sonvx/files/VieCap4H_VLSP21.pdf).
+This is an open-source repository for researching Image Captioning task (in Vietnamese currently). This repo implements most recent transformer-based state-of-the-art methods on the MS COCO Image Captioning datataset to evaluate them on the first two Vietnamese Image Captioning datasets [UIT-ViIC](https://arxiv.org/pdf/2002.00175.pdf) and [vieCap4H](https://people.cs.umu.se/sonvx/files/VieCap4H_VLSP21.pdf).
 
 ## Implemented modules
 We implemented most recent state-of-the-art (SOTA) transformer-based methods for image captioning on the MS-COCO image captioning dataset. For more detail, in this repo we conducted various encoder and decoder modules which are proposed by recent SOTA methods and you can compose properly together to get a novel method for experiments. For example, you can combine the encoder module equipped AugmentedGeometryScaledDotProductAttention together with the decoder equipped ScaleDotProductAttention to get the [Object Relation Transformer](https://arxiv.org/pdf/1906.05963.pdf) method.
@@ -19,7 +19,7 @@ For encoder modules, we have implemented:
 For decoder modules, we have implemented:
 - [Transformer-based Decoder](https://arxiv.org/pdf/1706.03762.pdf) module
 - [Transformer-based MeshedDecoder](https://arxiv.org/pdf/1912.08226.pdf) module
-- [Transformer-based Adaptive Decoder]() module
+- [Transformer-based AdaptiveDecoder]() module
 
 ## Data preparation
 
