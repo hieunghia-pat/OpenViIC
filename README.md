@@ -1,4 +1,7 @@
-# UIT-OpenIC
+# UIT-OpenViIC
+_
+Note: In Progress_
+
 Open UIT Image Captioning - an open source repository for researching Image Captioning task, which consists of recent state-of-the-art methods on the COCO image captioning dataset.
 
 We implement the state-of-the-art captioning models for Image Captioning.
