@@ -15,6 +15,7 @@ import json
 import sys
 sys.path.append("../..")
 import config
+from transformers import AutoTokenizer
 
 class DecoderLayer(Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
@@ -294,6 +295,7 @@ class AdaptiveDecoder(Module):
         self.N = N_dec
 
         # Mapping from ori index to pre-trained index.
+        self.token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
         self.pretrained_language_idx_mapping = json.load(open(os.path.join(config.checkpoint_path, config.model_name, "pretrained_language_idx_mapping.json")))
         self.pretrained_padding_idx = self.token_encoder.convert_tokens_to_ids(self.token_encoder.pad_token)
 
