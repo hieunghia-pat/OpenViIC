@@ -10,6 +10,11 @@ from models.modules.embeddings import Embedding
 from models.modules.containers import Module, ModuleList
 
 import os
+import json
+
+import sys
+sys.path.append("../..")
+import config
 
 class DecoderLayer(Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
@@ -288,13 +293,27 @@ class AdaptiveDecoder(Module):
         self.padding_idx = padding_idx
         self.N = N_dec
 
+        # Mapping from ori index to pre-trained index.
+        self.pretrained_language_idx_mapping = json.load(open(os.path.join(config.checkpoint_path, config.model_name, "pretrained_language_idx_mapping.json")))
+        self.pretrained_padding_idx = self.token_encoder.convert_tokens_to_ids(self.token_encoder.pad_token)
+
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
     def forward(self, input, encoder_output, mask_encoder=None, positional_emb=None):
         # input (b_s, seq_len)
         b_s, seq_len = input.shape[:2]
-        mask_queries = generate_padding_mask(input, self.padding_idx).to(input.device)  # (b_s, seq_len)
+
+        # Mapping from ori ids to pre-trained model ids.
+        pretrained_input_ids = []
+        for input_id in input:
+            pretrained_input_id = [self.pretrained_language_idx_mapping[str(ori_id.item())] for ori_id in input_id]
+            pretrained_input_ids.append(pretrained_input_id)
+
+        # List -> tensor.
+        pretrained_input_ids = torch.tensor(pretrained_input_ids).to(input.device)
+
+        mask_queries = generate_padding_mask(pretrained_input_ids, self.pretrained_padding_idx).to(input.device)  # (b_s, seq_len)
         mask_self_attention = generate_sequential_mask(seq_len).to(input.device)
         mask_self_attention = mask_self_attention.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
         mask_self_attention = torch.logical_or(mask_self_attention, mask_queries.unsqueeze(1).unsqueeze(1))
@@ -309,7 +328,7 @@ class AdaptiveDecoder(Module):
             seq = self.running_seq
 
         out = self.word_emb(input) + self.pos_emb(seq)
-        _, language_feature = self.language_model(input, attention_mask=torch.logical_not(mask_queries))
+        _, language_feature = self.language_model(pretrained_input_ids, attention_mask=torch.logical_not(mask_queries))
 
         # special process for the beam search of inference
         if positional_emb is not None and encoder_output.shape[0] > positional_emb.shape[0]:
