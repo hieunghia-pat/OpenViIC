@@ -2,6 +2,16 @@ import math
 import torch
 from torch import nn
 
+def get_normalized_grids(bs, grid_size=7):
+    a = torch.arange(0, grid_size).float().cuda()
+    c1 = a.view(-1, 1).expand(-1, grid_size).contiguous().view(-1)
+    c2 = a.view(1, -1).expand(grid_size, -1).contiguous().view(-1)
+    c3 = c1 + 1
+    c4 = c2 + 1
+    f = lambda x: x.view(1, -1, 1).expand(bs, -1, -1) / grid_size
+    x_min, y_min, x_max, y_max = f(c1), f(c2), f(c3), f(c4)
+    return y_min, x_min, y_max, x_max
+    
 def AllRelationalEmbedding(f_g, dim_g=64, wave_len=1000, trignometric_embedding=True, require_all_boxes=False):
     """
     Given a tensor with bbox coordinates for detected objects on each batch image,

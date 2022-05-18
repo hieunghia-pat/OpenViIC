@@ -20,10 +20,45 @@ class EncoderLayer(nn.Module):
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
 
     def forward(self, queries, keys, values, boxes=None, grid_sizes=None, positional_emb=None, attention_mask=None, attention_weights=None):
+
         if positional_emb is not None:
             queries += positional_emb
             keys += positional_emb
-        att = self.mhatt(queries, keys, values, boxes=boxes, grid_sizes=grid_sizes, attention_mask=attention_mask, attention_weights=attention_weights)
+        
+        # Init att
+        att = None
+
+        if torch.is_tensor(grid_sizes):
+          # Fit directly geometry features into MHA, not grid_sizes.
+          box_relation_embed_matrix = grid_sizes
+          att = self.mhatt(queries, keys, values, boxes=boxes, grid_sizes=box_relation_embed_matrix, attention_mask=attention_mask, attention_weights=attention_weights)
+
+        else:
+          # Fit grid sizes into MHA.
+          att = self.mhatt(queries, keys, values, boxes=boxes, grid_sizes=grid_sizes, attention_mask=attention_mask, attention_weights=attention_weights)
+        
+        ff = self.pwff(att)
+        return ff
+
+class LCCA(nn.Module):
+    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
+                 attention_module=None, attention_module_kwargs=None):
+        super(LCCA, self).__init__()
+        self.identity_map_reordering = identity_map_reordering
+        self.mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
+                                        attention_module=attention_module,
+                                        attention_module_kwargs=attention_module_kwargs)
+        self.dropout = nn.Dropout(dropout)
+        self.lnorm = nn.LayerNorm(d_model)
+        self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
+
+    def forward(self, queries, keys, values, relative_geometry_weights, attention_mask=None, attention_weights=None,
+                pos_source=None, pos_cross=None):
+
+        q = queries + pos_source
+        k = keys + pos_cross
+        att = self.mhatt(q, k, values, grid_sizes=relative_geometry_weights, attention_mask=attention_mask, attention_weights=attention_weights)
+        att = self.lnorm(queries + self.dropout(att))
         ff = self.pwff(att)
         return ff
 
@@ -96,19 +131,24 @@ class MultiLevelEncoder(nn.Module):
         outs = torch.cat(outs, dim=1)
         return outs, attention_mask
 
-class DualCollborativeMultiLevelEncoder(nn.Module):
+class DualCollaborativeLevelEncoder(nn.Module):
     '''
     DLCT Encoder
     '''
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
-                 identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
-        super(DualCollborativeMultiLevelEncoder, self).__init__()
-
-        self.fc = nn.Linear(d_in, d_model)
-        self.dropout = nn.Dropout(p=dropout)
-        self.layer_norm = nn.LayerNorm(d_model)
+                 identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None, multi_level_output=None):
+        super(DualCollaborativeLevelEncoder, self).__init__()
 
         self.d_model = d_model
+        self.dropout = dropout
+
+        self.fc_region = nn.Linear(d_in, self.d_model)
+        self.dropout_region = nn.Dropout(p=self.dropout)
+        self.layer_norm_region = nn.LayerNorm(self.d_model)
+
+        self.fc_grid = nn.Linear(d_in, self.d_model)
+        self.dropout_grid = nn.Dropout(p=self.dropout)
+        self.layer_nrom_grid = nn.LayerNorm(self.d_model)
 
         # Attention on regions
         self.layers_region = nn.ModuleList([EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout,
@@ -125,14 +165,14 @@ class DualCollborativeMultiLevelEncoder(nn.Module):
                                           for _ in range(N)])
         
         # Cross Attention between regions and grids
-        self.region2grid = nn.ModuleList([EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout,
+        self.region2grid = nn.ModuleList([LCCA(d_model, d_k, d_v, h, d_ff, dropout,
                                                             identity_map_reordering=identity_map_reordering,
                                                             attention_module=attention_module,
                                                             attention_module_kwargs=attention_module_kwargs)
                                           for _ in range(N)])
         
         # Cross Attention between grids and regions
-        self.grid2region = nn.ModuleList([EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout,
+        self.grid2region = nn.ModuleList([LCCA(d_model, d_k, d_v, h, d_ff, dropout,
                                                             identity_map_reordering=identity_map_reordering,
                                                             attention_module=attention_module,
                                                             attention_module_kwargs=attention_module_kwargs)
@@ -140,10 +180,29 @@ class DualCollborativeMultiLevelEncoder(nn.Module):
 
         self.padding_idx = padding_idx
         self.WGs = nn.ModuleList([nn.Linear(64, 1, bias=True) for _ in range(h)])
+        
+        # Whether using multi level output in encoder head.
+        self.multi_level_output = multi_level_output
 
-    def forward(self, region_features, grid_features, aligns, boxes=None, grid_sizes=None, positional_emb=None, attention_weights=None):
+    def forward(self, region_features, grid_features, boxes, aligns, attention_weights=None, region_embed=None, grid_embed=None):
         # input (b_s, seq_len, d_in)
         # blank features are added by zero tensors
+
+        mask_regions = (torch.sum(region_features, dim=-1) == 0).unsqueeze(-1)
+        mask_grids = (torch.sum(grid_features, dim=-1) == 0).unsqueeze(-1)
+
+        out_region = F.relu(self.fc_region(region_features))
+        out_region = self.dropout_region(out_region)
+        out_region = self.layer_norm_region(out_region)
+        out_region = out_region.masked_fill(mask_regions, 0)
+
+        out_grid = F.relu(self.fc_grid(grid_features))
+        out_grid = self.dropout_grid(out_grid)
+        out_grid = self.layer_nrom_grid(out_grid)
+        out_grid = out_grid.masked_fill(mask_grids, 0)
+
+        region_features = out_region
+        grid_features = out_grid
 
         attention_mask_region = (torch.sum(region_features == 0, -1) != 0).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
         attention_mask_grid = (torch.sum(grid_features == 0, -1) != 0).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
@@ -168,7 +227,6 @@ class DualCollborativeMultiLevelEncoder(nn.Module):
 
         bs = region_features.shape[0]
 
-        outs = []
         out_region = region_features
         out_grid = grid_features
         aligns = aligns.unsqueeze(1)  # bs * 1 * n_regions * n_grids
@@ -183,30 +241,47 @@ class DualCollborativeMultiLevelEncoder(nn.Module):
 
         pos_cross = torch.cat([region_embed, grid_embed],dim=-2)
         
-        outs = []
+        outs = None
+        if self.multi_level_output:
+          outs = []
         out = None
         for l_region, l_grid, l_r2g, l_g2r in zip(self.layers_region, self.layers_grid, self.region2grid,
                                                   self.grid2region):
 
-            out_region = l_region(out_region, out_region, out_region, region2region, attention_mask_region,
-                                  attention_weights, pos=region_embed)
+            # Dual-way Self-Attention
+            out_region = l_region(queries=out_region, values=out_region, keys=out_region, grid_sizes=region2region, positional_emb=region_embed, \
+            attention_mask=attention_mask_region, attention_weights=attention_weights)
 
-            out_grid = l_grid(out_grid, out_grid, out_grid, grid2grid, attention_mask_grid, attention_weights,
-                              pos=grid_embed)
+            out_grid = l_grid(queries=out_grid, values=out_grid, keys=out_grid, grid_sizes=grid2grid, positional_emb=grid_embed, \
+            attention_mask=attention_mask_grid, attention_weights=attention_weights)
 
+            # Concat
             out_all = torch.cat([out_region, out_grid], dim=1)
 
-            out_region = l_r2g(out_region, out_all, out_all, region2all, region_aligns, attention_weights,
-                               pos_source=region_embed, pos_cross=pos_cross)
+            # Cross Self-Attention between regions and grids
+            out_region = l_r2g(queries=out_region, keys=out_all, values=out_all, relative_geometry_weights=region2all, \
+                              attention_mask=region_aligns, attention_weights=attention_weights, \
+                              pos_source=region_embed, pos_cross=pos_cross)
 
-            out_grid = l_g2r(out_grid, out_all, out_all, grid2all, grid_aligns,
-                             attention_weights, pos_source=grid_embed, pos_cross=pos_cross)
+            out_grid = l_g2r(queries=out_grid, keys=out_all, values=out_all, relative_geometry_weights=grid2all, \
+                            attention_mask=grid_aligns, attention_weights=attention_weights, \
+                            pos_source=grid_embed, pos_cross=pos_cross)
 
+            # Concat
             out = torch.cat([out_region, out_grid], dim=1)
-            outs.append(out)
+            
+            # If 'multi_level_output' is applied.
+            if self.multi_level_output:
+              outs.append(out.unsqueeze(1))
 
-        outs = torch.stack(outs, dim=1)
-        #outs = torch.cat(outs, 1)
+        # If 'multi_level_output' is applied.
+        if self.multi_level_output:
+          outs = torch.cat(outs, dim=1)
+        
         attention_mask = torch.cat([attention_mask_region, attention_mask_grid], dim=-1)
-
-        return outs, attention_mask
+        
+        # If 'multi_level_output' is applied.
+        if self.multi_level_output:
+          return outs, attention_mask
+        else:
+          return out, attention_mask

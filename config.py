@@ -5,7 +5,10 @@ from models.modules.attentions import *
 from models.modules.encoders import *
 from models.modules.decoders import *
 
-# training configuration
+# Root dir
+root_path = '/content/drive/MyDrive/viecap4h-experiments/uit-vlsp-viecap4h-doanhcolabpro/'
+
+# Training configuration
 checkpoint_path = "saved_models"
 start_from = None
 learning_rate = 1.
@@ -17,7 +20,7 @@ warmup = 10000
 min_freq = 1
 get_scores = False
 
-# model configuration
+# Model configuration
 total_memory = 40
 nhead = 8
 nlayers = 3
@@ -50,12 +53,15 @@ ViGPTModel
 '''
 
 pretrained_language_model = PhoBERTModel
-# pretrained_language_model = BERTModel
 
 language_model_hidden_size = 768
-encoder_self_attention = ScaledDotProductAttention
+
+# Encoder configuration
+encoder_self_attention = ScaledDotProductWithBoxAttention
 encoder_self_attention_args = {}
-encoder_args = {}
+encoder_args = {'multi_level_output': True}
+
+# Decoder configuration
 decoder_self_attention = ScaledDotProductAttention
 decoder_enc_attention = ScaledDotProductAttention
 decoder_self_attention_args = {}
@@ -63,28 +69,30 @@ decoder_enc_attention_args = {}
 decoder_args = {
     "pretrained_language_model_name": pretrained_language_model_name,
     "pretrained_language_model": pretrained_language_model,
-    "pretrained_language_model_path": '/content/drive/MyDrive/DoanhNghia/OpenViIC/saved_models/rstnet_using_region/best_language_model.pth'
+    "pretrained_language_model_path": '/content/drive/MyDrive/viecap4h-experiments/OpenViIC/saved_models/rstnet_using_region/best_language_model.pth'
 }
-encoder = Encoder
-decoder = AdaptiveDecoder
+
+# Transformer configuration
+encoder = DualCollaborativeLevelEncoder
+decoder = MeshedAdaptiveDecoder
 transformer_args = {"use_img_pos": True, "use_box_embedd": True}
 
-# dataset configuration
-train_json_path = "/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/annotations/train.json"
-val_json_path = "/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/annotations/val.json"
+# Dataset configuration
+train_json_path = root_path + "/annotations/train.json"
+val_json_path = root_path + "/annotations/val.json"
 public_test_json_path = None
 private_test_json_path = None
 
-# feature path
-region_features_path = '/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/features/'
-grid_features_path = '/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/X152++_VieCap_feature.hdf5'
-mask_features_path = '/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/DLCT_masks/'
+# Feature paths
+region_features_path = root_path + '/region_features_butd/'
+grid_features_path = root_path + '/X152++_VieCap_feature.hdf5'
+mask_features_path = root_path + '/DLCT_masks/'
 
-# training configuration
+# Training configuration
 batch_size = 32
 workers = 2
 
-# tokenizer:
+# Tokenizer:
 '''
 + vncorenlp
 + pyvi
@@ -102,15 +110,15 @@ tokenizer = "vncorenlp"
 '''
 word_embedding = None   
 
-# sample submission configuration
+# Sample submission configuration
 sample_public_test_json_path = None
 sample_private_test_json_path = None
 
 # Type features used
 guided_load_feature = {
     'grid': True,
-    'region': False
+    'region': True
 }
 
-# idx by filename
+# Idx by filename
 idx_by_filename = True

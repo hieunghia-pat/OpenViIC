@@ -133,6 +133,7 @@ def collate_fn(samples):
     captions = []
     shifted_right_tokens = []
     max_seq_len = 0
+    masks = []
     
     for sample in samples:
         image_id = sample["image_id"]
@@ -144,7 +145,7 @@ def collate_fn(samples):
         token = sample["caption"] # for cross-entropy objective training
         shifted_right_token = sample["shifted_right_caption"] # for cross-entropy objective training
         caption = sample["captions"] # for self-critical sequential training
-        masks = sample["masks"]
+        mask = sample["masks"]
 
         if region_feature is not None:
             if max_seq_len < region_feature.shape[0]:
@@ -156,6 +157,9 @@ def collate_fn(samples):
         if grid_feature is not None:
             # Append grid features
             grid_features.append(torch.tensor(grid_feature))
+
+        if mask is not None:
+            masks.append(torch.tensor(mask))
 
         if image_id is not None:
             image_ids.append(image_id)
@@ -196,7 +200,11 @@ def collate_fn(samples):
             for ith in range(grid_features[batch_ith].shape[0], max_seq_len):
                 grid_features[batch_ith] = torch.cat([grid_features[batch_ith], zero_feature], dim=0)
 
-        grid_features = torch.cat([feature for feature in grid_features], dim=0)
+        grid_features = torch.cat([feature.unsqueeze_(0) for feature in grid_features], dim=0)
+
+    # Masks
+    if len(masks) > 0:
+        masks = torch.cat([mask.unsqueeze_(0) for mask in masks], dim=0)
 
     if len(image_ids) == 0:
         image_ids = None

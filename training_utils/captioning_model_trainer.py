@@ -221,7 +221,7 @@ class Trainer:
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dataloader):
-                
+
                 # Load region features
                 region_features = sample["region_features"]
                 if len(region_features) > 0:
@@ -238,7 +238,6 @@ class Trainer:
                     boxes = boxes.to(device)
 
                 # Load masks
-                import pdb; pdb.set_trace()
                 masks = sample["masks"]
                 if len(masks) > 0:
                     masks = masks.to(device)
@@ -252,8 +251,7 @@ class Trainer:
                 
                 if (len(region_features) > 0) and (len(grid_features) > 0):
                     # only for Dual-level Collaborative Encoder.
-                    import pdb; pdb.set_trace()
-                    out = self.model(region_features, grid_features, masks, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+                    out = self.model(region_features, tokens, boxes=boxes, grid_sizes=grid_sizes, grid_features=grid_features, masks=masks).contiguous()
                 
                 elif len(grid_features) > 0:
                     # Maybe RSTNet or some models using grid features.
