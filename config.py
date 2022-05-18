@@ -30,14 +30,27 @@ dropout = .1
 training_beam_size = 5
 evaluating_beam_size = 3
 model_name = "rstnet_using_region"
-pretrained_language_model_name = "vinai/phobert-base"                   # vinai/phobert-base
-                                                        # vinai/phobert-large
-                                                        # vinai/bartpho-syllable
-                                                        # vinai/bartpho-word
-                                                        # NlpHUST/gpt-neo-vi-small
-pretrained_language_model = PhoBERTModel    # PhoBERTModel
-                                    # BARTPhoModel
-                                    # ViGPTModel
+
+# Pre-train language model
+
+'''
+vinai/phobert-base
+vinai/phobert-large
+vinai/bartpho-syllable
+vinai/bartpho-word
+NlpHUST/gpt-neo-vi-small
+'''
+
+pretrained_language_model_name = "vinai/phobert-base" 
+
+'''
+PhoBERTModel
+BARTPhoModel
+ViGPTModel
+'''
+
+pretrained_language_model = PhoBERTModel
+# pretrained_language_model = BERTModel
 
 language_model_hidden_size = 768
 encoder_self_attention = ScaledDotProductAttention
@@ -49,29 +62,55 @@ decoder_self_attention_args = {}
 decoder_enc_attention_args = {}
 decoder_args = {
     "pretrained_language_model_name": pretrained_language_model_name,
-    "pretrained_language_model": pretrained_language_model
+    "pretrained_language_model": pretrained_language_model,
+    "pretrained_language_model_path": '/content/drive/MyDrive/DoanhNghia/OpenViIC/saved_models/rstnet_using_region/best_language_model.pth'
 }
 encoder = Encoder
-decoder = Decoder
-transformer_args = {"use_img_pos": True}
+decoder = AdaptiveDecoder
+transformer_args = {"use_img_pos": True, "use_box_embedd": True}
 
 # dataset configuration
-train_json_path = "features/annotations/UIT-ViIC/uitviic_captions_train2017.json"
-val_json_path = "features/annotations/UIT-ViIC/uitviic_captions_val2017.json"
-public_test_json_path = "features/annotations/UIT-ViIC/uitviic_captions_test2017.json"
+train_json_path = "/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/annotations/train.json"
+val_json_path = "/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/annotations/val.json"
+public_test_json_path = None
 private_test_json_path = None
-feature_path = "features/region_features/UIT-ViIC/faster_rcnn"
+
+# feature path
+region_features_path = '/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/features/'
+grid_features_path = '/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/X152++_VieCap_feature.hdf5'
+mask_features_path = '/content/drive/MyDrive/DoanhNghia/uit-vlsp-viecap4h-solution/DLCT_masks/'
+
+# training configuration
 batch_size = 32
 workers = 2
-tokenizer = "vncorenlp"    # vncorenlp
-                    # pyvi
-                    # spacy
-word_embedding = None   # "fasttext.vi.300d"
-                        # "phow2v.syllable.100d"
-                        # "phow2v.syllable.300d"
-                        # "phow2v.word.100d"
-                        # "phow2v.word.300d"
+
+# tokenizer:
+'''
++ vncorenlp
++ pyvi
++ spacy
+'''
+tokenizer = "vncorenlp" 
+
+# Word embedding:
+'''
++ fasttext.vi.300d
++ phow2v.syllable.100d
++ phow2v.syllable.300d
++ phow2v.word.100d
++ phow2v.word.300d
+'''
+word_embedding = None   
 
 # sample submission configuration
 sample_public_test_json_path = None
 sample_private_test_json_path = None
+
+# Type features used
+guided_load_feature = {
+    'grid': True,
+    'region': False
+}
+
+# idx by filename
+idx_by_filename = True

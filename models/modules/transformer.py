@@ -4,7 +4,7 @@ from models.captioning_model import CaptioningModel
 from models.modules.embeddings import SinusoidPositionalEmbedding
 
 class Transformer(CaptioningModel):
-    def __init__(self, bos_idx, encoder, decoder, use_img_pos=False):
+    def __init__(self, bos_idx, encoder, decoder, use_img_pos=False, use_box_embedd=False, **kwargs):
         super(Transformer, self).__init__()
         self.bos_idx = bos_idx
         self.encoder = encoder
@@ -12,6 +12,9 @@ class Transformer(CaptioningModel):
         self.use_img_pos = use_img_pos
         if self.use_img_pos:
             self.sinusoid_pos_embedding = SinusoidPositionalEmbedding(encoder.d_model, normalize=True)
+        self.use_box_embedd = use_box_embedd
+        if self.use_box_embedd:
+            self.box_embedding = nn.Linear(4, 512)
 
         self.register_state('enc_output', None)
         self.register_state('mask_enc', None)
@@ -28,6 +31,7 @@ class Transformer(CaptioningModel):
 
     def forward(self, input, tokens, boxes=None, grid_sizes=None):
         pos_emb = self.sinusoid_pos_embedding(input) if self.use_img_pos else None
+        region_embed = self.box_embedding(boxes) if self.use_box_embedd else None
         enc_output, mask_enc = self.encoder(input, boxes, grid_sizes, positional_emb=pos_emb)
         dec_output = self.decoder(tokens, enc_output, mask_encoder=mask_enc, positional_emb=pos_emb)
         return dec_output
@@ -43,7 +47,10 @@ class Transformer(CaptioningModel):
         elif mode == 'feedback':
             pos_emb = self.sinusoid_pos_embedding(visual) if self.use_img_pos else None
             if t == 0:
-                self.enc_output, self.mask_enc = self.encoder(visual, boxes, grid_sizes, positional_emb=pos_emb)
+                if self.use_box_embedd:
+                    self.enc_output, self.mask_enc = self.encoder(visual, boxes, grid_sizes, positional_emb=pos_emb)
+                else:
+                    self.enc_output, self.mask_enc = self.encoder(visual, boxes, grid_sizes, positional_emb=pos_emb)
                 if isinstance(visual, torch.Tensor):
                     it = visual.data.new_full((visual.shape[0], 1), self.bos_idx).long()
                 else:

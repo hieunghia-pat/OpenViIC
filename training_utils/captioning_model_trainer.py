@@ -102,14 +102,45 @@ class Trainer:
         with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             with torch.no_grad():
                 for it, sample in enumerate(dataloader):
-                    features = sample["features"].to(device)
+                    # Load region features
+                    region_features = sample["region_features"]
+                    if len(region_features) > 0:
+                        region_features = region_features.to(device)
+
+                    # Load grid features
+                    grid_features = sample["grid_features"]
+                    if len(grid_features) > 0:
+                        grid_features = grid_features.to(device)
+
+                    # Load boxes
                     boxes = sample["boxes"]
                     if boxes is not None:
                         boxes = boxes.to(device)
+
+                    # Load masks
+                    masks = sample["masks"]
+                    if len(masks) > 0:
+                        masks = masks.to(device)
+
                     grid_sizes = sample["grid_sizes"]
                     tokens = sample["tokens"].to(device)
                     shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                    out = self.model(features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+                    
+                    if (len(region_features) > 0) and (len(grid_features) > 0):
+                        # only for Dual-level Collaborative Encoder.
+                        with torch.no_grad():
+                            out = self.model(region_features, grid_features, masks, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+                    
+                    elif len(grid_features) > 0:
+                        # Maybe RSTNet or some models using grid features.
+                        with torch.no_grad():
+                            out = self.model(grid_features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+                    
+                    elif len(region_features) > 0:
+                        # Models using region features.
+                        with torch.no_grad():
+                            out = self.model(region_features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+                    
                     loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
@@ -127,15 +158,49 @@ class Trainer:
         gts = {}
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
-                features = sample["features"].to(device)
+                # Load region features
+                region_features = sample["region_features"]
+                if len(region_features) > 0:
+                    region_features = region_features.to(device)
+
+                # Load grid features
+                grid_features = sample["grid_features"]
+                if len(grid_features) > 0:
+                    grid_features = grid_features.to(device)
+
+                # Load boxes
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = boxes.to(device)
+
+                # Load masks
+                masks = sample["masks"]
+                if len(masks) > 0:
+                    masks = masks.to(device)
+
                 grid_sizes = sample["grid_sizes"]
+                tokens = sample["tokens"].to(device)
+                shifted_right_tokens = sample["shifted_right_tokens"].to(device)
                 caps_gt = sample["captions"]
-                with torch.no_grad():
-                    out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                beam_size=config.evaluating_beam_size, out_size=1)
+                
+                if (len(region_features) > 0) and (len(grid_features) > 0):
+                    # only for Dual-level Collaborative Encoder.
+                    with torch.no_grad():
+                        out, _ = self.model.beam_search(region_features, grid_features, masks, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                                                    beam_size=config.evaluating_beam_size, out_size=1)
+                
+                elif len(grid_features) > 0:
+                    # Maybe RSTNet or some models using grid features.
+                    with torch.no_grad():
+                        out, _ = self.model.beam_search(grid_features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                                                    beam_size=config.evaluating_beam_size, out_size=1)
+                
+                elif len(region_features) > 0:
+                    # Models using region features.
+                    with torch.no_grad():
+                        out, _ = self.model.beam_search(region_features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                                                    beam_size=config.evaluating_beam_size, out_size=1)
+                
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -156,14 +221,48 @@ class Trainer:
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dataloader):
-                features = sample["features"].to(device)
+                
+                # Load region features
+                region_features = sample["region_features"]
+                if len(region_features) > 0:
+                    region_features = region_features.to(device)
+
+                # Load grid features
+                grid_features = sample["grid_features"]
+                if len(grid_features) > 0:
+                    grid_features = grid_features.to(device)
+
+                # Load boxes
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = boxes.to(device)
+
+                # Load masks
+                import pdb; pdb.set_trace()
+                masks = sample["masks"]
+                if len(masks) > 0:
+                    masks = masks.to(device)
+                
+                # Load grid sizes
                 grid_sizes = sample["grid_sizes"]
+                
                 tokens = sample["tokens"].to(device)
+                
                 shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                out = self.model(features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+                
+                if (len(region_features) > 0) and (len(grid_features) > 0):
+                    # only for Dual-level Collaborative Encoder.
+                    import pdb; pdb.set_trace()
+                    out = self.model(region_features, grid_features, masks, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+                
+                elif len(grid_features) > 0:
+                    # Maybe RSTNet or some models using grid features.
+                    out = self.model(grid_features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+                
+                elif len(region_features) > 0:
+                    # Models using region features.
+                    out = self.model(region_features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                 loss.backward()
@@ -189,14 +288,46 @@ class Trainer:
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dict_dataloader):
-                features = sample["features"].to(device)
+                # features = sample["features"].to(device)
+
+                # Load region features
+                region_features = sample["region_features"]
+                if len(region_features) > 0:
+                    region_features = region_features.to(device)
+
+                # Load grid features
+                grid_features = sample["grid_features"]
+                if len(grid_features) > 0:
+                    grid_features = grid_features.to(device)
+
+                # Load boxes
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = boxes.to(device)
+
+                # Load masks
+                masks = sample["masks"]
+                if len(masks) > 0:
+                    masks = masks.to(device)
+
                 grid_sizes = sample["grid_sizes"]
                 caps_gt = sample["captions"]
-                outs, log_probs = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+
+                if (len(region_features) > 0) and (len(grid_features) > 0):
+                    # only for Dual-level Collaborative Encoder.
+                    outs, log_probs = self.model.beam_search(region_features, grid_features, masks, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
                                                     beam_size=config.training_beam_size, out_size=config.training_beam_size)
+                
+                elif len(grid_features) > 0:
+                    # Maybe RSTNet or some models using grid features.
+                    outs, log_probs = self.model.beam_search(grid_features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+                                                    beam_size=config.training_beam_size, out_size=config.training_beam_size)
+                
+                elif len(region_features) > 0:
+                    # Models using region features.
+                    outs, log_probs = self.model.beam_search(region_features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+                                                    beam_size=config.training_beam_size, out_size=config.training_beam_size)
+
                 self.optim.zero_grad()
 
                 # Rewards

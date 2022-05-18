@@ -6,8 +6,10 @@ from typing import Callable
 def get_tokenizer(tokenizer):
     if callable(tokenizer):
         return tokenizer
+    
     elif tokenizer is None:
         return lambda s: s 
+    
     elif tokenizer == "pyvi":
         try:
             from pyvi import ViTokenizer
@@ -27,6 +29,7 @@ def get_tokenizer(tokenizer):
             print("Please install SpaCy and the SpaCy Vietnamese tokenizer. "
                   "See the docs at https://gitlab.com/trungtv/vi_spacy for more information.")
             raise
+    
     elif tokenizer == "vncorenlp":
         try:
             from vncorenlp import VnCoreNLP
@@ -122,25 +125,37 @@ def unk_init(token, dim):
 def collate_fn(samples):
     image_ids = []
     filenames = []
-    features = []
-    boxes = []
-    grid_sizes = []
+    region_features = [] # region features
+    grid_features = [] # grid features
+    boxes = [] # boxes for region features
+    grid_sizes = [] # grid sizes for grid features
     tokens = []
     captions = []
     shifted_right_tokens = []
     max_seq_len = 0
+    
     for sample in samples:
         image_id = sample["image_id"]
         filename = sample["filename"]
-        feature = sample["features"]
+        region_feature = sample["region_features"]
+        grid_feature = sample["grid_features"]
         box = sample["boxes"]
         grid_size = sample["grid_size"]
         token = sample["caption"] # for cross-entropy objective training
         shifted_right_token = sample["shifted_right_caption"] # for cross-entropy objective training
         caption = sample["captions"] # for self-critical sequential training
+        masks = sample["masks"]
 
-        if max_seq_len < feature.shape[0]:
-            max_seq_len = feature.shape[0]
+        if region_feature is not None:
+            if max_seq_len < region_feature.shape[0]:
+                max_seq_len = region_feature.shape[0]
+
+            # Append region features
+            region_features.append(torch.tensor(region_feature))
+
+        if grid_feature is not None:
+            # Append grid features
+            grid_features.append(torch.tensor(grid_feature))
 
         if image_id is not None:
             image_ids.append(image_id)
@@ -156,20 +171,32 @@ def collate_fn(samples):
             tokens.append(token)
         if shifted_right_token is not None:
             shifted_right_tokens.append(shifted_right_token)
-        features.append(torch.tensor(feature))
 
-    zero_feature = torch.zeros_like(features[-1][-1]).unsqueeze(0) # (1, dim)
-    if len(boxes) > 0:
-        zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
-    else:
-        zero_box = None
-    for batch_ith in range(len(samples)):
-        for ith in range(features[batch_ith].shape[0], max_seq_len):
-            features[batch_ith] = torch.cat([features[batch_ith], zero_feature], dim=0)
-            if zero_box is not None:
-                boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
+    # if use region features
+    if len(region_features) > 0:
+        zero_feature = torch.zeros_like(region_features[-1][-1]).unsqueeze(0) # (1, dim)
+        
+        if len(boxes) > 0:
+            zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
+        else:
+            zero_box = None
+        
+        for batch_ith in range(len(samples)):
+            for ith in range(region_features[batch_ith].shape[0], max_seq_len):
+                region_features[batch_ith] = torch.cat([region_features[batch_ith], zero_feature], dim=0)
+                if zero_box is not None:
+                    boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
 
-    features = torch.cat([feature.unsqueeze_(0) for feature in features], dim=0)
+        region_features = torch.cat([feature.unsqueeze_(0) for feature in region_features], dim=0)
+    
+    # if use grid features
+    if len(grid_features) > 0:
+        zero_feature = torch.zeros_like(grid_features[-1][-1]).unsqueeze(0) # (1, dim)
+        for batch_ith in range(len(samples)):
+            for ith in range(grid_features[batch_ith].shape[0], max_seq_len):
+                grid_features[batch_ith] = torch.cat([grid_features[batch_ith], zero_feature], dim=0)
+
+        grid_features = torch.cat([feature for feature in grid_features], dim=0)
 
     if len(image_ids) == 0:
         image_ids = None
@@ -201,10 +228,12 @@ def collate_fn(samples):
     return {
         "image_ids": image_ids,
         "filenames": filenames,
-        "features": features, 
+        "region_features": region_features,
+        "grid_features": grid_features, 
         "boxes": boxes,
         "grid_sizes": grid_sizes,
         "tokens": tokens, 
         "shifted_right_tokens": shifted_right_tokens,
-        "captions": captions
+        "captions": captions,
+        "masks": masks
     }

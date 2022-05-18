@@ -133,11 +133,12 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         
         # embedding geometric information from boxes coordinates
         if grid_sizes is not None:
-            assert boxes is None, "there is no boxe when using grid-based extractor"
+            assert boxes is None, "there is no boxes when using grid-based extractor"
             bs, seq_len = queries.shape[:2]
             boxes = get_grids_position(bs, seq_len, grid_sizes[0])
         else:
             assert boxes is not None, "coordinates of objects are requiered for region-based extractor"
+        
         relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
         flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, self.d_g)
         bs, nk, _, _ = relative_geometry_embeddings.shape
@@ -336,6 +337,7 @@ class MultiHeadAttention(Module):
         self.identity_map_reordering = identity_map_reordering
 
         self.use_aoa = use_aoa # whether to use Attention on Attention (AoA) mechanism or not
+        
         if self.use_aoa:    # define additionally AoA layers
             self.informative_attention = nn.Linear(2*d_model, d_model)
             self.gated_attention = nn.Linear(2*d_model, d_model)

@@ -32,8 +32,24 @@ else:
     vocab = pickle.load(open(os.path.join(config.checkpoint_path, config.model_name, "vocab.pkl"), "rb"))
 
 # creating iterable dataset
-train_dataset = FeatureDataset(config.train_json_path, config.feature_path, vocab) # for training with cross-entropy loss
-val_dataset = FeatureDataset(config.val_json_path, config.feature_path, vocab) # for calculating evaluation loss
+train_dataset = FeatureDataset(config.train_json_path, \
+                                config.region_features_path, \
+                                config.grid_features_path, \
+                                config.mask_features_path, \
+                                config.guided_load_feature,
+                                49,
+                                vocab,
+                                config.idx_by_filename) # for training with cross-entropy loss
+
+val_dataset = FeatureDataset(config.val_json_path, \
+                                config.region_features_path, \
+                                config.grid_features_path, \
+                                config.mask_features_path, \
+                                config.guided_load_feature,
+                                49,
+                                vocab,
+                                config.idx_by_filename)  # for calculating evaluation loss
+                                
 if config.public_test_json_path is not None:
     public_test_dataset = FeatureDataset(config.public_test_json_path, config.feature_path, vocab=vocab)
 else:
