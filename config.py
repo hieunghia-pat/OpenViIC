@@ -6,7 +6,7 @@ from models.modules.encoders import *
 from models.modules.decoders import *
 
 # Root dir
-root_path = '/content/drive/MyDrive/viecap4h-experiments/uit-vlsp-viecap4h-doanhcolabpro/'
+root_path = 'features_for_exp'
 
 # Training configuration
 checkpoint_path = "saved_models"
