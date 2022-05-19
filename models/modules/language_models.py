@@ -15,7 +15,7 @@ import os
 from transformers import AutoTokenizer
 
 class BERTModel(Module):
-    def __init__(self, pretrained_language_model_name, padding_idx=0, bert_hidden_size=768, vocab_size=10201,
+    def __init__(self, pretrained_language_model_name, padding_idx=0, language_model_hidden_size=768, vocab_size=10201,
                     d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, max_len=54, dropout=.1):
         super(BERTModel, self).__init__()
         self.padding_idx = padding_idx
@@ -27,7 +27,7 @@ class BERTModel(Module):
         for param in self.language_model.parameters():
             param.requires_grad = False
             
-        self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
+        self.proj_to_caption_model = nn.Linear(language_model_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
         self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
@@ -76,7 +76,7 @@ class BERTModel(Module):
         return out, language_feature
 
 class PhoBERTModel(Module):
-    def __init__(self, pretrained_language_model_name, padding_idx=1, bert_hidden_size=768, vocab_size=10201,
+    def __init__(self, pretrained_language_model_name, padding_idx=1, language_model_hidden_size=768, vocab_size=10201,
                     d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, max_len=54, dropout=.1):
         super(PhoBERTModel, self).__init__()
         self.padding_idx = padding_idx
@@ -90,7 +90,7 @@ class PhoBERTModel(Module):
         for param in self.language_model.parameters():
             param.requires_grad = False
             
-        self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
+        self.proj_to_caption_model = nn.Linear(language_model_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
         self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
