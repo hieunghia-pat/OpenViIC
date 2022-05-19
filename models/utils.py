@@ -1,7 +1,14 @@
 import torch
 from torch import nn
+
 from data_utils.types import *
+from configs.constants import *
+
 import copy
+from yacs.config import CfgNode
+
+from data_utils.vocab import Vocab
+from models.modules.transformer import Transformer
 
 def get_batch_size(x: TensorOrSequence) -> int:
     if isinstance(x, torch.Tensor):
@@ -146,3 +153,56 @@ def box_relational_embedding(f_g, dim_g=64, wave_len=1000, trignometric_embeddin
         embedding = position_mat
         
     return embedding # (batch_size, max_nr_bounding_boxes, max_nr_bounding_boxes, dim_g)
+
+def get_encoder(model_config: CfgNode, encoder_config: CfgNode, vocab: Vocab):
+    encoder = encoders[encoder_config.encoder_module]
+    encoder_self_attention = attentions[encoder_config.encoder_self_attention_module]
+    encoder_self_attention_args = dict(encoder_config.encoder_self_attention_args)
+    encoder_args = dict(encoder_config.encoder_args)
+
+    return encoder(N=model_config.nlayers, padding_idx=vocab.padding_idx, d_in=model_config.d_feature, d_model=model_config.d_model, d_k=model_config.d_k, 
+                    d_v=model_config.d_v, d_ff=model_config.d_ff, dropout=model_config.dropout, 
+                    attention_module=encoder_self_attention, 
+                    attention_module_kwargs=encoder_self_attention_args, 
+                    **encoder_args)
+
+def get_decoder(model_config: CfgNode, decoder_config: CfgNode, vocab: Vocab):
+    decoder = decoders[decoder_config.decoder_module]
+    decoder_self_attention = attentions[decoder_config.decoder_self_attention_module]
+    decoder_self_attention_args = dict(decoder_config.decoder_self_attention_args)
+    decoder_enc_attention = attentions[decoder_config.decoder_enc_attention_module]
+    decoder_enc_attention_args = dict(decoder_config.decoder_enc_attention_args)
+    decoder_args = {
+        **dict(decoder_config.decoder_args),
+        **dict(decoder_config.language_model)
+    }
+
+    return decoder(vocab_size=len(vocab), max_len=vocab.max_caption_length, N_dec=model_config.nlayers, padding_idx=vocab.padding_idx,
+                            d_model=model_config.d_model, d_k=model_config.d_k, d_v=model_config.d_v, d_ff=model_config.d_ff, dropout=model_config.dropout,
+                            self_att_module=decoder_self_attention, enc_att_module=decoder_enc_attention,
+                            self_att_module_kwargs=decoder_self_attention_args, enc_att_module_kwargs=decoder_enc_attention_args, **decoder_args)
+
+def get_captioning_model(config: CfgNode, vocab: Vocab):
+
+    model_config = config.model
+    transformer_config = config.transformer
+    encoder_config = transformer_config.encoder
+    decoder_config = transformer_config.decoder
+
+    encoder = get_encoder(model_config, encoder_config, vocab)
+    decoder = get_decoder(model_config, decoder_config, vocab)
+
+    # init Transformer model.
+    captioning_model = Transformer(vocab.bos_idx, encoder, decoder, **config.transformer_args)
+
+    return captioning_model
+
+def get_language_model(config: CfgNode, vocab: Vocab):
+    model_config = config.model
+    language_model_config = config.model.transformer.decoder.language_model
+    language_model = pretrained_language_model(language_model_config.pretrained_language_model_name, padding_idx=vocab.padding_idx, 
+                                language_model_hidden_size=language_model_config.language_model_hidden_size,
+                                vocab_size=len(vocab), d_model=model_config.d_model, d_k=model_config.d_k, d_v=model_config.d_v, 
+                                h=model_config.nhead, d_ff=model_config.d_ff, max_len=vocab.max_caption_length, dropout=model_config.dropout)
+
+    return language_model
