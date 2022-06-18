@@ -7,8 +7,6 @@ from models.modules.encoders import EncoderLayer
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
 from models.modules.containers import Module
 
-import sys
-sys.path.append("../..")
 import config
 import json
 import os

@@ -1,21 +1,16 @@
 import torch
 from torch import nn
 from models.captioning_model import CaptioningModel
-from models.modules.embeddings import SinusoidPositionalEmbedding, PositionEmbeddingSine
+from models.modules.embeddings import SinusoidPositionalEmbedding
 
 class Transformer(CaptioningModel):
-    def __init__(self, bos_idx, encoder, decoder, use_img_pos=False, use_box_embedd=False, **kwargs):
+    def __init__(self, bos_idx, encoder, decoder, **kwargs):
         super(Transformer, self).__init__()
         self.bos_idx = bos_idx
         self.encoder = encoder
         self.decoder = decoder
-        self.use_img_pos = use_img_pos
-        if self.use_img_pos:
-            # self.sinusoid_pos_embedding = SinusoidPositionalEmbedding(decoder.d_model // 2, normalize=True)
-            self.pos_embedding = PositionEmbeddingSine(decoder.d_model // 2, normalize=True)
-        self.use_box_embedd = use_box_embedd
-        if self.use_box_embedd:
-            self.box_embedding = nn.Linear(4, 512)
+        self.sinusoid_pos_embedding = SinusoidPositionalEmbedding(decoder.d_model // 2, normalize=True)
+        self.box_embedding = nn.Linear(4, 512)
 
         self.register_state('enc_output', None)
         self.register_state('mask_enc', None)
@@ -30,16 +25,6 @@ class Transformer(CaptioningModel):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def get_pos_embedding(self, boxes, grids, split=False):
-        bs = boxes.shape[0]
-        region_embed = self.box_embedding(boxes)
-        grid_embed = self.grid_embedding(grids.view(bs, 7, 7, -1))
-        if not split:
-            pos = torch.cat([region_embed, grid_embed], dim=1)
-            return pos
-        else:
-            return region_embed, grid_embed
-
     def forward(self, input, tokens, boxes=None, grid_sizes=None, **kwargs):
         # Get batch size
         bs = input.shape[0]
@@ -53,11 +38,11 @@ class Transformer(CaptioningModel):
             grid_features = kwargs['grid_features']
             masks = kwargs['masks']
             # Positional embedding for region features.
-            region_embed = self.box_embedding(boxes) if self.use_box_embedd else None
+            region_embed = self.box_embedding(boxes)
             # Positional embedding for grid features.
-            grid_embed = self.pos_embedding(grid_features.view(bs, 7, 7, -1)) if self.use_img_pos else None
+            grid_embed = self.pos_embedding(grid_features.view(bs, 7, 7, -1))
             # Fit into the Encoder.
-            enc_output, mask_enc = self.encoder(region_features=region_features, grid_features=grid_features, boxes=boxes, aligns=masks, \
+            enc_output, mask_enc = self.encoder(region_features=region_features, grid_features=grid_features, boxes=boxes, aligns=masks,
                                             region_embed=region_embed, grid_embed=grid_embed)
         
         else:
@@ -69,8 +54,7 @@ class Transformer(CaptioningModel):
         return dec_output
 
     def init_state(self, b_s, device):
-        return [torch.zeros((b_s, 0), dtype=torch.long, device=device),
-                None, None]
+        return [torch.zeros((b_s, 0), dtype=torch.long, device=device), None, None]
 
     def step(self, t, prev_output, visual, boxes, grid_sizes=None, mode='teacher_forcing', **kwargs):
         it = None
@@ -87,7 +71,7 @@ class Transformer(CaptioningModel):
                     masks = kwargs['masks']
                     region_embed = self.box_embedding(boxes) if self.use_box_embedd else None
                     grid_embed = self.pos_embedding(grid_features.view(bs, 7, 7, -1)) if self.use_img_pos else None
-                    self.enc_output, self.mask_enc = self.encoder(region_features=region_features, grid_features=grid_features, aligns=masks, \
+                    self.enc_output, self.mask_enc = self.encoder(region_features=region_features, grid_features=grid_features, aligns=masks,
                     boxes=boxes, region_embed=region_embed, grid_embed=grid_embed)
                 else:
                     # Using one type of feature.

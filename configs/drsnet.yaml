@@ -1,10 +1,6 @@
 model:
   model_name: "drstnet"
   transformer:
-    transformer_args:
-      use_img_pos: True
-      use_box_embedd: True
-
     encoder:
       encoder_args:
         multi_level_output: True

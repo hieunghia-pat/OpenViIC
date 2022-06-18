@@ -3,43 +3,33 @@ from models.modules.language_models import *
 from models.modules.encoders import *
 from models.modules.decoders import *
 
-attentions = {
-    "scaled_dot_product_attention": ScaledDotProductAttention,
-    "augmented_geometry_scaled_dot_product_attention": AugmentedGeometryScaledDotProductAttention,
-    "augmented_memory_scaled_dot_product_attention": AugmentedMemoryScaledDotProductAttention,
-    "apdative_scaled_dot_product_attention": AdaptiveScaledDotProductAttention,
-    "none": None
-}
-
 encoders = {
     "encoder": Encoder,
-    "multilevel_encoder": MultiLevelEncoder,
-    "none": None
+    "dlct-encoder": DualCollaborativeLevelEncoder
 }
 
 decoders = {
     "decoder": Decoder,
     "meshed_decoder": MeshedDecoder,
-    "apdaptive_decoder": AdaptiveDecoder,
-    "meshed_adaptive_decoder": MeshedAdaptiveDecoder,
-    "none": None
+    "apdaptive-decoder": AdaptiveDecoder,
+    "meshed-adaptive-decoder": MeshedAdaptiveDecoder,
 }
 
 pretrained_language_model_names = {
-    "phobert_base": "vinai/phobert-base",
-    "phobert_large": "vinai/phobert-large",
-    "bartpho_syllable": "vinai/bartpho-syllable",
-    "bartpho_word": "vinai/bartpho-word",
-    "gpt_2": "NlpHUST/gpt-neo-vi-small",
-    "none": None
+    "phobert-base": "vinai/phobert-base",
+    "phobert-large": "vinai/phobert-large",
+    "bartpho-syllable": "vinai/bartpho-syllable",
+    "bartpho-word": "vinai/bartpho-word",
+    "gpt2": "NlpHUST/gpt-neo-vi-small",
+    None: None
 }
 
 pretrained_language_model = {
-    "bert_model": BERTModel,
-    "pho_bert_model": PhoBERTModel,
+    "bert-model": BERTModel,
+    "pho-bert-model": PhoBERTModel,
     # "bart_pho_model": BARTPhoModel,
     # "gpt_2": GPT2Model,
-    "none": None
+    None: None
 }
 
 word_embedding = {
@@ -48,5 +38,5 @@ word_embedding = {
     "phow2v_syllable_300": "phow2v.syllable.300d",
     "phow2v_word_100": "phow2v.word.100d",
     "phow2v_word_300": "phow2v.word.300d",
-    "none": None
+    None: None
 }

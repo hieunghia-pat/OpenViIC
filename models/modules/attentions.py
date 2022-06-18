@@ -1,10 +1,8 @@
 import torch
 from torch import nn
-from torch.nn import functional as F
 import numpy as np
 
 from models.modules.containers import Module
-from models.utils import clones, box_relational_embedding, get_grids_position
 
 class ScaledDotProductAttention(nn.Module):
     '''
@@ -41,7 +39,7 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, relative_geometry_weights=None, language_signals=None, attention_mask=None):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -53,17 +51,11 @@ class ScaledDotProductAttention(nn.Module):
         '''
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
-        '''
-        if using DLCT features:
-          keys has shape of (bs, layers, nk, dk)
-        '''
         q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)
         k = self.fc_k(keys).view(b_s, nk, self.h, self.d_k).permute(0, 2, 3, 1)  # (b_s, h, d_k, nk)
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_weights is not None:
-            att = att * attention_weights
         if attention_mask is not None:
             att = att.masked_fill(attention_mask, -np.inf)
         att = torch.softmax(att, dim=-1)
@@ -77,7 +69,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
     Scaled dot-product attention with box relation
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, trignometric_embedding=True):
+    def __init__(self, d_model, d_k, d_v, h):
         '''
             :param d_model: Output dimensionality of the model
             :param d_k: Dimensionality of queries and keys
@@ -86,17 +78,10 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         '''
         super(AugmentedGeometryScaledDotProductAttention, self).__init__()
 
-        self.trignometric_embedding = trignometric_embedding
-        if trignometric_embedding:
-            self.d_g = d_model // h
-        else:
-            self.d_g = 4
-
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
         self.fc_v = nn.Linear(d_model, h * d_v)
         self.fc_o = nn.Linear(h * d_v, d_model)
-        self.fc_gs = clones(nn.Linear(self.d_g, 1), h)
 
         self.d_model = d_model
         self.d_k = d_k
@@ -120,37 +105,17 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, relative_geometry_weights=None, language_signals=None, attention_mask=None):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
             :param keys: Keys (b_s, nk, d_model)
             :param values: Values (b_s, nk, d_model)
-            :param boxes: Boxes (b_s, nk, 4). None indicates image is extracted under region-based methods.
-            :param grid_sizes: Size of the image features. Default value is None if image features is regional features
+            :param relative_geometry_weights: Boxes (b_s, nk, 4). None indicates image is extracted under region-based methods.
             :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
             :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
             :return:
         '''
-
-        assert not (boxes is None and grid_sizes is None), "In AugmentedGeometryScaledDotProductAttention: both boxes and grid_sizes are None"
-        
-        # embedding geometric information from boxes coordinates
-        if grid_sizes is not None:
-            assert boxes is None, "there is no boxes when using grid-based extractor"
-            bs, seq_len = queries.shape[:2]
-            boxes = get_grids_position(bs, seq_len, grid_sizes[0])
-        else:
-            assert boxes is not None, "coordinates of objects are requiered for region-based extractor"
-        
-        relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
-        flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, self.d_g)
-        bs, nk, _, _ = relative_geometry_embeddings.shape
-        box_size_per_head = [bs, 1, nk, nk]
-        relative_geometry_weights_per_head = [fc_g(flatten_relative_geometry_embeddings).view(box_size_per_head) for fc_g in self.fc_gs]
-        relative_geometry_weights = torch.cat(relative_geometry_weights_per_head, dim=1) # (bs, h, nk, nk)
-        relative_geometry_weights = F.relu(relative_geometry_weights)
-        
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
         q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)
@@ -158,8 +123,6 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         a = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_weights is not None:
-            a = a * attention_weights
         if attention_mask is not None:
             a = a.masked_fill(attention_mask, -np.inf)
 
@@ -212,7 +175,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, relative_geometry_weights=None, language_signals=None, attention_mask=None, attention_weights=None):
         '''
         Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -241,80 +204,6 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
 
-        return out
-
-class ScaledDotProductWithBoxAttention(nn.Module):
-    '''
-    Scaled dot-product attention
-    '''
-
-    def __init__(self, d_model, d_k, d_v, h, dropout=.1, comment=None):
-        '''
-        :param d_model: Output dimensionality of the model
-        :param d_k: Dimensionality of queries and keys
-        :param d_v: Dimensionality of values
-        :param h: Number of heads
-        '''
-        super(ScaledDotProductWithBoxAttention, self).__init__()
-        self.fc_q = nn.Linear(d_model, h * d_k)
-        self.fc_k = nn.Linear(d_model, h * d_k)
-        self.fc_v = nn.Linear(d_model, h * d_v)
-        self.fc_o = nn.Linear(h * d_v, d_model)
-        self.dropout = nn.Dropout(dropout)
-
-        self.d_model = d_model
-        self.d_k = d_k
-        self.d_v = d_v
-        self.h = h
-
-        self.init_weights()
-
-        self.comment = comment
-
-    def init_weights(self):
-        nn.init.xavier_uniform_(self.fc_q.weight)
-        nn.init.xavier_uniform_(self.fc_k.weight)
-        nn.init.xavier_uniform_(self.fc_v.weight)
-        nn.init.xavier_uniform_(self.fc_o.weight)
-        nn.init.constant_(self.fc_q.bias, 0)
-        nn.init.constant_(self.fc_k.bias, 0)
-        nn.init.constant_(self.fc_v.bias, 0)
-        nn.init.constant_(self.fc_o.bias, 0)
-
-    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
-        '''
-        Computes
-        :param queries: Queries (b_s, nq, d_model)
-        :param keys: Keys (b_s, nk, d_model)
-        :param values: Values (b_s, nk, d_model)
-        :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
-        :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
-        :return:
-        '''
-        b_s, nq = queries.shape[:2]
-        nk = keys.shape[1]
-
-        q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)
-        k = self.fc_k(keys).view(b_s, nk, self.h, self.d_k).permute(0, 2, 3, 1)  # (b_s, h, d_k, nk)
-        v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
-
-        att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_weights is not None:
-            att = att * attention_weights
-
-        if attention_mask is not None:
-            att = att.masked_fill(attention_mask, -np.inf)
-
-        w_g = grid_sizes
-        w_a = att
-
-        w_mn = torch.log(torch.clamp(w_g, min=1e-6)) + w_a
-        w_mn = torch.softmax(w_mn, -1)  ## bs * 8 * r * r
-
-        att = self.dropout(w_mn)
-
-        out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
-        out = self.fc_o(out)  # (b_s, nq, d_model)
         return out
         
 class AdaptiveScaledDotProductAttention(nn.Module):
@@ -359,7 +248,7 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_o.bias, 0)
         nn.init.constant_(self.fc_s.bias, 0)
 
-    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, relative_geometry_weights=None, language_signals=None, attention_mask=None):
         '''
         Computes
         :param queries: Queries (b_s, nq, d_model)
@@ -383,8 +272,6 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         attn = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_weights is not None:
-            attn = attn * attention_weights
         if attention_mask is not None:
             attn = attn.masked_fill(attention_mask, -np.inf)
 
