@@ -11,7 +11,7 @@ from data_utils.vocab import Vocab
 from data_utils.dataset import FeatureDataset, DictionaryDataset
 from data_utils.utils import collate_fn
 
-from models.modules.transformer import Transformer
+from models.modules.transformers import EncoderDecoderTransformer
 
 random.seed(13)
 torch.manual_seed(13)
@@ -84,7 +84,7 @@ decoder = config.decoder(vocab_size=len(vocab), max_len=vocab.max_caption_length
                         self_att_module_kwargs=config.decoder_enc_attention_args, enc_att_module_kwargs=config.decoder_enc_attention_args, **config.decoder_args)
 
 # init Transformer model.
-model = Transformer(vocab.bos_idx, encoder, decoder, **config.transformer_args).to(device)
+model = EncoderDecoderTransformer(vocab.bos_idx, encoder, decoder, **config.transformer_args).to(device)
 
 # Define Trainer
 trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),

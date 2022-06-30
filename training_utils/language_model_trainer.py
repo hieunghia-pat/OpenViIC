@@ -4,7 +4,7 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from data_utils.vocab import Vocab
 from data_utils.utils import *
-from models.modules.transformer import Transformer
+from models.modules.transformers import EncoderDecoderTransformer
 from data_utils.dataset import *
 import evaluation
 from evaluation import Cider, PTBTokenizer
@@ -21,7 +21,7 @@ from shutil import copyfile
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Trainer:
-    def __init__(self,  model: Transformer, 
+    def __init__(self,  model: EncoderDecoderTransformer, 
                         train_dataset: FeatureDataset,
                         val_dataset: FeatureDataset,
                         test_dataset: Union[FeatureDataset, None],

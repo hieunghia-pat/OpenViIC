@@ -39,16 +39,12 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, relative_geometry_weights=None, language_signals=None, attention_mask=None):
-        '''
-            Computes
-            :param queries: Queries (b_s, nq, d_model)
-            :param keys: Keys (b_s, nk, d_model)
-            :param values: Values (b_s, nk, d_model)
-            :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
-            :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
-            :return:
-        '''
+    def forward(self, inputs):
+        queries = inputs.queries
+        keys = inputs.keys
+        values = inputs.values
+        attention_mask = inputs.attention_masks
+
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
         q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)
@@ -105,17 +101,15 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, queries, keys, values, relative_geometry_weights=None, language_signals=None, attention_mask=None):
-        '''
-            Computes
-            :param queries: Queries (b_s, nq, d_model)
-            :param keys: Keys (b_s, nk, d_model)
-            :param values: Values (b_s, nk, d_model)
-            :param relative_geometry_weights: Boxes (b_s, nk, 4). None indicates image is extracted under region-based methods.
-            :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
-            :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
-            :return:
-        '''
+    def forward(self, inputs):
+        queries = inputs.queries
+        keys = inputs.keys
+        values = inputs.values
+        relative_geometry_weights = inputs.relative_geometry_weights
+        attention_mask = inputs.attention_masks
+
+        assert relative_geometry_weights is not None, "AugmentedGeometryScaledDotProductAttention requires relative_geometry_weights tensor"
+
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
         q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)
@@ -175,16 +169,12 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, relative_geometry_weights=None, language_signals=None, attention_mask=None, attention_weights=None):
-        '''
-        Computes
-            :param queries: Queries (b_s, nq, d_model)
-            :param keys: Keys (b_s, nk, d_model)
-            :param values: Values (b_s, nk, d_model)
-            :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
-            :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
-            :return:
-        '''
+    def forward(self, inputs):
+        queries = inputs.queries
+        keys = inputs.keys
+        values = inputs.values
+        attention_mask = inputs.attention_masks
+        
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
 
@@ -196,8 +186,6 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         v = torch.cat([self.fc_v(values), m_v], 1).view(b_s, nk + self.m, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_weights is not None:
-            att = torch.cat([att[:, :, :, :nk] * attention_weights, att[:, :, :, nk:]], -1)
         if attention_mask is not None:
             att[:, :, :, :nk] = att[:, :, :, :nk].masked_fill(attention_mask, -np.inf)
         att = torch.softmax(att, -1)
@@ -248,17 +236,12 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_o.bias, 0)
         nn.init.constant_(self.fc_s.bias, 0)
 
-    def forward(self, queries, keys, values, relative_geometry_weights=None, language_signals=None, attention_mask=None):
-        '''
-        Computes
-        :param queries: Queries (b_s, nq, d_model)
-        :param keys: Keys (b_s, nk, d_model)
-        :param values: Values (b_s, nk, d_model)
-        :param language_signals: Language signals (b_s, ns, d_model)
-        :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
-        :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
-        :return:
-        '''
+    def forward(self, inputs):
+        queries = inputs.queries
+        keys = inputs.keys
+        values = inputs.values
+        language_signals = inputs.language_signals
+        attention_mask = inputs.attention_masks
 
         assert language_signals is not None, "In AdaptiveScaledDotProductAttention: language_signals is None"
 
@@ -297,7 +280,7 @@ class MultiHeadAttention(Module):
     '''
 
     def __init__(self, d_model, d_k, d_v, h, dropout=.1, identity_map_reordering=False, can_be_stateful=False,
-                 use_aoa=False, attention_module=None, attention_module_kwargs=None):
+                 use_aoa=False, attention_module=None, **attention_module_kwargs):
         super(MultiHeadAttention, self).__init__()
         self.identity_map_reordering = identity_map_reordering
 
@@ -308,10 +291,7 @@ class MultiHeadAttention(Module):
             self.gated_attention = nn.Linear(2*d_model, d_model)
 
         if attention_module is not None:
-            if attention_module_kwargs is not None:
-                self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h, **attention_module_kwargs)
-            else:
-                self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h)
+            self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h, **attention_module_kwargs)
         else:
             self.attention = ScaledDotProductAttention(d_model=d_model, d_k=d_k, d_v=d_v, h=h)
         self.dropout = nn.Dropout(p=dropout)
@@ -322,7 +302,7 @@ class MultiHeadAttention(Module):
             self.register_state('running_keys', torch.zeros((0, d_model)))
             self.register_state('running_values', torch.zeros((0, d_model)))
 
-    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, language_signals=None, attention_mask=None, attention_weights=None):
+    def forward(self, inputs):
         if self.can_be_stateful and self._is_stateful:
             self.running_keys = torch.cat([self.running_keys, keys], 1)
             keys = self.running_keys
@@ -331,20 +311,20 @@ class MultiHeadAttention(Module):
             values = self.running_values
 
         if self.identity_map_reordering:
-            queries = self.layer_norm(queries)
-            keys = self.layer_norm(keys)
-            values = self.layer_norm(values)
-            out = self.attention(queries, keys, values, boxes, grid_sizes, language_signals, attention_mask, attention_weights)
+            inputs.queries = self.layer_norm(inputs.queries)
+            inputs.keys = self.layer_norm(inputs.keys)
+            inputs.values = self.layer_norm(inputs.values)
+            out = self.attention(inputs)
             # residual connection after normalizing
-            out = queries + self.dropout(torch.relu(out))
+            out = inputs.queries + self.dropout(torch.relu(out))
         else:
-            out = self.attention(queries, keys, values, boxes, grid_sizes, language_signals, attention_mask, attention_weights)
+            out = self.attention(inputs)
             # normalization after residual connection
             out = self.dropout(out)
-            out = self.layer_norm(queries + out)
+            out = self.layer_norm(inputs.queries + out)
 
         if self.use_aoa:
-            aoa_input = torch.cat([queries, out], dim=-1)
+            aoa_input = torch.cat([inputs.queries, out], dim=-1)
             i = self.informative_attention(aoa_input)
             g = torch.sigmoid(self.gated_attention(aoa_input))
             out = i * g

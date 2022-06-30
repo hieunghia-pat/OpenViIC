@@ -7,27 +7,31 @@ from models.modules.attentions import AugmentedGeometryScaledDotProductAttention
 from models.utils import generate_padding_mask, get_combine_masks, box_relational_embedding, clones
 from models.modules.embeddings import SinusoidPositionalEmbedding
 
+from data_utils.feature import Feature
+
 class EncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
-                 use_aoa=False, attention_module=None, attention_module_kwargs=None, **kwargs):
+                 use_aoa=False, attention_module=None, **attention_module_kwargs):
         super(EncoderLayer, self).__init__()
         self.identity_map_reordering = identity_map_reordering
         self.mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
                                         use_aoa=use_aoa,
                                         attention_module=attention_module,
-                                        attention_module_kwargs=attention_module_kwargs)
+                                        **attention_module_kwargs)
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
 
-    def forward(self, queries, keys, values, boxes=None, attention_mask=None):
-        att = self.mhatt(queries, keys, values, boxes=boxes, attention_mask=attention_mask)
+    def forward(self, **kwargs):
+        inputs = Feature(kwargs)
+        att = self.mhatt(inputs)
         ff = self.pwff(att)
+        attention_mask = inputs.attention_mask
         ff = ff.masked_fill(attention_mask.squeeze().unsqueeze(-1), value=0)
 
         return ff
 
 class Encoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
-                 identity_map_reordering=False, use_aoa=False, attention_module_kwargs=None):
+                 identity_map_reordering=False, use_aoa=False, **attention_module_kwargs):
         super(Encoder, self).__init__()
 
         self.fc = nn.Linear(d_in, d_model)
@@ -41,13 +45,17 @@ class Encoder(nn.Module):
                                                   identity_map_reordering=identity_map_reordering,
                                                   use_aoa=use_aoa,
                                                   attention_module=ScaledDotProductAttention,
-                                                  attention_module_kwargs=attention_module_kwargs)
+                                                  **attention_module_kwargs)
                                      for _ in range(N)])
         self.padding_idx = padding_idx
         self.multi_level_output = multi_level_output
 
-    def forward(self, visuals):
+    def forward(self, **kwargs):
+        visuals = Feature(kwargs)
+
         features = visuals.features
+        padding_masks = generate_padding_mask(features)
+
         features = F.relu(self.fc(features))
         features = self.dropout(features)
         out = self.layer_norm(features)
@@ -55,11 +63,9 @@ class Encoder(nn.Module):
         if self.multi_level_output:
             outs = []
         pos_embedding = self.pos_embedding(out)
-        padding_masks = visuals.padding_masks
-        
         for layer in self.layers:
             out = out + pos_embedding
-            out = layer(out, out, out, padding_masks)
+            out = layer(queries=out, keys=out, values=out, attention_mask=padding_masks)
             if self.multi_level_output:
                 outs.append(out.unsqueeze(1))
 
@@ -71,7 +77,7 @@ class Encoder(nn.Module):
 
 class AugmentedMemoryEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
-                 identity_map_reordering=False, use_aoa=False, attention_module_kwargs=None):
+                 identity_map_reordering=False, use_aoa=False, **attention_module_kwargs):
         super(AugmentedMemoryEncoder, self).__init__()
 
         self.fc = nn.Linear(d_in, d_model)
@@ -85,13 +91,17 @@ class AugmentedMemoryEncoder(nn.Module):
                                                   identity_map_reordering=identity_map_reordering,
                                                   use_aoa=use_aoa,
                                                   attention_module=AugmentedMemoryScaledDotProductAttention,
-                                                  attention_module_kwargs=attention_module_kwargs)
+                                                  **attention_module_kwargs)
                                      for _ in range(N)])
         self.padding_idx = padding_idx
         self.multi_level_output = multi_level_output
 
-    def forward(self, visuals):
+    def forward(self, **kwargs):
+        visuals = Feature(kwargs)
+
         features = visuals.features
+        padding_masks = generate_padding_mask(features)
+
         features = F.relu(self.fc(features))
         features = self.dropout(features)
         out = self.layer_norm(features)
@@ -99,11 +109,9 @@ class AugmentedMemoryEncoder(nn.Module):
         if self.multi_level_output:
             outs = []
         pos_embedding = self.pos_embedding(out)
-        padding_masks = visuals.padding_masks
-        
         for layer in self.layers:
             out = out + pos_embedding
-            out = layer(out, out, out, padding_masks)
+            out = layer(queries=out, keys=out, values=out, attention_mask=padding_masks)
             if self.multi_level_output:
                 outs.append(out.unsqueeze(1))
 
@@ -115,7 +123,7 @@ class AugmentedMemoryEncoder(nn.Module):
 
 class AugmentedGeometryEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
-                 identity_map_reordering=False, use_aoa=False, trignometric_embedding=True, attention_module_kwargs=None):
+                 identity_map_reordering=False, use_aoa=False, trignometric_embedding=True, **attention_module_kwargs):
         super(Encoder, self).__init__()
 
         self.trignometric_embedding = trignometric_embedding
@@ -137,13 +145,17 @@ class AugmentedGeometryEncoder(nn.Module):
                                                   identity_map_reordering=identity_map_reordering,
                                                   use_aoa=use_aoa,
                                                   attention_module=AugmentedGeometryScaledDotProductAttention,
-                                                  attention_module_kwargs=attention_module_kwargs)
+                                                  **attention_module_kwargs)
                                      for _ in range(N)])
         self.padding_idx = padding_idx
         self.multi_level_output = multi_level_output
 
-    def forward(self, visuals):
+    def forward(self, **kwargs):
+        visuals = Feature(kwargs)
+
         features = visuals.features
+        padding_masks = generate_padding_mask(features)
+
         features = F.relu(self.fc(features))
         features = self.dropout(features)
         out = self.layer_norm(features)
@@ -161,10 +173,11 @@ class AugmentedGeometryEncoder(nn.Module):
             outs = []
 
         pos_embedding = self.pos_embedding(out)
-        padding_masks = visuals.padding_masks
         for layer in self.layers:
             out = out + pos_embedding
-            out = layer(out, out, out, relative_geometry_weights=relative_geometry_weights, attention_mask=padding_masks)
+            out = layer(queries=out, keys=out, values=out, 
+                        relative_geometry_embeddings=relative_geometry_embeddings, 
+                        attention_mask=padding_masks)
             if self.multi_level_output:
                 outs.append(out.unsqueeze(1))
 
@@ -176,7 +189,7 @@ class AugmentedGeometryEncoder(nn.Module):
 
 class DualCollaborativeLevelEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
-                 identity_map_reordering=False, use_aoa=False, trignometric_embedding=True, attention_module_kwargs=None):
+                 identity_map_reordering=False, use_aoa=False, trignometric_embedding=True, **attention_module_kwargs):
         super(DualCollaborativeLevelEncoder, self).__init__()
 
         self.d_model = d_model
@@ -205,7 +218,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
                                                          identity_map_reordering=identity_map_reordering,
                                                          use_aoa = use_aoa,
                                                          attention_module=AugmentedGeometryScaledDotProductAttention,
-                                                         attention_module_kwargs=attention_module_kwargs)
+                                                         **attention_module_kwargs)
                                             for _ in range(N)])
 
         # Attention on grids
@@ -213,7 +226,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
                                                        identity_map_reordering=identity_map_reordering,
                                                        use_aoa = use_aoa,
                                                        attention_module=AugmentedGeometryScaledDotProductAttention,
-                                                       attention_module_kwargs=attention_module_kwargs)
+                                                       **attention_module_kwargs)
                                           for _ in range(N)])
 
         # Cross Attention between regions and grids
@@ -221,7 +234,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
                                                identity_map_reordering=identity_map_reordering,
                                                use_aoa = use_aoa,
                                                attention_module=AugmentedGeometryScaledDotProductAttention,
-                                               attention_module_kwargs=attention_module_kwargs)
+                                               **attention_module_kwargs)
                                           for _ in range(N)])
 
         # Cross Attention between grids and regions
@@ -229,7 +242,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
                                                identity_map_reordering=identity_map_reordering,
                                                use_aoa = use_aoa,
                                                attention_module=AugmentedGeometryScaledDotProductAttention,
-                                               attention_module_kwargs=attention_module_kwargs)
+                                               **attention_module_kwargs)
                                           for _ in range(N)])
 
         self.padding_idx = padding_idx
@@ -237,7 +250,9 @@ class DualCollaborativeLevelEncoder(nn.Module):
         # Whether using multi level output in encoder head.
         self.multi_level_output = multi_level_output
 
-    def forward(self, visuals):
+    def forward(self, **kwargs):
+        visuals = Feature(kwargs)
+
         region_features = visuals.region_features
         grid_features = visuals.grid_features
 
@@ -320,10 +335,10 @@ class DualCollaborativeLevelEncoder(nn.Module):
         if self.multi_level_output:
             outs = torch.cat(outs, dim=1)
 
-        attention_mask = torch.cat([region_padding_masks, grid_padding_masks], dim=-1)
+        padding_mask = torch.cat([region_padding_masks, grid_padding_masks], dim=-1)
 
         # If 'multi_level_output' is applied.
         if self.multi_level_output:
-            return outs, attention_mask
+            return outs, padding_mask
         else:
-            return out, attention_mask
+            return out, padding_mask

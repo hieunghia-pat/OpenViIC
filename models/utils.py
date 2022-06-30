@@ -6,23 +6,6 @@ from configs.constants import *
 
 import copy
 
-
-def get_batch_size(x: TensorOrSequence) -> int:
-    if isinstance(x, torch.Tensor):
-        b_s = x.size(0)
-    else:
-        b_s = x[0].size(0)
-    return b_s
-
-
-def get_device(x: TensorOrSequence) -> int:
-    if isinstance(x, torch.Tensor):
-        b_s = x.device
-    else:
-        b_s = x[0].device
-    return b_s
-
-
 def positional_embedding(input, d_model) -> torch.Tensor:
     input = input.view(-1, 1)
     dim = torch.arange(d_model // 2, dtype=torch.float32,
@@ -52,14 +35,14 @@ def clones(module, n):
 
 def generate_padding_mask(sequences: TensorOrNone, padding_idx: int) -> torch.BoolTensor:
     '''
-        sequences: (bs, seq_len, dim)
+        sequences: (bs, seq_len) or (bs, seq_len, dim)
     '''
     if sequences is None:
         return None
 
     if len(sequences.shape) == 2:  # (bs, seq_len)
         __seq = sequences.unsqueeze(dim=-1)  # (bs, seq_len, 1)
-    else:
+    else: # (bs, deq_len, dim)
         __seq = sequences
 
     mask = (torch.sum(__seq, dim=-1) == padding_idx)  # (b_s, seq_len)
