@@ -262,15 +262,6 @@ class Decoder(Module):
         out = self.word_emb(tokens)
         token_pos = self.word_pos_emb(seq)
 
-        # special process for the beam search of inference
-        if enc_outputs.shape[0] > enc_pos_embedding.shape[0]:
-            assert enc_outputs.shape[0] % enc_pos_embedding.shape[0] == 0
-            beam_size = int(enc_outputs.shape[0] / enc_pos_embedding.shape[0])
-            enc_pos_embedding = enc_pos_embedding.unsqueeze(1)  # (bs, 1, seq_len, d_model)
-            enc_pos_embedding = enc_pos_embedding.expand(enc_pos_embedding.shape[0], enc_pos_embedding.shape[1]*beam_size, 
-                                                    enc_pos_embedding.shape[2], enc_pos_embedding.shape[3])  # (bs, beam_size, seq_len, d_model)
-            enc_pos_embedding = enc_pos_embedding.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
-
         for layer in self.layers:
             out = out + token_pos
             out = layer(tokens=out, enc_outputs=enc_outputs, 
@@ -327,15 +318,6 @@ class MeshedDecoder(Module):
 
         out = self.word_emb(tokens)
         word_pos_embedding = self.pos_emb(seq)
-
-        # special process for the beam search of inference
-        if enc_outputs.shape[0] > enc_pos_embedding.shape[0]:
-            assert enc_outputs.shape[0] % enc_pos_embedding.shape[0] == 0
-            beam_size = int(enc_outputs.shape[0] / enc_pos_embedding.shape[0])
-            enc_pos_embedding = enc_pos_embedding.unsqueeze(1)  # (bs, 1, seq_len, d_model)
-            enc_pos_embedding = enc_pos_embedding.expand(enc_pos_embedding.shape[0], enc_pos_embedding.shape[1]*beam_size, 
-                                                    enc_pos_embedding.shape[2], enc_pos_embedding.shape[3])  # (bs, beam_size, seq_len, d_model)
-            enc_pos_embedding = enc_pos_embedding.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
 
         for layer in self.layers:
             out += word_pos_embedding
@@ -418,15 +400,6 @@ class AdaptiveDecoder(Module):
         word_pos_embedding = self.pos_emb(seq)
 
         _, language_feature = self.language_model(tokens, attention_mask=torch.logical_not(mask_queries))
-
-        # special process for the beam search of inference
-        if enc_outputs.shape[0] > enc_pos_embedding.shape[0]:
-            assert enc_outputs.shape[0] % enc_pos_embedding.shape[0] == 0
-            beam_size = int(enc_outputs.shape[0] / enc_pos_embedding.shape[0])
-            enc_pos_embedding = enc_pos_embedding.unsqueeze(1)  # (bs, 1, seq_len, d_model)
-            enc_pos_embedding = enc_pos_embedding.expand(enc_pos_embedding.shape[0], enc_pos_embedding.shape[1]*beam_size, 
-                                                    enc_pos_embedding.shape[2], enc_pos_embedding.shape[3])  # (bs, beam_size, seq_len, d_model)
-            enc_pos_embedding = enc_pos_embedding.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
 
         for i, layer in enumerate(self.layers):
             out += word_pos_embedding
@@ -516,15 +489,6 @@ class MeshedAdaptiveDecoder(Module):
         out = self.word_emb(tokens)
         word_pos_embedding = self.pos_emb(seq)
         _, language_feature = self.language_model(input, attention_mask = torch.logical_not(mask_queries))
-
-        # special process for the beam search of inference
-        if enc_outputs.shape[0] > enc_pos_embedding.shape[0]:
-            assert enc_outputs.shape[0] % enc_pos_embedding.shape[0] == 0
-            beam_size = int(enc_outputs.shape[0] / enc_pos_embedding.shape[0])
-            enc_pos_embedding = enc_pos_embedding.unsqueeze(1)  # (bs, 1, seq_len, d_model)
-            enc_pos_embedding = enc_pos_embedding.expand(enc_pos_embedding.shape[0], enc_pos_embedding.shape[1]*beam_size, 
-                                                    enc_pos_embedding.shape[2], enc_pos_embedding.shape[3])  # (bs, beam_size, seq_len, d_model)
-            enc_pos_embedding = enc_pos_embedding.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
 
         for i, layer in enumerate(self.layers):
             out += word_pos_embedding

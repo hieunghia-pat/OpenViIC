@@ -29,7 +29,7 @@ class BeamSearch(object):
 
         return fn
 
-    def _expand_tensor(self, tensor: TensorOrSequence, cur_beam_size: int, selected_beam: torch.Tensor):
+    def _expand_visual(self, tensor: TensorOrSequence, cur_beam_size: int, selected_beam: torch.Tensor):
         tensor_shape = tensor.shape # (bs, seq_len, d_model)
         tensor_exp_shape = (self.b_s, cur_beam_size) + tensor_shape[1:] # (bs, cur_beam_size, seq_len, d_model)
         tensor_red_shape = (self.b_s * self.beam_size,) + tensor_shape[1:] # (bs * beam_size, seq_len, d_model)
@@ -43,13 +43,6 @@ class BeamSearch(object):
                                                                                                     # to new branch that has beam_size leaves
         
         return tensor # (bs * beam_size, seq_len, d_model)
-
-    def _expand_visual(self, visual_inputs, cur_beam_size: int, selected_beam: torch.Tensor):
-        for att_name, att_value in visual_inputs.data():
-            if isinstance(att_value, torch.Tensor):
-                visual_inputs.set(att_name, self._expand_tensor(att_value, cur_beam_size, selected_beam))
-
-        return visual_inputs
 
     def select(self, candidate_logprob):
         selected_logprob, selected_idx = torch.sort(candidate_logprob.view(self.b_s, -1), -1, descending=True)  # flatten the candicate_lobprob from (bs, beam_size, vocab_size) 
@@ -68,18 +61,16 @@ class BeamSearch(object):
         if t > 0:
             mask = (self.selected_words.view(self.b_s, cur_beam_size) == self.eos_idx).unsqueeze(-1) # (bs, cur_beam_size, 1)
             self.seq_mask = self.seq_mask.masked_fill(mask, value=0)
-            word_logprob = word_logprob * self.seq_mask.expand_as(word_logprob)
-            old_seq_logprob = self.seq_logprob.expand_as(candidate_logprob).contiguous()
-            old_seq_logprob[:, :, 1:] = -999
-            candidate_logprob = self.seq_mask * candidate_logprob + old_seq_logprob * (1 - self.seq_mask)
+            word_logprob = word_logprob.masked_fill(self.seq_mask.expand_as(word_logprob), value=0)
+            candidate_logprob = torch.where(self.seq_mask, -99999, word_logprob + self.seq_logprob)
 
-        selected_idx, selected_logprob = self.select(candidate_logprob)
-        selected_beam = torch.div(selected_idx, candidate_logprob.shape[-1], rounding_mode=None)
-        selected_words = selected_idx - selected_beam * candidate_logprob.shape[-1]
+        selected_idx, selected_logprob = self.select(candidate_logprob) # get the top-beam_size highest logits
+        selected_beam = torch.div(selected_idx, candidate_logprob.shape[-1], rounding_mode="floor") # then find its appropriate beam
+        selected_words = selected_idx - selected_beam * candidate_logprob.shape[-1] # and get the index of them in term of vocab size
 
         self.model.apply_to_states(self._expand_state(selected_beam, cur_beam_size))
-        visual = self._expand_visual(visual, cur_beam_size, selected_beam)
 
+        # reorder the seq_logprob as well as the seq_mask and outputs to match the newest selected beam
         self.seq_logprob = selected_logprob.unsqueeze(-1)
         self.seq_mask = torch.gather(self.seq_mask, 1, selected_beam.unsqueeze(-1))
         outputs = list(torch.gather(o, 1, selected_beam.unsqueeze(-1)) for o in outputs)
@@ -100,7 +91,7 @@ class BeamSearch(object):
         self.log_probs.append(this_word_logprob)
         self.selected_words = selected_words.view(-1, 1)
 
-        return visual, outputs
+        return outputs
 
     def apply(self, visual_inputs, out_size=1, return_probs=False):
         self.b_s = visual_inputs.batch_size
@@ -116,7 +107,7 @@ class BeamSearch(object):
         outputs = []
         with self.model.statefulness(self.b_s):
             for t in range(self.max_len):
-                visual_inputs, outputs = self.iter(t, visual_inputs, outputs, return_probs)
+                outputs = self.iter(t, visual_inputs, outputs, return_probs)
 
         # Sort result
         _, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)
