@@ -2,7 +2,7 @@ import torch
 from torchvision import transforms
 import re
 from typing import Callable
-from feature import Feature
+from data_utils.feature import Feature
 
 def get_tokenizer(tokenizer):
     if callable(tokenizer):

@@ -132,25 +132,20 @@ class FeatureDataset(data.Dataset):
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
 
-        region_features = feature["region_features"]
-        region_boxes = feature["region_boxes"]
-        grid_features = feature["grid_features"]
-        grid_boxes = feature["grid_boxes"]
-
-        return region_features, region_boxes, grid_features, grid_boxes
+        return Feature(feature)
 
     def __getitem__(self, idx: int):
         caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
         shifted_right_caption = torch.zeros_like(caption).fill_(self.vocab.padding_idx)
         shifted_right_caption[:-1] = caption[1:]
         caption = torch.where(caption == self.vocab.eos_idx, self.vocab.padding_idx, caption) # remove eos_token in caption
-        region_features, region_boxes, grid_features, grid_boxes = self.load_feature(self.annotations[idx]["image_id"])
+        feature = self.load_feature(self.annotations[idx]["image_id"])
 
         return Feature({
-            "region_features": region_features, 
-            "region_boxes": region_boxes,
-            "grid_features": grid_features,
-            "grid_boxes": grid_boxes,
+            "region_features": feature.region_features, 
+            "region_boxes": feature.region_boxes,
+            "grid_features": feature.grid_features,
+            "grid_boxes": feature.grid_boxes,
             "caption": caption, 
             "shifted_right_caption": shifted_right_caption
         })

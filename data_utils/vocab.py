@@ -11,10 +11,7 @@ import logging
 import six
 import json
 from typing import List, Union
-import re
 import sys
-sys.path.append("..")
-import config
 import os
 logger = logging.getLogger(__name__)
 
@@ -105,9 +102,6 @@ class Vocab(object):
             self.pretrained_language_idx_mapping[self.bos_idx] = self.token_encoder.convert_tokens_to_ids(self.token_encoder.bos_token)
             self.pretrained_language_idx_mapping[self.eos_idx] = self.token_encoder.convert_tokens_to_ids(self.token_encoder.eos_token)
             self.pretrained_language_idx_mapping[self.unk_idx] = self.token_encoder.convert_tokens_to_ids(self.token_encoder.unk_token)
-
-            # save mapping dictionary
-            json.dump(self.pretrained_language_idx_mapping, open(os.path.join(config.checkpoint_path, config.model_name, "pretrained_language_idx_mapping.json"), "w"), indent=4)
 
     def make_vocab(self, json_dirs):
         self.freqs = Counter()
