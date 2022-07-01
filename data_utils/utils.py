@@ -2,6 +2,7 @@ import torch
 from torchvision import transforms
 import re
 from typing import Callable
+from feature import Feature
 
 def get_tokenizer(tokenizer):
     if callable(tokenizer):
@@ -125,50 +126,44 @@ def unk_init(token, dim):
 def collate_fn(samples):
     image_ids = []
     filenames = []
-    region_features = [] # region features
-    grid_features = [] # grid features
-    boxes = [] # boxes for region features
-    grid_sizes = [] # grid sizes for grid features
+    region_features = []
+    grid_features = []
+    region_boxes = []
+    grid_boxes = []
     tokens = []
-    captions = []
     shifted_right_tokens = []
+    captions = []
     max_seq_len = 0
-    masks = []
     
     for sample in samples:
-        image_id = sample["image_id"]
-        filename = sample["filename"]
-        region_feature = sample["region_features"]
-        grid_feature = sample["grid_features"]
-        box = sample["boxes"]
-        grid_size = sample["grid_size"]
-        token = sample["caption"] # for cross-entropy objective training
-        shifted_right_token = sample["shifted_right_caption"] # for cross-entropy objective training
-        caption = sample["captions"] # for self-critical sequential training
-        mask = sample["masks"]
+        image_id = sample.image_id
+        filename = sample.filename
+        region_feature = sample.region_features
+        region_box = sample.region_boxes
+        grid_feature = sample.grid_features
+        grid_box = sample.grid_boxes
+        token = sample.caption # for cross-entropy objective training
+        shifted_right_token = sample.shifted_right_caption # for cross-entropy objective training
+        caption = sample.captions # for self-critical sequential training
 
         if region_feature is not None:
-            if max_seq_len < region_feature.shape[0]:
-                max_seq_len = region_feature.shape[0]
-
-            # Append region features
             region_features.append(torch.tensor(region_feature))
+            if max_seq_len < region_features.shape[0]:
+                max_seq_len = region_features.shape[0]
 
         if grid_feature is not None:
-            # Append grid features
             grid_features.append(torch.tensor(grid_feature))
-
-        if mask is not None:
-            masks.append(torch.tensor(mask))
+            if max_seq_len < grid_features.shape[0]:
+                max_seq_len = grid_features.shape[0]
 
         if image_id is not None:
             image_ids.append(image_id)
         if filename is not None:
             filenames.append(filename)
-        if box is not None:
-            boxes.append(torch.tensor(box))
-        if grid_size is not None:
-            grid_sizes.append(grid_size)
+        if region_box is not None:
+            region_boxes.append(torch.tensor(region_box))
+        if grid_box is not None:
+            grid_boxes.append(torch.tensor(grid_box))
         if caption is not None:
             captions.append(caption)
         if token is not None:
@@ -178,47 +173,37 @@ def collate_fn(samples):
 
     # if use region features
     if len(region_features) > 0:
-        zero_feature = torch.zeros_like(region_features[-1][-1]).unsqueeze(0) # (1, dim)
-        
-        if len(boxes) > 0:
-            zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
-        else:
-            zero_box = None
-        
+        zero_feature = torch.zeros((1, region_features[0].shape[-1])) # (1, dim)
         for batch_ith in range(len(samples)):
-            for ith in range(region_features[batch_ith].shape[0], max_seq_len):
+            delta = max_seq_len - region_features[batch_ith].shape[0]
+            if delta > 0:
+                zero_feature = torch.zeros((delta, region_features[batch_ith].shape[-1]))
                 region_features[batch_ith] = torch.cat([region_features[batch_ith], zero_feature], dim=0)
-                if zero_box is not None:
-                    boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
+                if len(region_boxes) > 0:
+                    zero_box = torch.zeros((delta, 4))
+                    region_boxes[batch_ith] = torch.cat([region_boxes[batch_ith], zero_box], dim=0)
 
         region_features = torch.cat([feature.unsqueeze_(0) for feature in region_features], dim=0)
     
     # if use grid features
     if len(grid_features) > 0:
-        zero_feature = torch.zeros_like(grid_features[-1][-1]).unsqueeze(0) # (1, dim)
+        zero_feature = torch.zeros((1, grid_features[0].shape[-1])) # (1, dim)
         for batch_ith in range(len(samples)):
-            for ith in range(grid_features[batch_ith].shape[0], max_seq_len):
+            delta = max_seq_len - grid_features[batch_ith].shape[0]
+            if delta > 0:
+                zero_feature = torch.zeros((delta, grid_features[batch_ith].shape[-1]))
                 grid_features[batch_ith] = torch.cat([grid_features[batch_ith], zero_feature], dim=0)
+                if len(grid_boxes) > 0:
+                    zero_box = torch.zeros((delta, 4))
+                    grid_boxes[batch_ith] = torch.cat([grid_boxes[batch_ith], zero_box], dim=0)
 
         grid_features = torch.cat([feature.unsqueeze_(0) for feature in grid_features], dim=0)
-
-    # Masks
-    if len(masks) > 0:
-        masks = torch.cat([mask.unsqueeze_(0) for mask in masks], dim=0)
 
     if len(image_ids) == 0:
         image_ids = None
     
     if len(filenames) == 0:
         filenames = None
-    
-    if len(boxes) > 0:
-        boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
-    else:
-        boxes = None
-
-    if len(grid_sizes) == 0:
-        grid_sizes = None
     
     if len(captions) == 0:
         captions = None
@@ -233,15 +218,14 @@ def collate_fn(samples):
     else:
         shifted_right_tokens = None
 
-    return {
+    return Feature({
         "image_ids": image_ids,
         "filenames": filenames,
         "region_features": region_features,
+        "region_boxes": region_boxes,
         "grid_features": grid_features, 
-        "boxes": boxes,
-        "grid_sizes": grid_sizes,
+        "grid_boxes": grid_boxes,
         "tokens": tokens, 
         "shifted_right_tokens": shifted_right_tokens,
-        "captions": captions,
-        "masks": masks
-    }
+        "captions": captions
+    })
