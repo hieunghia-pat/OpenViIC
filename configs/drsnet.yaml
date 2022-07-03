@@ -1,6 +1,0 @@
-model:
-  model_name: "drstnet"
-  transformer:
-    encoder:
-      encoder_args:
-        multi_level_output: True

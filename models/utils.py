@@ -2,8 +2,8 @@ import torch
 from torch import nn
 
 from data_utils.types import *
-from configs.constants import *
 
+import numpy as np
 import copy
 
 def positional_embedding(input, d_model) -> torch.Tensor:
@@ -46,7 +46,7 @@ def generate_padding_mask(sequences: TensorOrNone, padding_idx: int) -> torch.Bo
         __seq = sequences
 
     mask = (torch.sum(__seq, dim=-1) == padding_idx)  # (b_s, seq_len)
-    return mask.unsqueeze(1).unsqueeze(1)  # (bs, 1, 1, seq_len)
+    return mask
 
 
 def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
@@ -54,8 +54,7 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
         Mask out subsequent positions
     '''
     attn_shape = (seq_len, seq_len)
-    subsequent_mask = torch.triu(torch.ones(
-        attn_shape), diagonal=1).to(torch.bool)
+    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool)
 
     return subsequent_mask
 
@@ -141,7 +140,7 @@ def get_combine_masks(boxes, grid_size=7) -> torch.Tensor:
         masks_per_batch = torch.cat(masks_per_batch, dim=0) # (n, grid_size*grid_size)
         masks.append(masks_per_batch.unsqueeze(0))
 
-    return torch.cat(masks, dim=0) # (bs, n, grid_size*grid_size)
+    return torch.cat(masks, dim=0).unsqueeze(1).unsqueeze(1) # (bs, 1, n, grid_size*grid_size)
 
 def box_relational_embedding(f_g, dim_g=64, wave_len=1000, trignometric_embedding=True):
     """

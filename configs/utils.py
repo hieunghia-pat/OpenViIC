@@ -3,19 +3,19 @@ from models.modules.language_models import *
 from models.modules.encoders import *
 from models.modules.decoders import *
 
-encoders = {
+Encoders = {
     "encoder": Encoder,
     "dlct-encoder": DualCollaborativeLevelEncoder
 }
 
-decoders = {
+Decoders = {
     "decoder": Decoder,
     "meshed_decoder": MeshedDecoder,
     "apdaptive-decoder": AdaptiveDecoder,
     "meshed-adaptive-decoder": MeshedAdaptiveDecoder,
 }
 
-pretrained_language_model_names = {
+Pretrained_language_model_names = {
     "phobert-base": "vinai/phobert-base",
     "phobert-large": "vinai/phobert-large",
     "bartpho-syllable": "vinai/bartpho-syllable",
@@ -24,7 +24,7 @@ pretrained_language_model_names = {
     None: None
 }
 
-pretrained_language_model = {
+Pretrained_language_model = {
     "bert-model": BERTModel,
     "pho-bert-model": PhoBERTModel,
     # "bart_pho_model": BARTPhoModel,
@@ -32,7 +32,7 @@ pretrained_language_model = {
     None: None
 }
 
-word_embedding = {
+Word_embedding = {
     "fasttex": "fasttext.vi.300d",
     "phow2v_syllable_100": "phow2v.syllable.100d",
     "phow2v_syllable_300": "phow2v.syllable.300d",
@@ -40,3 +40,20 @@ word_embedding = {
     "phow2v_word_300": "phow2v.word.300d",
     None: None
 }
+
+def get_encoder(vocab, config):
+    encoder = Encoders[config.model.transformer.encoder.module]
+
+    return encoder(N=config.model.nlayers, padding_idx=vocab.padding_idx, d_in=config.model.d_feature, 
+                    d_model=config.model.d_model, d_k=config.model.d_k, d_v=config.model.d_v,
+                    d_ff=config.model.d_ff, dropout=config.model.dropout,
+                    **config.model.transformer.encoder.args)
+
+
+def get_decoder(vocab, config):
+    decoder = Decoders[config.model.transformer.decoder.module]
+
+    return decoder(vocab_size=len(vocab), max_len=vocab.max_caption_length, N_dec=config.model.nlayers, 
+                    padding_idx=vocab.padding_idx, d_model=config.model.d_model, d_k=config.model.d_k,
+                    d_v=config.model.d_v, d_ff=config.model.d_ff, dropout=config.model.dropout,
+                    **config.model.transformer.decoder.args)

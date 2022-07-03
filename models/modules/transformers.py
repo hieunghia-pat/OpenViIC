@@ -46,7 +46,7 @@ class EncoderDecoderTransformer(CaptioningModel):
         if ith == 0:
             self.enc_output, self.enc_attention_mask, self.enc_pos_embedding = self.encoder(visual_inputs)
             bs = self.enc_output.shape[0]
-            it = torch.zeros((bs, 1)).long().fill_(self.bos_idx).to(self.device)
+            it = torch.zeros((bs, 1)).long().fill_(self.bos_idx).to(self.enc_output.device)
         else:
             it = prev_output
 

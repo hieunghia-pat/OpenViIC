@@ -7,6 +7,9 @@ class Feature(object):
     def data(self):
         return self.__dict__.items()
 
+    def properties(self):
+        return self.__dict__.keys()
+
     def set(self, name, value):
         self.__dict__[name] = value
 

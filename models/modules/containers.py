@@ -69,3 +69,9 @@ class Module(nn.Module):
             yield
         finally:
             self.disable_statefulness()
+
+class ModuleList(nn.ModuleList, Module):
+    pass
+
+class ModuleDict(nn.ModuleDict, Module):
+    pass

@@ -304,11 +304,11 @@ class MultiHeadAttention(Module):
 
     def forward(self, inputs):
         if self.can_be_stateful and self._is_stateful:
-            self.running_keys = torch.cat([self.running_keys, keys], 1)
-            keys = self.running_keys
+            self.running_keys = torch.cat([self.running_keys, inputs.keys], 1)
+            inputs.keys = self.running_keys
 
-            self.running_values = torch.cat([self.running_values, values], 1)
-            values = self.running_values
+            self.running_values = torch.cat([self.running_values, inputs.values], 1)
+            inputs.values = self.running_values
 
         if self.identity_map_reordering:
             inputs.queries = self.layer_norm(inputs.queries)

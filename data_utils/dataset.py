@@ -60,26 +60,21 @@ class DictionaryDataset(data.Dataset):
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
 
-        region_features = feature["region_features"]
-        region_boxes = feature["region_boxes"]
-        grid_features = feature["grid_features"]
-        grid_boxes = feature["grid_boxes"]
-
-        return region_features, region_boxes, grid_features, grid_boxes
+        return Feature(feature)
 
     def __getitem__(self, idx: int):
         image_id = self.image_ids[idx]
         filename = self.filenames[idx]
-        region_features, region_boxes, grid_features, grid_boxes = self.load_feature(image_id)
+        feature = self.load_feature(image_id)
         captions = self.captions_with_image[idx]
 
         return Feature({
             "image_id": image_id,
             "filename": filename, 
-            "region_features": region_features,
-            "region_boxex": region_boxes,
-            "grid_features": grid_features,
-            "grid_boxes": grid_boxes,
+            "region_features": feature.region_features,
+            "region_boxes": feature.region_boxes,
+            "grid_features": feature.grid_features,
+            "grid_boxes": feature.grid_boxes,
             "captions": captions
         })
 

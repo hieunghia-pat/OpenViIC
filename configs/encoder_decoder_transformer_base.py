@@ -4,24 +4,29 @@ config = CN()
 
 ## configuration for paths
 config.path = CN()
-config.path.train_json_path = "features/annotations/UIT-ViIC/uitviic_captions_train2017.json"
-config.path.dev_json_path = "features/annotations/UIT-ViIC/uitviic_captions_val2017.json"
-config.path.test_json_path = "features/annotations/UIT-ViIC/uitviic_captions_test2017.json"
-config.path.image_features_path = "features/region_features/UIT-ViIC/faster_rcnn"
+config.path.train_json_path = "features/annotations/vieCap4H/viecap4h_captions_train2017.json"
+config.path.dev_json_path = "features/annotations/vieCap4H/viecap4h_captions_val2017.json"
+config.path.public_test_json_path = "features/annotations/vieCap4H/viecap4h_captions_public_test2017.json"
+config.path.private_test_json_path = "features/annotations/vieCap4H/viecap4h_captions_private_test2017.json"
+config.path.image_features_path = "features/hybrid_features/vieCap4H/faster_rcnn_x152++"
 config.path.images_path = None
 
 ## configuration for training
 config.training = CN()
 config.training.checkpoint_path = "saved_models"
+config.training.start_from = None
 config.training.learning_rate = 1.
 config.training.warmup = 10000
 config.training.get_scores = False
 config.training.training_beam_size = 5
 config.training.evaluating_beam_size = 5
+config.training.using_features = "region" # region
+                                          # grid
+                                          # region+grid
 
 ## model configuration
 config.model = CN()
-config.model.name = "transformer_using_region"
+config.model.name = "transformer"
 config.model.nhead = 8
 config.model.nlayers = 3
 config.model.d_model = 512
@@ -47,9 +52,8 @@ config.model.language_model_hidden_size = 768
 config.model.transformer = CN()
 config.model.transformer.encoder = CN()
 config.model.transformer.encoder.args = CN()
-config.model.transformer.encoder.total_memory = None
-config.model.transformer.encoder.use_aoa = False
-config.model.transformer.encoder.multi_level_output = False
+# config.model.transformer.encoder.args.total_memory = None
+config.model.transformer.encoder.args.use_aoa = False
 config.model.transformer.encoder.module = "encoder" # encoder
                                                     # dlct-encoder
 
@@ -63,7 +67,7 @@ config.model.transformer.decoder.module = "decoder" # decoder
 ## dataset configuration
 config.dataset = CN()
 config.dataset.batch_size = 32
-config.dataset.workers = 2
+config.dataset.workers = 0
 config.dataset.tokenizer = None # vncorenlp
                                 # pyvi
                                 # spacy

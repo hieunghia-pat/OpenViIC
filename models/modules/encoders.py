@@ -38,7 +38,7 @@ class Encoder(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         self.layer_norm = nn.LayerNorm(d_model)
 
-        self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
+        self.pos_embedding = SinusoidPositionalEmbedding(d_model, normalize=True)
 
         self.d_model = d_model
         self.layers = nn.ModuleList([EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout,
@@ -50,11 +50,9 @@ class Encoder(nn.Module):
         self.padding_idx = padding_idx
         self.multi_level_output = multi_level_output
 
-    def forward(self, **kwargs):
-        visuals = Feature(kwargs)
-
+    def forward(self, visuals):
         features = visuals.features
-        padding_masks = generate_padding_mask(features)
+        padding_masks = generate_padding_mask(features, padding_idx=0)
 
         features = F.relu(self.fc(features))
         features = self.dropout(features)
@@ -71,9 +69,9 @@ class Encoder(nn.Module):
 
         if self.multi_level_output:
             outs = torch.cat(outs, dim=1)
-            return outs, padding_masks
+            return outs, padding_masks, pos_embedding
         else:
-            return out, padding_masks
+            return out, padding_masks, pos_embedding
 
 class AugmentedMemoryEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
@@ -84,7 +82,7 @@ class AugmentedMemoryEncoder(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         self.layer_norm = nn.LayerNorm(d_model)
 
-        self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
+        self.pos_embedding = SinusoidPositionalEmbedding(d_model, normalize=True)
 
         self.d_model = d_model
         self.layers = nn.ModuleList([EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout,
@@ -96,11 +94,9 @@ class AugmentedMemoryEncoder(nn.Module):
         self.padding_idx = padding_idx
         self.multi_level_output = multi_level_output
 
-    def forward(self, **kwargs):
-        visuals = Feature(kwargs)
-
+    def forward(self, visuals):
         features = visuals.features
-        padding_masks = generate_padding_mask(features)
+        padding_masks = generate_padding_mask(features, padding_idx=0)
 
         features = F.relu(self.fc(features))
         features = self.dropout(features)
@@ -117,9 +113,9 @@ class AugmentedMemoryEncoder(nn.Module):
 
         if self.multi_level_output:
             outs = torch.cat(outs, dim=1)
-            return outs, padding_masks
+            return outs, padding_masks, pos_embedding
         else:
-            return out, padding_masks
+            return out, padding_masks, pos_embedding
 
 class AugmentedGeometryEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
@@ -138,7 +134,7 @@ class AugmentedGeometryEncoder(nn.Module):
 
         self.fc_gs = clones(nn.Linear(self.d_g, 1), h)
 
-        self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
+        self.pos_embedding = SinusoidPositionalEmbedding(d_model, normalize=True)
 
         self.d_model = d_model
         self.layers = nn.ModuleList([EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout,
@@ -150,11 +146,9 @@ class AugmentedGeometryEncoder(nn.Module):
         self.padding_idx = padding_idx
         self.multi_level_output = multi_level_output
 
-    def forward(self, **kwargs):
-        visuals = Feature(kwargs)
-
+    def forward(self, visuals):
         features = visuals.features
-        padding_masks = generate_padding_mask(features)
+        padding_masks = generate_padding_mask(features, padding_idx=0)
 
         features = F.relu(self.fc(features))
         features = self.dropout(features)
@@ -183,9 +177,9 @@ class AugmentedGeometryEncoder(nn.Module):
 
         if self.multi_level_output:
             outs = torch.cat(outs, dim=1)
-            return outs, padding_masks
+            return outs, padding_masks, pos_embedding
         else:
-            return out, padding_masks
+            return out, padding_masks, pos_embedding
 
 class DualCollaborativeLevelEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
@@ -211,7 +205,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
 
         self.fc_gs = clones(nn.Linear(self.d_g, 1), h)
 
-        self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
+        self.pos_embedding = SinusoidPositionalEmbedding(d_model, normalize=True)
 
         # Attention on regions
         self.layers_region = nn.ModuleList([EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout,
@@ -250,9 +244,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
         # Whether using multi level output in encoder head.
         self.multi_level_output = multi_level_output
 
-    def forward(self, **kwargs):
-        visuals = Feature(kwargs)
-
+    def forward(self, visuals):
         region_features = visuals.region_features
         grid_features = visuals.grid_features
 
@@ -339,6 +331,6 @@ class DualCollaborativeLevelEncoder(nn.Module):
 
         # If 'multi_level_output' is applied.
         if self.multi_level_output:
-            return outs, padding_mask
+            return outs, padding_mask, region_pos_embedding
         else:
-            return out, padding_mask
+            return out, padding_mask, region_pos_embedding

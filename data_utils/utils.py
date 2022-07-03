@@ -148,13 +148,13 @@ def collate_fn(samples):
 
         if region_feature is not None:
             region_features.append(torch.tensor(region_feature))
-            if max_seq_len < region_features.shape[0]:
-                max_seq_len = region_features.shape[0]
+            if max_seq_len < region_feature.shape[0]:
+                max_seq_len = region_feature.shape[0]
 
         if grid_feature is not None:
             grid_features.append(torch.tensor(grid_feature))
-            if max_seq_len < grid_features.shape[0]:
-                max_seq_len = grid_features.shape[0]
+            if max_seq_len < grid_feature.shape[0]:
+                max_seq_len = grid_feature.shape[0]
 
         if image_id is not None:
             image_ids.append(image_id)
@@ -184,6 +184,8 @@ def collate_fn(samples):
                     region_boxes[batch_ith] = torch.cat([region_boxes[batch_ith], zero_box], dim=0)
 
         region_features = torch.cat([feature.unsqueeze_(0) for feature in region_features], dim=0)
+        if len(region_boxes) > 0:
+            region_boxes = torch.cat([region_box.unsqueeze_(0) for region_box in region_boxes])
     
     # if use grid features
     if len(grid_features) > 0:
@@ -198,6 +200,14 @@ def collate_fn(samples):
                     grid_boxes[batch_ith] = torch.cat([grid_boxes[batch_ith], zero_box], dim=0)
 
         grid_features = torch.cat([feature.unsqueeze_(0) for feature in grid_features], dim=0)
+        if len(grid_boxes) > 0:
+            grid_boxes = torch.cat([grid_box.unsqueeze_(0) for grid_box in grid_boxes])
+
+    if len(region_boxes) == 0:
+        region_boxes = None
+
+    if len(grid_boxes) == 0:
+        grid_boxes = None
 
     if len(image_ids) == 0:
         image_ids = None
