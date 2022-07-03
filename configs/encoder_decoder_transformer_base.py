@@ -26,7 +26,7 @@ config.training.using_features = "region" # region
 
 ## model configuration
 config.model = CN()
-config.model.name = "transformer"
+config.model.name = "base_transformer"
 config.model.nhead = 8
 config.model.nlayers = 3
 config.model.d_model = 512
@@ -52,8 +52,8 @@ config.model.language_model_hidden_size = 768
 config.model.transformer = CN()
 config.model.transformer.encoder = CN()
 config.model.transformer.encoder.args = CN()
-# config.model.transformer.encoder.args.total_memory = None
 config.model.transformer.encoder.args.use_aoa = False
+config.model.transformer.encoder.args.multi_level_output = False
 config.model.transformer.encoder.module = "encoder" # encoder
                                                     # dlct-encoder
 

@@ -13,21 +13,15 @@ from data_utils.feature import Feature
 
 class DecoderLayer(Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
-    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                 use_aoa=False, enc_att_module=None, **attention_module_kwargs):
+    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, use_aoa=False, **attention_module_kwargs):
         super(DecoderLayer, self).__init__()
-        if self_att_module is None:
-            self_att_module = ScaledDotProductAttention
         self.self_attn = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=True,
                                             use_aoa=use_aoa,
-                                            attention_module=self_att_module,
+                                            attention_module=ScaledDotProductAttention,
                                             **attention_module_kwargs)
-
-        if enc_att_module is None:
-            enc_att_module = ScaledDotProductAttention
         self.enc_attn = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=False,
                                             use_aoa=use_aoa,
-                                            attention_module=enc_att_module,
+                                            attention_module=ScaledDotProductAttention,
                                             **attention_module_kwargs)
 
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
@@ -65,16 +59,15 @@ class DecoderLayer(Module):
         return ff
 
 class MeshedDecoderLayer(Module):
-    def __init__(self, N_enc=3, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                 use_aoa=False, enc_att_module=None, **attention_module_kwargs):
+    def __init__(self, N_enc=3, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, use_aoa=False, **attention_module_kwargs):
         super(MeshedDecoderLayer, self).__init__()
         self.self_att = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=True,
                                             use_aoa=use_aoa,
-                                            attention_module=self_att_module,
+                                            attention_module=ScaledDotProductAttention,
                                             **attention_module_kwargs)
         self.enc_att = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=False,
                                             use_aoa=use_aoa,
-                                            attention_module=enc_att_module,
+                                            attention_module=ScaledDotProductAttention,
                                             **attention_module_kwargs)
         
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
@@ -137,19 +130,13 @@ class MeshedDecoderLayer(Module):
         return ff
 
 class AdaptiveDecoderLayer(Module):
-    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                 use_aoa=False, enc_att_module=None, **attention_module_kwargs):
+    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, use_aoa=False, **attention_module_kwargs):
         super(AdaptiveDecoderLayer, self).__init__()
-        if self_att_module is None:
-            self_att_module = ScaledDotProductAttention
         self.self_attn = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=True,
-                                            use_aoa=use_aoa, attention_module=self_att_module,
+                                            use_aoa=use_aoa, attention_module=ScaledDotProductAttention,
                                             **attention_module_kwargs)
-
-        if enc_att_module is None:
-            enc_att_module = AdaptiveScaledDotProductAttention
         self.enc_attn = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=False, 
-                                            use_aoa=use_aoa, attention_module=enc_att_module, 
+                                            use_aoa=use_aoa, attention_module=AdaptiveScaledDotProductAttention, 
                                             **attention_module_kwargs)
 
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
@@ -190,20 +177,14 @@ class AdaptiveDecoderLayer(Module):
         return ff
 
 class MeshedAdaptiveDecoderLayer(Module):
-    def __init__(self, N_enc=3, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                 use_aoa=False, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+    def __init__(self, N_enc=3, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, use_aoa=False, **attention_module_kwargs):
         super(MeshedAdaptiveDecoderLayer, self).__init__()
-        if self_att_module is None:
-            self_att_module = ScaledDotProductAttention
         self.self_att = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=True,
-                                            use_aoa=use_aoa, attention_module=self_att_module,
-                                            attention_module_kwargs=self_att_module_kwargs)
-
-        if enc_att_module is None:
-            enc_att_module = AdaptiveScaledDotProductAttention
+                                            use_aoa=use_aoa, attention_module=ScaledDotProductAttention,
+                                            **attention_module_kwargs)
         self.enc_att = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=False, 
-                                            use_aoa=use_aoa, attention_module=enc_att_module, 
-                                            attention_module_kwargs=enc_att_module_kwargs)
+                                            use_aoa=use_aoa, attention_module=AdaptiveScaledDotProductAttention, 
+                                            **attention_module_kwargs)
 
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
         self.N_enc = N_enc
@@ -268,15 +249,14 @@ class MeshedAdaptiveDecoderLayer(Module):
 class Decoder(Module):
     "Generic N layer decoder with masking."
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
-                 use_aoa=False, self_att_module=None, enc_att_module=None, **attention_module_kwargs):
+                 use_aoa=False, **attention_module_kwargs):
         super(Decoder, self).__init__()
         
         self.d_model = d_model
         self.word_embedding = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
         self.pos_embedding = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
         self.layers = ModuleList(
-            [DecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, self_att_module=self_att_module, use_aoa=use_aoa,
-                                enc_att_module=enc_att_module, **attention_module_kwargs) for _ in range(N_dec)])
+            [DecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa, **attention_module_kwargs) for _ in range(N_dec)])
         self.fc = nn.Linear(d_model, vocab_size, bias=False)
         self.max_len = max_len
         self.padding_idx = padding_idx
@@ -322,16 +302,13 @@ class Decoder(Module):
 
 class MeshedDecoder(Module):
     def __init__(self, vocab_size, max_len, N_enc, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
-                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
-                 enc_att_module_kwargs=None):
+                 use_aoa=False, **attention_module_kwargs):
         super(MeshedDecoder, self).__init__()
         self.d_model = d_model
         self.word_embedding = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
         self.pos_embedding = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
         self.layers = ModuleList(
-            [MeshedDecoderLayer(N_enc, d_model, d_k, d_v, h, d_ff, dropout, self_att_module=self_att_module, use_aoa=use_aoa,
-                                enc_att_module=enc_att_module, self_att_module_kwargs=self_att_module_kwargs,
-                                enc_att_module_kwargs=enc_att_module_kwargs) for _ in range(N_dec)])
+            [MeshedDecoderLayer(N_enc, d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa, **attention_module_kwargs) for _ in range(N_dec)])
         self.fc = nn.Linear(d_model, vocab_size, bias=False)
         self.max_len = max_len
         self.padding_idx = padding_idx
@@ -378,22 +355,15 @@ class MeshedDecoder(Module):
 class AdaptiveDecoder(Module):
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
                     pretrained_language_model, pretrained_language_model_path: str=None, use_aoa=False, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
-                    language_model_hidden_size=768, dropout=.1, weights=None, 
-                    self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
-                    enc_att_module_kwargs=None):
+                    language_model_hidden_size=768, dropout=.1, weights=None, **attention_module_kwargs):
         super(AdaptiveDecoder, self).__init__()
         self.d_model = d_model
         self.word_embbeding = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
         self.pos_embbeding = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
         self.layers = ModuleList(
-            [   DecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa, self_att_module=self_att_module, 
-                                enc_att_module=enc_att_module, self_att_module_kwargs=self_att_module_kwargs, 
-                                enc_att_module_kwargs=enc_att_module_kwargs) 
+            [   DecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa, **attention_module_kwargs) 
             if i < N_dec else 
-                AdaptiveDecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa,
-                                        self_att_module=self_att_module, enc_att_module=enc_att_module, 
-                                        self_att_module_kwargs=self_att_module_kwargs, 
-                                        enc_att_module_kwargs=enc_att_module_kwargs) for i in range(N_dec + 1)
+                AdaptiveDecoderLayer(d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa, **attention_module_kwargs) for i in range(N_dec + 1)
             ]
         )
         self.fc = nn.Linear(d_model, vocab_size, bias=False)
@@ -466,21 +436,16 @@ class MeshedAdaptiveDecoder(Module):
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
                     pretrained_language_model, pretrained_language_model_path: str=None, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, \
                     language_model_hidden_size=768, dropout=.1, weights=None,
-                 use_aoa=False, N_enc=3, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, 
-                 enc_att_module_kwargs=None):
+                 use_aoa=False, N_enc=3, **attention_module_kwargs):
         
         super(MeshedAdaptiveDecoder, self).__init__()
         self.d_model = d_model
         self.word_embbeding = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
         self.pos_embbeding = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
         self.layers = ModuleList(
-            [   MeshedDecoderLayer(N_enc, d_model, d_k, d_v, h, d_ff, dropout, self_att_module=self_att_module, use_aoa=use_aoa,
-                                enc_att_module=enc_att_module, self_att_module_kwargs=self_att_module_kwargs,
-                                enc_att_module_kwargs=enc_att_module_kwargs)
+            [   MeshedDecoderLayer(N_enc, d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa, **attention_module_kwargs)
             if i < N_dec else 
-                MeshedAdaptiveDecoderLayer(N_enc, d_model, d_k, d_v, h, d_ff, dropout, self_att_module=self_att_module, use_aoa=use_aoa,
-                                enc_att_module=None, self_att_module_kwargs=self_att_module_kwargs,
-                                enc_att_module_kwargs=enc_att_module_kwargs) for i in range(N_dec + 1)
+                MeshedAdaptiveDecoderLayer(N_enc, d_model, d_k, d_v, h, d_ff, dropout, use_aoa=use_aoa, **attention_module_kwargs) for i in range(N_dec + 1)
             ]
         )
 
