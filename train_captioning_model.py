@@ -83,14 +83,14 @@ else:
 # Inference on Public test (if available)
 if public_test_dict_dataset is not None:
     public_results = trainer.get_predictions(public_test_dict_dataset,
-                                                checkpoint_filename=os.path.join(config.path.checkpoint_path, config.model.name, config.training.start_from),
-                                                get_scores=config.get_scores)
-    json.dump(public_results, open(os.path.join(config.path.checkpoint_path, config.model.name, "scored_public_results.json"), "w+"), ensure_ascii=False)
+                                                checkpoint_filename=os.path.join(config.training.checkpoint_path, config.model.name, config.training.start_from),
+                                                get_scores=config.training.get_scores)
+    json.dump(public_results, open(os.path.join(config.training.checkpoint_path, config.model.name, "scored_public_results.json"), "w+"), ensure_ascii=False)
 
 # Inference on Private test (if available)
 if private_test_dict_dataset is not None:
     private_results = trainer.get_predictions(private_test_dict_dataset,
-                                                checkpoint_filename=os.path.join(config.path.checkpoint_path, config.model.name, config.training.start_from),
+                                                checkpoint_filename=os.path.join(config.training.checkpoint_path, config.model.name, config.training.start_from),
                                                 get_scores=config.training.get_scores)
     json.dump(private_results, open(os.path.join(config.path.checkpoint_path, config.model.name, "scored_private_results.json"), "w+"), ensure_ascii=False)
 
