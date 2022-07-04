@@ -29,8 +29,17 @@ class BERTModel(Module):
         self.proj_to_vocab = nn.Linear(d_model, len(vocab))
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None):
-        # input (b_s, seq_len)
-        b_s, seq_len = input_ids.shape[:2]
+        # Mapping from original ids to pre-trained model ids.
+        pretrained_input_ids = []
+        
+        for input_id in input_ids:
+            pretrained_input_id = [self.vocab.pretrained_language_idx_mapping[str(ori_id.item())] for ori_id in input_id]
+            pretrained_input_ids.append(pretrained_input_id)
+
+        # List -> tensor.
+        pretrained_input_ids = torch.tensor(pretrained_input_ids).to(input_ids.device)
+
+        b_s, seq_len = input_ids.shape
         mask_queries = generate_padding_mask(input_ids, self.padding_idx).to(input_ids.device)  # (b_s, seq_len)
         mask_self_attention = generate_sequential_mask(seq_len).to(input_ids.device)
         mask_self_attention = mask_self_attention.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
@@ -86,7 +95,7 @@ class PhoBERTModel(Module):
         '''
         Forward language model.
         '''
-        # Mapping from ori ids to pre-trained model ids.
+        # Mapping from original ids to pre-trained model ids.
         pretrained_input_ids = []
         
         for input_id in input_ids:
@@ -97,7 +106,7 @@ class PhoBERTModel(Module):
         pretrained_input_ids = torch.tensor(pretrained_input_ids).to(input_ids.device)
         
         # Masking
-        b_s, seq_len = input_ids.shape[:2]
+        b_s, seq_len = input_ids.shape
         mask_queries = generate_padding_mask(input_ids, self.padding_idx).to(input_ids.device)  # (b_s, seq_len)
         mask_self_attention = generate_sequential_mask(seq_len).to(input_ids.device)
         mask_self_attention = mask_self_attention.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)

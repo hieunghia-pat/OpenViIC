@@ -4,7 +4,7 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from data_utils.vocab import Vocab
 from data_utils.utils import *
-from models.modules.transformers import EncoderDecoderTransformer
+from models.transformers import EncoderDecoderTransformer
 from data_utils.dataset import *
 from training_utils.utils import get_visual_getter
 import evaluation

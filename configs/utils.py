@@ -1,5 +1,5 @@
 from models.modules.attentions import *
-from models.modules.language_models import *
+from models.language_models import *
 from models.modules.encoders import *
 from models.modules.decoders import *
 
@@ -28,20 +28,20 @@ Pretrained_language_model_names = {
     "gpt2": "NlpHUST/gpt-neo-vi-small"
 }
 
-Pretrained_language_model = {
+Pretrained_language_models = {
     "bert": BERTModel,
     "phobert": PhoBERTModel,
     # "bart_pho_model": BARTPhoModel,
     # "gpt_2": GPT2Model
 }
 
-Tokenizer = {
+Tokenizers = {
     "vncorenlp": "vncorenlp",
     "pyvi": "pyvi",
     "spacy": "spacy"
 }
 
-Word_embedding = {
+Word_embeddings = {
     "fasttex": "fasttext.vi.300d",
     "phow2v_syllable_100": "phow2v.syllable.100d",
     "phow2v_syllable_300": "phow2v.syllable.300d",
@@ -64,6 +64,19 @@ def get_decoder(vocab, config):
                     padding_idx=vocab.padding_idx, d_model=config.model.d_model, d_k=config.model.d_k,
                     d_v=config.model.d_v, d_ff=config.model.d_ff, dropout=config.model.dropout,
                     **config.model.transformer.decoder.args)
+
+def get_language_model(vocab, config):
+    language_model = Pretrained_language_models[config.model.pretrained_language_model]
+    return language_model(vocab, config.model.pretrained_language_model_name, padding_idx=1, 
+                            language_model_hidden_size=config.model.language_model_hidden_size,
+                            d_model=config.model.d_model, d_k=config.model.d_k, d_v=config.model.d_v, h=config.model.nheads,
+                            d_ff=config.model.d_ff, max_len=vocab.max_caption_length, dropout=config.model.dropout)
+
+def get_tokenizer(tokenizer_name: str):
+    return Tokenizers[tokenizer_name]
+
+def get_word_embedding(word_embedding_name: str):
+    return Word_embeddings[word_embedding_name]
 
 def get_config(yaml_file):
     return CfgNode(init_dict=yaml.load(open(yaml_file, "r"), Loader=yaml.FullLoader))

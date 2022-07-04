@@ -11,8 +11,7 @@ from configs.utils import get_encoder, get_decoder, get_config
 from data_utils.vocab import Vocab
 from data_utils.dataset import FeatureDataset, DictionaryDataset
 from data_utils.utils import collate_fn
-from configs.utils import Pretrained_language_model_names, Word_embedding, Tokenizer
-from models.modules.transformers import EncoderDecoderTransformer
+from models.transformers import EncoderDecoderTransformer
 
 random.seed(13)
 torch.manual_seed(13)

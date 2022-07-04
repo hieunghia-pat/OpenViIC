@@ -35,10 +35,9 @@ model:
   pretrained_language_model_name : null # phobert-base
                                         # phobert-large
                                         # bartpho-syllable
-                                        # bartpho-word      
-  pretrained_language_model : null  # PhoBERTModel
-                                    # BARTPhoModel
-                                    # GPT2Model
+                                        # bartpho-word
+  pretrained_language_model : null  # bert
+                                    # phobert
   pretrained_language_model_path : null
   language_model_hidden_size : 768
 
