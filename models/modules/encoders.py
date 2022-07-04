@@ -352,3 +352,18 @@ class DualCollaborativeLevelEncoder(nn.Module):
             return outs, padding_mask, region_pos_embedding
         else:
             return out, padding_mask, region_pos_embedding
+
+Encoders = {
+    "encoder": Encoder,
+    "augmented-memory-encoder": AugmentedMemoryEncoder,
+    "augmented-geometry-encoder": AugmentedGeometryEncoder,
+    "dlct-encoder": DualCollaborativeLevelEncoder
+}
+
+def get_encoder(vocab, config):
+    encoder = Encoders[config.model.transformer.encoder.module]
+
+    return encoder(N=config.model.nlayers, padding_idx=vocab.padding_idx, d_in=config.model.d_feature, 
+                    d_model=config.model.d_model, d_k=config.model.d_k, d_v=config.model.d_v,
+                    d_ff=config.model.d_ff, dropout=config.model.dropout,
+                    **config.model.transformer.encoder.args)

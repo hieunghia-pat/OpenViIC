@@ -135,3 +135,18 @@ class PhoBERTModel(Module):
         logits = self.proj_to_vocab(language_feature)
         out = F.log_softmax(logits, dim=-1)
         return out, language_feature
+
+Pretrained_language_models = {
+    "bert": BERTModel,
+    "phobert": PhoBERTModel
+}
+
+def get_pretrained_language_model(model: str):
+    return Pretrained_language_models[model]
+
+def get_language_model(vocab, config):
+    language_model = Pretrained_language_models[config.model.pretrained_language_model]
+    return language_model(vocab, config.model.pretrained_language_model_name, padding_idx=1, 
+                            language_model_hidden_size=config.model.language_model_hidden_size,
+                            d_model=config.model.d_model, d_k=config.model.d_k, d_v=config.model.d_v, h=config.model.nheads,
+                            d_ff=config.model.d_ff, max_len=vocab.max_caption_length, dropout=config.model.dropout)

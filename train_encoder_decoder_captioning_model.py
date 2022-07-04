@@ -7,11 +7,13 @@ import json
 import argparse
 
 from training_utils.captioning_model_trainer import Trainer
-from configs.utils import get_encoder, get_decoder, get_config
+from configs.utils import get_config
 from data_utils.vocab import Vocab
 from data_utils.dataset import FeatureDataset, DictionaryDataset
 from data_utils.utils import collate_fn
 from models.transformers import EncoderDecoderTransformer
+from models.modules.encoders import get_encoder
+from models.modules.decoders import get_decoder
 
 random.seed(13)
 torch.manual_seed(13)

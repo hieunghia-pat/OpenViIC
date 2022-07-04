@@ -4,6 +4,7 @@ from torch.nn import functional as F
 import numpy as np
 import os
 
+from models.language_models import get_pretrained_language_model
 from models.modules.attentions import AdaptiveScaledDotProductAttention, MultiHeadAttention, ScaledDotProductAttention
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
@@ -248,10 +249,11 @@ class MeshedAdaptiveDecoderLayer(Module):
 
 class Decoder(Module):
     "Generic N layer decoder with masking."
-    def __init__(self, vocab_size, max_len, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
+    def __init__(self, vocab, max_len, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
                  use_aoa=False, **attention_module_kwargs):
         super(Decoder, self).__init__()
-        
+        vocab_size = len(vocab)
+
         self.d_model = d_model
         self.word_embedding = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
         self.pos_embedding = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
@@ -301,9 +303,11 @@ class Decoder(Module):
         return F.log_softmax(out, dim=-1)
 
 class MeshedDecoder(Module):
-    def __init__(self, vocab_size, max_len, N_enc, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
+    def __init__(self, vocab, max_len, N_enc, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
                  use_aoa=False, **attention_module_kwargs):
         super(MeshedDecoder, self).__init__()
+        vocab_size = len(vocab)
+
         self.d_model = d_model
         self.word_embedding = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
         self.pos_embedding = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
@@ -353,10 +357,12 @@ class MeshedDecoder(Module):
         return F.log_softmax(out, dim=-1)
 
 class AdaptiveDecoder(Module):
-    def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
-                    pretrained_language_model, pretrained_language_model_path: str=None, use_aoa=False, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
+    def __init__(self, vocab, max_len, N_dec, padding_idx, pretrained_language_model_name, 
+                    pretrained_language_model, pretrained_language_model_path=None, use_aoa=False, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
                     language_model_hidden_size=768, dropout=.1, weights=None, **attention_module_kwargs):
         super(AdaptiveDecoder, self).__init__()
+        vocab_size = len(vocab)
+
         self.d_model = d_model
         self.word_embbeding = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
         self.pos_embbeding = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
@@ -369,9 +375,10 @@ class AdaptiveDecoder(Module):
         self.fc = nn.Linear(d_model, vocab_size, bias=False)
 
         # load and froze the language model
-        self.language_model = pretrained_language_model(padding_idx=padding_idx, language_model_hidden_size=language_model_hidden_size, 
-                                            pretrained_language_model_name=pretrained_language_model_name,
-                                            vocab_size=vocab_size, max_len=max_len)
+        language_model = get_pretrained_language_model(pretrained_language_model)
+        self.language_model = language_model(vocab, pretrained_language_model_name, padding_idx=1, 
+                                            language_model_hidden_size=language_model_hidden_size, d_model=d_model, 
+                                            d_k=d_k, d_v=d_v, h=h, d_ff=d_ff, max_len=max_len, dropout=dropout)
 
         if os.path.isfile(pretrained_language_model_path):
             language_model_checkpoint = torch.load(pretrained_language_model_path)
@@ -433,12 +440,15 @@ class AdaptiveDecoder(Module):
         return F.log_softmax(out, dim=-1)
 
 class MeshedAdaptiveDecoder(Module):
-    def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
-                    pretrained_language_model, pretrained_language_model_path: str=None, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, \
+    def __init__(self, vocab, max_len, N_dec, padding_idx, pretrained_language_model_name, 
+                    pretrained_language_model, pretrained_language_model_path: str=None, d_model=512, 
+                    d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
                     language_model_hidden_size=768, dropout=.1, weights=None,
                  use_aoa=False, N_enc=3, **attention_module_kwargs):
         
         super(MeshedAdaptiveDecoder, self).__init__()
+        vocab_size = len(vocab)
+
         self.d_model = d_model
         self.word_embbeding = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
         self.pos_embbeding = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)
@@ -452,9 +462,10 @@ class MeshedAdaptiveDecoder(Module):
         self.fc = nn.Linear(d_model, vocab_size, bias=False)
 
         # load and froze the language model
-        self.language_model = pretrained_language_model(padding_idx=padding_idx, language_model_hidden_size=language_model_hidden_size, 
-                                            pretrained_language_model_name=pretrained_language_model_name,
-                                            vocab_size=vocab_size, max_len=max_len)
+        language_model = get_pretrained_language_model(pretrained_language_model)
+        self.language_model = language_model(vocab, pretrained_language_model_name, padding_idx=1, 
+                                            language_model_hidden_size=language_model_hidden_size, d_model=d_model, 
+                                            d_k=d_k, d_v=d_v, h=h, d_ff=d_ff, max_len=max_len, dropout=dropout)
 
         if os.path.isfile(pretrained_language_model_path):
             language_model_checkpoint = torch.load(pretrained_language_model_path)
@@ -513,3 +524,18 @@ class MeshedAdaptiveDecoder(Module):
 
         out = self.fc(out)
         return F.log_softmax(out, dim=-1)
+
+Decoders = {
+    "decoder": Decoder,
+    "meshed-decoder": MeshedDecoder,
+    "adaptive-decoder": AdaptiveDecoder,
+    "meshed-adaptive-decoder": MeshedAdaptiveDecoder
+}
+
+def get_decoder(vocab, config):
+    decoder = Decoders[config.model.transformer.decoder.module]
+
+    return decoder(vocab=vocab, max_len=vocab.max_caption_length, N_dec=config.model.nlayers, 
+                    padding_idx=vocab.padding_idx, d_model=config.model.d_model, d_k=config.model.d_k,
+                    d_v=config.model.d_v, d_ff=config.model.d_ff, dropout=config.model.dropout,
+                    **config.model.transformer.decoder.args)

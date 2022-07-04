@@ -170,10 +170,6 @@ class Trainer:
 
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
-
-                print(loss.item())
-                raise Exception("For debugging")
-
                 loss.backward()
 
                 self.optim.step()
