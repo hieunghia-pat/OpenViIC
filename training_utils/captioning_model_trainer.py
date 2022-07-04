@@ -49,14 +49,12 @@ class Trainer:
             dataset=self.train_dataset,
             batch_size=self.config.dataset.batch_size,
             shuffle=True,
-            num_workers=self.config.dataset.workers,
             collate_fn=collate_fn
         )
         self.val_dataloader = data.DataLoader(
             dataset=self.val_dataset,
             batch_size=self.config.dataset.batch_size,
             shuffle=True,
-            num_workers=self.config.dataset.workers,
             collate_fn=collate_fn
         )
 
@@ -81,7 +79,6 @@ class Trainer:
                 dataset=self.test_dataset,
                 batch_size=self.config.dataset.batch_size,
                 shuffle=True,
-                num_workers=self.config.dataset.workers,
                 collate_fn=collate_fn
             )
         else:
