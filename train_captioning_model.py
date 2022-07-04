@@ -4,21 +4,25 @@ import dill as pickle
 import numpy as np
 import random
 import json
+import argparse
 
 from training_utils.captioning_model_trainer import Trainer
-from configs.utils import get_encoder, get_decoder
+from configs.utils import get_encoder, get_decoder, get_config
 from data_utils.vocab import Vocab
 from data_utils.dataset import FeatureDataset, DictionaryDataset
 from data_utils.utils import collate_fn
-from configs.encoder_decoder_transformer_base import get_default_config
-
+from configs.utils import Pretrained_language_model_names, Word_embedding, Tokenizer
 from models.modules.transformers import EncoderDecoderTransformer
 
 random.seed(13)
 torch.manual_seed(13)
 np.random.seed(13)
 
-config = get_default_config()
+parser = argparse.ArgumentParser()
+parser.add_argument("--config-file", type=str, required=True)
+args = parser.parse_args()
+
+config = get_config(args.config_file)
 
 if not os.path.isdir(os.path.join(config.training.checkpoint_path, config.model.name)):
     os.makedirs(os.path.join(config.training.checkpoint_path, config.model.name))
@@ -31,8 +35,8 @@ if not os.path.isdir(os.path.join(config.training.checkpoint_path, config.model.
 
 # Creating vocabulary and dataset
 if not os.path.isfile(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl")):
-    vocab = Vocab([config.path.train_json_path, config.path.dev_json_path], tokenizer_name=config.dataset.tokenizer, 
-                    pretrained_language_model_name=config.model.pretrained_language_model_name)
+    vocab = Vocab([config.path.train_json_path, config.path.dev_json_path], tokenizer_name=Tokenizer[config.dataset.tokenizer], 
+                    pretrained_language_model_name=Pretrained_language_model_names[config.model.pretrained_language_model_name])
     pickle.dump(vocab, open(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl"), "wb"))
 else:
     vocab = pickle.load(open(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl"), "rb"))
@@ -72,7 +76,7 @@ model = EncoderDecoderTransformer(vocab.bos_idx, encoder, decoder).to(device)
 
 # Define Trainer
 trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),
-                    test_datasets=(public_test_dataset, public_test_dict_dataset), vocab=vocab, collate_fn=collate_fn)
+                    test_datasets=(public_test_dataset, public_test_dict_dataset), vocab=vocab, config=config, collate_fn=collate_fn)
 
 # Training
 if config.training.start_from:

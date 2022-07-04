@@ -3,16 +3,21 @@ from models.modules.language_models import *
 from models.modules.encoders import *
 from models.modules.decoders import *
 
+from yacs.config import CfgNode
+import yaml
+
 Encoders = {
     "encoder": Encoder,
+    "augmented-memory-encoder": AugmentedMemoryEncoder,
+    "augmented-geometry-encoder": AugmentedGeometryEncoder,
     "dlct-encoder": DualCollaborativeLevelEncoder
 }
 
 Decoders = {
     "decoder": Decoder,
-    "meshed_decoder": MeshedDecoder,
+    "meshed-decoder": MeshedDecoder,
     "apdaptive-decoder": AdaptiveDecoder,
-    "meshed-adaptive-decoder": MeshedAdaptiveDecoder,
+    "meshed-adaptive-decoder": MeshedAdaptiveDecoder
 }
 
 Pretrained_language_model_names = {
@@ -21,7 +26,7 @@ Pretrained_language_model_names = {
     "bartpho-syllable": "vinai/bartpho-syllable",
     "bartpho-word": "vinai/bartpho-word",
     "gpt2": "NlpHUST/gpt-neo-vi-small",
-    None: None
+    "None": None
 }
 
 Pretrained_language_model = {
@@ -29,7 +34,14 @@ Pretrained_language_model = {
     "pho-bert-model": PhoBERTModel,
     # "bart_pho_model": BARTPhoModel,
     # "gpt_2": GPT2Model,
-    None: None
+    "None": None
+}
+
+Tokenizer = {
+    "vncorenlp": "vncorenlp",
+    "pyvi": "pyvi",
+    "spacy": "spacy",
+    "None": None
 }
 
 Word_embedding = {
@@ -38,7 +50,7 @@ Word_embedding = {
     "phow2v_syllable_300": "phow2v.syllable.300d",
     "phow2v_word_100": "phow2v.word.100d",
     "phow2v_word_300": "phow2v.word.300d",
-    None: None
+    "None": None
 }
 
 def get_encoder(vocab, config):
@@ -49,7 +61,6 @@ def get_encoder(vocab, config):
                     d_ff=config.model.d_ff, dropout=config.model.dropout,
                     **config.model.transformer.encoder.args)
 
-
 def get_decoder(vocab, config):
     decoder = Decoders[config.model.transformer.decoder.module]
 
@@ -57,3 +68,6 @@ def get_decoder(vocab, config):
                     padding_idx=vocab.padding_idx, d_model=config.model.d_model, d_k=config.model.d_k,
                     d_v=config.model.d_v, d_ff=config.model.d_ff, dropout=config.model.dropout,
                     **config.model.transformer.decoder.args)
+
+def get_config(yaml_file):
+    return CfgNode(init_dict=yaml.load(open(yaml_file, "r"), Loader=yaml.FullLoader))

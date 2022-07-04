@@ -5,20 +5,21 @@ from typing import Callable
 from data_utils.feature import Feature
 
 def get_tokenizer(tokenizer):
+    if tokenizer is None:
+        return lambda s: s
+
     if callable(tokenizer):
         return tokenizer
     
-    elif tokenizer is None:
-        return lambda s: s 
-    
-    elif tokenizer == "pyvi":
+    if tokenizer == "pyvi":
         try:
             from pyvi import ViTokenizer
             return ViTokenizer.tokenize
         except ImportError:
             print("Please install PyVi package. "
                   "See the docs at https://github.com/trungtv/pyvi for more information.")
-    elif tokenizer == "spacy":
+
+    if tokenizer == "spacy":
         try:
             from spacy.lang.vi import Vietnamese
             return Vietnamese()
@@ -31,7 +32,7 @@ def get_tokenizer(tokenizer):
                   "See the docs at https://gitlab.com/trungtv/vi_spacy for more information.")
             raise
     
-    elif tokenizer == "vncorenlp":
+    if tokenizer == "vncorenlp":
         try:
             from vncorenlp import VnCoreNLP
             # annotator = VnCoreNLP(r"data_utils/vncorenlp/VnCoreNLP-1.1.1.jar", port=9000, annotators="wseg", max_heap_size='-Xmx500m')

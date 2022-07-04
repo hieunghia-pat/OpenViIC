@@ -120,7 +120,7 @@ class AugmentedMemoryEncoder(nn.Module):
 class AugmentedGeometryEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
                  identity_map_reordering=False, use_aoa=False, trignometric_embedding=True, **attention_module_kwargs):
-        super(Encoder, self).__init__()
+        super(AugmentedGeometryEncoder, self).__init__()
 
         self.trignometric_embedding = trignometric_embedding
         if trignometric_embedding:
@@ -145,6 +145,15 @@ class AugmentedGeometryEncoder(nn.Module):
                                      for _ in range(N)])
         self.padding_idx = padding_idx
         self.multi_level_output = multi_level_output
+
+        self.init_weights()
+
+    def init_weights(self):
+        for fc_g in self.fc_gs:
+            nn.init.xavier_uniform_(fc_g.weight)
+
+        for fc_g in self.fc_gs:
+            nn.init.constant_(fc_g.bias, 0)
 
     def forward(self, visuals):
         features = visuals.features
@@ -243,6 +252,15 @@ class DualCollaborativeLevelEncoder(nn.Module):
 
         # Whether using multi level output in encoder head.
         self.multi_level_output = multi_level_output
+
+        self.init_weights()
+
+    def init_weights(self):
+        for fc_g in self.fc_gs:
+            nn.init.xavier_uniform_(fc_g.weight)
+
+        for fc_g in self.fc_gs:
+            nn.init.constant_(fc_g.bias, 0)
 
     def forward(self, visuals):
         region_features = visuals.region_features

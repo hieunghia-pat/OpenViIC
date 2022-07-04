@@ -11,8 +11,6 @@ import logging
 import six
 import json
 from typing import List, Union
-import sys
-import os
 logger = logging.getLogger(__name__)
 
 class Vocab(object):
@@ -43,7 +41,6 @@ class Vocab(object):
                 returns a Tensor of the same size. Default: torch.Tensor.zero_
             vectors_cache: directory for cached vectors. Default: '.vector_cache'
         """
-
         self.tokenizer = get_tokenizer(tokenizer_name)
         
         self.token_encoder = None

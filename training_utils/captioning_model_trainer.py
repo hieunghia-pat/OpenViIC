@@ -9,7 +9,6 @@ from data_utils.dataset import *
 from training_utils.utils import get_visual_getter
 import evaluation
 from evaluation import Cider, PTBTokenizer
-from configs.encoder_decoder_transformer_base import get_default_config
 
 import multiprocessing
 from tqdm import tqdm
@@ -17,10 +16,9 @@ import itertools
 from typing import Tuple, Union
 import random
 from shutil import copyfile
+from yacs.config import CfgNode
 
-# device = "cuda" if torch.cuda.is_available() else "cpu"
-device = "cpu"
-config = get_default_config()
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Trainer:
     def __init__(self,  model: EncoderDecoderTransformer, 
@@ -28,9 +26,11 @@ class Trainer:
                         val_datasets: Tuple[FeatureDataset, DictionaryDataset],
                         test_datasets: Tuple[Union[FeatureDataset, None], Union[DictionaryDataset, None]],
                         vocab: Vocab,
+                        config: CfgNode,
                         collate_fn=collate_fn):
         self.model = model
         self.vocab = vocab
+        self.config = config
 
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
@@ -42,34 +42,34 @@ class Trainer:
         self.train_dataset, self.train_dict_dataset = train_datasets
         self.val_dataset, self.val_dict_dataset = val_datasets
 
-        self.get_visual_features = get_visual_getter(config.training.using_features)
+        self.get_visual_features = get_visual_getter(self.config.training.using_features)
 
         # creating iterable-dataset data loader
         self.train_dataloader = data.DataLoader(
             dataset=self.train_dataset,
-            batch_size=config.dataset.batch_size,
+            batch_size=self.config.dataset.batch_size,
             shuffle=True,
-            num_workers=config.dataset.workers,
+            num_workers=self.config.dataset.workers,
             collate_fn=collate_fn
         )
         self.val_dataloader = data.DataLoader(
             dataset=self.val_dataset,
-            batch_size=config.dataset.batch_size,
+            batch_size=self.config.dataset.batch_size,
             shuffle=True,
-            num_workers=config.dataset.workers,
+            num_workers=self.config.dataset.workers,
             collate_fn=collate_fn
         )
 
         # creating dictionary iterable-dataset data loader
         self.train_dict_dataloader = data.DataLoader(
             dataset=self.train_dict_dataset,
-            batch_size=config.dataset.batch_size // config.training.training_beam_size,
+            batch_size=self.config.dataset.batch_size // self.config.training.training_beam_size,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.val_dict_dataloader = data.DataLoader(
             dataset=self.val_dict_dataset,
-            batch_size=config.dataset.batch_size // config.training.training_beam_size,
+            batch_size=self.config.dataset.batch_size // self.config.training.training_beam_size,
             shuffle=True,
             collate_fn=collate_fn
         )
@@ -79,9 +79,9 @@ class Trainer:
         if self.test_dataset is not None:
             self.test_dataloader = data.DataLoader(
                 dataset=self.test_dataset,
-                batch_size=config.dataset.batch_size,
+                batch_size=self.config.dataset.batch_size,
                 shuffle=True,
-                num_workers=config.dataset.workers,
+                num_workers=self.config.dataset.workers,
                 collate_fn=collate_fn
             )
         else:
@@ -90,7 +90,7 @@ class Trainer:
         if self.test_dict_dataset is not None:
             self.test_dict_dataloader = data.DataLoader(
                 dataset=self.test_dict_dataset,
-                batch_size=config.dataset.batch_size // config.training.training_beam_size,
+                batch_size=self.config.dataset.batch_size // self.config.training.training_beam_size,
                 shuffle=True,
                 collate_fn=collate_fn
             )
@@ -138,7 +138,7 @@ class Trainer:
                 
                 with torch.no_grad():
                     out, _ = self.model.beam_search(visual_inputs, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                    beam_size=config.training.evaluating_beam_size, out_size=1)
+                                                    beam_size=self.config.training.evaluating_beam_size, out_size=1)
                 
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
@@ -174,6 +174,9 @@ class Trainer:
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
 
+                print(loss.item())
+                raise Exception("For debugging")
+
                 loss.backward()
 
                 self.optim.step()
@@ -201,16 +204,16 @@ class Trainer:
                 caps_gt = sample.captions
 
                 outs, log_probs = self.model.beam_search(visual_inputs, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
-                                                            beam_size=config.training.training_beam_size, out_size=config.training.training_beam_size)
+                                                            beam_size=self.config.training.training_beam_size, out_size=self.config.training.training_beam_size)
 
                 self.optim.zero_grad()
 
                 # Rewards
                 caps_gen = vocab.decode_caption(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
-                caps_gt = list(itertools.chain(*([c, ] * config.training.training_beam_size for c in caps_gt)))
+                caps_gt = list(itertools.chain(*([c, ] * self.config.training.training_beam_size for c in caps_gt)))
                 caps_gen, caps_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [caps_gen, caps_gt])
                 reward = self.train_cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
-                reward = torch.from_numpy(reward).to(device).view(self.train_dict_dataloader.batch_size, config.training.training_beam_size)
+                reward = torch.from_numpy(reward).to(device).view(self.train_dict_dataloader.batch_size, self.config.training.training_beam_size)
                 reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
                 loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
 
@@ -226,7 +229,7 @@ class Trainer:
                 pbar.update()
 
     def lambda_lr(self, step):
-        warm_up = config.training.warmup
+        warm_up = self.config.training.warmup
         step += 1
         return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
@@ -270,7 +273,7 @@ class Trainer:
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
-        torch.save(dict_for_saving, os.path.join(config.path.checkpoint_path, config.model.model_name, "last_model.pth"))
+        torch.save(dict_for_saving, os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, "last_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
         
@@ -330,7 +333,7 @@ class Trainer:
                     exit_train = True
 
             if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(config.path.checkpoint_path, config.model.model_name, "best_model.pth"))
+                self.load_checkpoint(os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, "best_model.pth"))
 
             self.save_checkpoint({
                 'val_loss': val_loss,
@@ -342,8 +345,8 @@ class Trainer:
             })
 
             if best:
-                copyfile(os.path.join(config.path.checkpoint_path, config.model.model_name, "last_model.pth"), 
-                            os.path.join(config.path.checkpoint_path, config.model.model_name, "best_model.pth"))
+                copyfile(os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, "last_model.pth"), 
+                            os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, "best_model.pth"))
 
             if exit_train:
                 break
@@ -369,7 +372,7 @@ class Trainer:
 
                 with torch.no_grad():
                     out, _ = self.model.beam_search(visual_inputs, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                    beam_size=config.training.evaluating_beam_size, out_size=1)
+                                                    beam_size=self.config.training.evaluating_beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 gts = {}
                 gens = {}
@@ -406,4 +409,4 @@ class Trainer:
                     sample_item["captions"] = generated_captions[0][0]
                     break
 
-        json.dump(sample_json_data, open(os.path.join(config.path.checkpoint_path, config.model.model_name, f"{split}_results.json"), "w+"), ensure_ascii=False)
+        json.dump(sample_json_data, open(os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, f"{split}_results.json"), "w+"), ensure_ascii=False)

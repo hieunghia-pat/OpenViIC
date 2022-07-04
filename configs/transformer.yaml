@@ -15,9 +15,9 @@ training:
   get_scores: False
   training_beam_size: 5
   evaluating_beam_size: 5
-  using_features: region # region
-                            # grid
-                            # region+grid
+  using_features: region  # region
+                          # grid
+                          # region+grid
 
 ## model configuration
 model:
@@ -50,8 +50,9 @@ model:
         use_aoa: False
         multi_level_output: False
       module: encoder # encoder
-                      # multilevel-encoder
-                      # DLCT-encoder
+                      # augmented-memory-encoder
+                      # augmented-geometry-encoder
+                      # dlct-encoder
 
     decoder:
       args:
@@ -59,6 +60,7 @@ model:
       module: decoder # decoder
                       # meshed-decoder
                       # adaptive-decoder
+                      # meshed-adaptive-decoder
 
 ## dataset configuration
 dataset:

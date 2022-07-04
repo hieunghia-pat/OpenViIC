@@ -84,23 +84,6 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         self.d_v = d_v
         self.h = h
 
-        self.init_weights()
-
-    def init_weights(self):
-        nn.init.xavier_uniform_(self.fc_q.weight)
-        nn.init.xavier_uniform_(self.fc_k.weight)
-        nn.init.xavier_uniform_(self.fc_v.weight)
-        nn.init.xavier_uniform_(self.fc_o.weight)
-        for fc_g in self.fc_gs:
-            nn.init.xavier_uniform_(fc_g.weight)
-
-        nn.init.constant_(self.fc_q.bias, 0)
-        nn.init.constant_(self.fc_k.bias, 0)
-        nn.init.constant_(self.fc_v.bias, 0)
-        nn.init.constant_(self.fc_o.bias, 0)
-        for fc_g in self.fc_gs:
-            nn.init.constant_(fc_g.bias, 0)
-
     def forward(self, inputs):
         queries = inputs.queries
         keys = inputs.keys
@@ -133,7 +116,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         Scaled dot-product attention with memory
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, m):
+    def __init__(self, d_model, d_k, d_v, h, total_memory):
         '''
         :param d_model: Output dimensionality of the model
         :param d_k: Dimensionality of queries and keys
@@ -146,14 +129,14 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         self.fc_k = nn.Linear(d_model, h * d_k)
         self.fc_v = nn.Linear(d_model, h * d_v)
         self.fc_o = nn.Linear(h * d_v, d_model)
-        self.m_k = nn.Parameter(torch.FloatTensor(1, m, h * d_k))
-        self.m_v = nn.Parameter(torch.FloatTensor(1, m, h * d_v))
+        self.m_k = nn.Parameter(torch.FloatTensor(1, total_memory, h * d_k))
+        self.m_v = nn.Parameter(torch.FloatTensor(1, total_memory, h * d_v))
 
         self.d_model = d_model
         self.d_k = d_k
         self.d_v = d_v
         self.h = h
-        self.m = m
+        self.m = total_memory
 
         self.init_weights()
 
@@ -199,7 +182,7 @@ class AdaptiveScaledDotProductAttention(nn.Module):
     Scaled dot-product with adaptive attention
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, dropout=.1, comment=None):
+    def __init__(self, d_model, d_k, d_v, h, dropout=.1):
         '''
         :param d_model: Output dimensionality of the model
         :param d_k: Dimensionality of queries and keys
@@ -221,8 +204,6 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         self.h = h
 
         self.init_weights()
-
-        self.comment = comment
 
     def init_weights(self):
         nn.init.xavier_uniform_(self.fc_q.weight)

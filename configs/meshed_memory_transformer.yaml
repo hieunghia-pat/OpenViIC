@@ -1,0 +1,75 @@
+## configuration for paths
+path:
+  train_json_path : features/annotations/UIT-ViIC/uitviic_captions_train2017.json
+  dev_json_path : features/annotations/UIT-ViIC/uitviic_captions_val2017.json
+  public_test_json_path : features/annotations/UIT-ViIC/uitviic_captions_test2017.json
+  private_test_json_path: features/annotations/vieCap4H/viecap4h_captions_private_test2017.json
+  image_features_path : features/region_features/UIT-ViIC/faster_rcnn
+  images_path : None
+
+## configuration for training
+training:
+  checkpoint_path: saved_models
+  learning_rate: 1.0
+  warmup: 10000
+  get_scores: False
+  training_beam_size: 5
+  evaluating_beam_size: 5
+  using_features: region  # region
+                          # grid
+                          # region+grid
+
+## model configuration
+model:
+  name: m2
+  nhead : 8
+  nlayers : 3
+  d_model : 512
+  d_k : 64
+  d_v : 64
+  d_ff : 2048
+  d_feature : 2048
+  dropout : .5
+  embedding_dim : 300
+  ## pretrained language model components
+  pretrained_language_model_name : None # phobert-base
+                                        # phobert-large
+                                        # bartpho-syllable
+                                        # bartpho-word      
+                                        # None
+  pretrained_language_model : None  # PhoBERTModel
+                                    # BARTPhoModel
+                                    # GPT2Model
+                                    # None
+  pretrained_language_model_path : None
+  language_model_hidden_size : 768
+
+  transformer:
+    encoder:
+      args:
+        use_aoa: False
+        multi_level_output: True
+        total_memory: 40
+      module: augmented-memory-encoder
+
+    decoder:
+      args:
+        use_aoa: False
+        N_enc: 3
+      module: meshed-decoder
+
+## dataset configuration
+dataset:
+  batch_size: 32
+  workers: 2
+  tokenizer: None # vncorenlp
+                  # pyvi
+                  # spacy
+                  # None
+  word_embedding: None  # fasttext.vi.300d
+                        # phow2v.syllable.100d
+                        # phow2v.syllable.300d
+                        # phow2v.word.100d
+                        # phow2v.word.300d
+                        # None
+  min_freq: 1
