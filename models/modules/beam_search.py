@@ -50,10 +50,10 @@ class BeamSearch(object):
         selected_logprob, selected_idx = selected_logprob[:, :self.beam_size], selected_idx[:, :self.beam_size] # then select the top-beam_size highest digits
         return selected_idx, selected_logprob
 
-    def iter(self, t: int, visual_inputs, outputs, return_probs):
+    def iter(self, t: int, outputs, return_probs, **visual_inputs):
         cur_beam_size = 1 if t == 0 else self.beam_size
 
-        word_logprob = self.model.step(t, self.selected_words, visual_inputs)
+        word_logprob = self.model.step(t, self.selected_words, **visual_inputs)
         word_logprob = word_logprob.view(self.b_s, cur_beam_size, -1)
         candidate_logprob = self.seq_logprob + word_logprob
 
@@ -62,7 +62,7 @@ class BeamSearch(object):
             mask = (self.selected_words.view(self.b_s, cur_beam_size) == self.eos_idx).unsqueeze(-1) # (bs, cur_beam_size, 1)
             self.seq_mask = torch.logical_or(self.seq_mask, mask)
             word_logprob = word_logprob.masked_fill(self.seq_mask.expand_as(word_logprob), value=0)
-            candidate_logprob = torch.where(self.seq_mask, torch.scalar_tensor(0), word_logprob + self.seq_logprob)
+            candidate_logprob = torch.where(self.seq_mask, torch.scalar_tensor(0, device=self.device), word_logprob + self.seq_logprob)
 
         selected_idx, selected_logprob = self.select(candidate_logprob) # get the top-beam_size highest logits
         selected_beam = torch.div(selected_idx, candidate_logprob.shape[-1], rounding_mode="floor") # then find its appropriate beam
@@ -93,9 +93,9 @@ class BeamSearch(object):
 
         return outputs
 
-    def apply(self, visual_inputs, out_size=1, return_probs=False):
-        self.b_s = visual_inputs.batch_size
-        self.device = visual_inputs.device
+    def apply(self, batch_size, device, out_size=1, return_probs=False, **visual_inputs):
+        self.b_s = batch_size
+        self.device = device
         self.seq_mask = torch.zeros((self.b_s, self.beam_size, 1), device=self.device).bool()
         self.seq_logprob = torch.zeros((self.b_s, 1, 1), device=self.device)    # (bs, beam_size, 1)
                                                                                 # at the beginning the beam search tree has a root of bos_idx
@@ -107,7 +107,7 @@ class BeamSearch(object):
         outputs = []
         with self.model.statefulness(self.b_s):
             for t in range(self.max_len):
-                outputs = self.iter(t, visual_inputs, outputs, return_probs)
+                outputs = self.iter(t, outputs, return_probs, **visual_inputs)
 
         # Sort result
         _, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)

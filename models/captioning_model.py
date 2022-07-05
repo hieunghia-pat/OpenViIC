@@ -14,6 +14,6 @@ class CaptioningModel(Module):
     def forward(self, **kwargs):
         raise NotImplementedError
 
-    def beam_search(self, visual_inputs, max_len, eos_idx, beam_size, out_size=1, return_probs=False):
+    def beam_search(self, batch_size, device, max_len, eos_idx, beam_size, out_size=1, return_probs=False, **visual_inputs):
         bs = BeamSearch(self, max_len, eos_idx, beam_size)
-        return bs.apply(visual_inputs, out_size, return_probs)
+        return bs.apply(batch_size=batch_size, device=device, out_size=out_size, return_pobs=return_probs, **visual_inputs)

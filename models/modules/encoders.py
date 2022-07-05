@@ -2,12 +2,9 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
-from models.modules.attentions import AugmentedGeometryScaledDotProductAttention, AugmentedMemoryScaledDotProductAttention, \
-                                        MultiHeadAttention, ScaledDotProductAttention
+from models.modules.attentions import AugmentedGeometryScaledDotProductAttention, AugmentedMemoryScaledDotProductAttention, MultiHeadAttention, ScaledDotProductAttention
 from models.utils import generate_padding_mask, get_combine_masks, box_relational_embedding, clones
 from models.modules.embeddings import SinusoidPositionalEmbedding
-
-from data_utils.feature import Feature
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
@@ -20,11 +17,9 @@ class EncoderLayer(nn.Module):
                                         **attention_module_kwargs)
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
 
-    def forward(self, **kwargs):
-        inputs = Feature(kwargs)
-        att = self.mhatt(inputs)
+    def forward(self, queries, keys, values, attention_mask, **kwargs):
+        att = self.mhatt(queries=queries, keys=keys, values=values, attention_mask=attention_mask, **kwargs)
         ff = self.pwff(att)
-        attention_mask = inputs.attention_mask
         ff = ff.masked_fill(attention_mask.squeeze().unsqueeze(-1), value=0)
 
         return ff
@@ -50,9 +45,8 @@ class Encoder(nn.Module):
         self.padding_idx = padding_idx
         self.multi_level_output = multi_level_output
 
-    def forward(self, visuals):
-        features = visuals.features
-        padding_masks = generate_padding_mask(features, padding_idx=0)
+    def forward(self, features, **kwargs):
+        padding_masks = generate_padding_mask(features, padding_idx=0).unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
         features = F.relu(self.fc(features))
         features = self.dropout(features)
@@ -94,9 +88,8 @@ class AugmentedMemoryEncoder(nn.Module):
         self.padding_idx = padding_idx
         self.multi_level_output = multi_level_output
 
-    def forward(self, visuals):
-        features = visuals.features
-        padding_masks = generate_padding_mask(features, padding_idx=0)
+    def forward(self, features, **kwargs):
+        padding_masks = generate_padding_mask(features, padding_idx=0).unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
         features = F.relu(self.fc(features))
         features = self.dropout(features)
@@ -155,15 +148,13 @@ class AugmentedGeometryEncoder(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, visuals):
-        features = visuals.features
-        padding_masks = generate_padding_mask(features, padding_idx=0)
+    def forward(self, features, boxes, **kwargs):
+        padding_masks = generate_padding_mask(features, padding_idx=0).unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
         features = F.relu(self.fc(features))
         features = self.dropout(features)
         out = self.layer_norm(features)
 
-        boxes = visuals.boxes
         relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
         flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, self.d_g)
         bs, nk, _, _ = relative_geometry_embeddings.shape
@@ -179,7 +170,7 @@ class AugmentedGeometryEncoder(nn.Module):
         for layer in self.layers:
             out = out + pos_embedding
             out = layer(queries=out, keys=out, values=out, 
-                        relative_geometry_embeddings=relative_geometry_embeddings, 
+                        relative_geometry_weights=relative_geometry_weights, 
                         attention_mask=padding_masks)
             if self.multi_level_output:
                 outs.append(out.unsqueeze(1))
@@ -262,10 +253,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, visuals):
-        region_features = visuals.region_features
-        grid_features = visuals.grid_features
-
+    def forward(self, region_features, region_boxes, grid_features, grid_boxes, **kwargs):
         out_region = F.relu(self.fc_region(region_features))
         out_region = self.dropout_region(out_region)
         out_region = self.layer_norm_region(out_region)
@@ -276,9 +264,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
 
         torch.cat([out_region, out_grid], dim=1)
 
-        region_boxes = visuals.region_boxes
         n_regions = region_boxes.shape[1]
-        grid_boxes = visuals.grid_boxes
         n_grids = grid_boxes.shape[1]
         grid_size = int(n_grids**0.5) # default is 7
 
@@ -291,8 +277,8 @@ class DualCollaborativeLevelEncoder(nn.Module):
         relative_geometry_weights = torch.cat(relative_geometry_weights_per_head, dim=1) # (bs, h, nk, nk)
         relative_geometry_weights = F.relu(relative_geometry_weights)
 
-        region_padding_masks = generate_padding_mask(region_features, padding_idx=0)
-        grid_padding_masks = generate_padding_mask(grid_features, padding_idx=0)
+        region_padding_masks = generate_padding_mask(region_features, padding_idx=0).unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
+        grid_padding_masks = generate_padding_mask(grid_features, padding_idx=0).unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
         region2grid_padding_masks = []
         region2grid_padding_masks = get_combine_masks(region_boxes, grid_size).unsqueeze(1) # (bs, 1, n_regions, n_grids)
         grid2region_padding_masks = region2grid_padding_masks.permute(0, 1, 3, 2) # (bs, 1, n_grids, n_regions)

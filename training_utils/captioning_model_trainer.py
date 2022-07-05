@@ -3,7 +3,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
 
 from data_utils.vocab import Vocab
-from data_utils.utils import *
+from data_utils.utils import collate_fn
 from models.transformers import EncoderDecoderTransformer
 from data_utils.dataset import *
 from training_utils.utils import get_visual_getter
@@ -100,18 +100,15 @@ class Trainer:
         # Calculating validation loss
         self.model.eval()
         running_loss = .0
-        with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Validation' % (self.epoch + 1), unit='it', total=len(dataloader)) as pbar:
             with torch.no_grad():
                 for it, sample in enumerate(dataloader):
                     visual_inputs = self.get_visual_features(sample)
-                    
+
                     tokens = sample.tokens.to(device)
                     shifted_right_tokens = sample.shifted_right_tokens.to(device)
-                    linguistic_inputs = Feature({
-                        "tokens": tokens
-                    })
-                    
-                    out = self.model(visual_inputs, linguistic_inputs).contiguous()
+
+                    out = self.model(tokens=tokens, **visual_inputs).contiguous()
                     
                     loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                     this_loss = loss.item()
@@ -128,14 +125,15 @@ class Trainer:
         self.model.eval()
         gen = {}
         gts = {}
-        with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Evaluation' % (self.epoch + 1), unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
                 visual_inputs = self.get_visual_features(sample)
                 caps_gt = sample.captions
                 
                 with torch.no_grad():
-                    out, _ = self.model.beam_search(visual_inputs, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                    beam_size=self.config.training.evaluating_beam_size, out_size=1)
+                    out, _ = self.model.beam_search(batch_size=dataloader.batch_size, device=device, out_size=1,
+                                                    max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                                                    beam_size=self.config.training.evaluating_beam_size, **visual_inputs)
                 
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
@@ -155,18 +153,14 @@ class Trainer:
         self.model.train()
 
         running_loss = .0
-        with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Training with cross-entropy loss' % (self.epoch + 1), unit='it', total=len(self.train_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dataloader):
                 visual_inputs = self.get_visual_features(sample)
                 
                 tokens = sample.tokens.to(device)
                 shifted_right_tokens = sample.shifted_right_tokens.to(device)
-
-                linguistic_inputs = Feature({
-                    "tokens": tokens
-                })
                 
-                out = self.model(visual_inputs, linguistic_inputs).contiguous()
+                out = self.model(tokens=tokens, **visual_inputs).contiguous()
 
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
@@ -191,13 +185,16 @@ class Trainer:
         self.model.train()
 
         running_loss = .0
-        with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Training with self-critical learning' % (self.epoch + 1), unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dict_dataloader):
                 visual_inputs = self.get_visual_features(sample)
                 caps_gt = sample.captions
 
-                outs, log_probs = self.model.beam_search(visual_inputs, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
-                                                            beam_size=self.config.training.training_beam_size, out_size=self.config.training.training_beam_size)
+                outs, log_probs = self.model.beam_search(batch_size=self.train_dict_dataloader.batch_size, device=device,
+                                                            max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+                                                            beam_size=self.config.training.training_beam_size, 
+                                                            out_size=self.config.training.training_beam_size,
+                                                            **visual_inputs)
 
                 self.optim.zero_grad()
 
@@ -266,7 +263,7 @@ class Trainer:
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
-        torch.save(dict_for_saving, os.path.join(self.config.path.checkpoint_path, 
+        torch.save(dict_for_saving, os.path.join(self.config.training.checkpoint_path, 
                                                     f"{self.config.model.name}_using_{self.config.training.using_features}",
                                                     "last_model.pth"))
 
@@ -328,7 +325,7 @@ class Trainer:
                     exit_train = True
 
             if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(self.config.path.checkpoint_path,
+                self.load_checkpoint(os.path.join(self.config.training.checkpoint_path,
                                                     f"{self.config.model.name}_using_{self.config.training.using_features}",
                                                     "best_model.pth"))
 
@@ -342,10 +339,10 @@ class Trainer:
             })
 
             if best:
-                copyfile(os.path.join(self.config.path.checkpoint_path,
+                copyfile(os.path.join(self.config.training.checkpoint_path,
                                         f"{self.config.model.name}_using_{self.config.training.using_features}",
                                         "last_model.pth"), 
-                            os.path.join(self.config.path.checkpoint_path, 
+                            os.path.join(self.config.training.checkpoint_path, 
                                             f"{self.config.model.name}_using_{self.config.training.using_features}",
                                             "best_model.pth"))
 
@@ -410,6 +407,6 @@ class Trainer:
                     sample_item["captions"] = generated_captions[0][0]
                     break
 
-        json.dump(sample_json_data, open(os.path.join(self.config.path.checkpoint_path, 
+        json.dump(sample_json_data, open(os.path.join(self.config.training.checkpoint_path, 
                                                         f"{self.config.model.name}_using_{self.config.training.using_features}",
                                                         f"{split}_results.json"), "w+"), ensure_ascii=False)
