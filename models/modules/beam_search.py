@@ -59,13 +59,15 @@ class BeamSearch(object):
 
         # Mask sequence if it reaches <eos>
         if t > 0:
-            mask = (self.selected_words.view(self.b_s, cur_beam_size) == self.eos_idx).unsqueeze(-1) # (bs, cur_beam_size, 1)
-            self.seq_mask = torch.logical_or(self.seq_mask, mask)
-            word_logprob = word_logprob.masked_fill(self.seq_mask.expand_as(word_logprob), value=0)
-            candidate_logprob = torch.where(self.seq_mask, torch.scalar_tensor(0, device=self.device), word_logprob + self.seq_logprob)
+            mask = (self.selected_words.view(self.b_s, cur_beam_size) != self.eos_idx).float().unsqueeze(-1)
+            self.seq_mask = self.seq_mask * mask
+            word_logprob = word_logprob * self.seq_mask.expand_as(word_logprob)
+            old_seq_logprob = self.seq_logprob.expand_as(candidate_logprob).contiguous()
+            old_seq_logprob[:, :, 1:] = -999
+            candidate_logprob = self.seq_mask * candidate_logprob + old_seq_logprob * (1 - self.seq_mask)
 
         selected_idx, selected_logprob = self.select(candidate_logprob) # get the top-beam_size highest logits
-        selected_beam = torch.div(selected_idx, candidate_logprob.shape[-1], rounding_mode="floor") # then find its appropriate beam
+        selected_beam = torch.div(selected_idx, candidate_logprob.shape[-1], rounding_mode="trunc") # then find its appropriate beam
         selected_words = selected_idx - selected_beam * candidate_logprob.shape[-1] # and get the index of them in term of vocab size
 
         self.model.apply_to_states(self._expand_state(selected_beam, cur_beam_size))
@@ -96,7 +98,7 @@ class BeamSearch(object):
     def apply(self, batch_size, device, out_size=1, return_probs=False, **visual_inputs):
         self.b_s = batch_size
         self.device = device
-        self.seq_mask = torch.zeros((self.b_s, self.beam_size, 1), device=self.device).bool()
+        self.seq_mask = torch.ones((self.b_s, self.beam_size, 1), device=self.device)
         self.seq_logprob = torch.zeros((self.b_s, 1, 1), device=self.device)    # (bs, beam_size, 1)
                                                                                 # at the beginning the beam search tree has a root of bos_idx
         self.log_probs = []

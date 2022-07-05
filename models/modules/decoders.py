@@ -183,8 +183,6 @@ class Decoder(Module):
         self_attention_mask = generate_sequential_mask(seq_len).to(tokens.device)
         self_attention_mask = self_attention_mask.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
         self_attention_mask = torch.logical_or(self_attention_mask, mask_queries.unsqueeze(1).unsqueeze(1))
-        print(self_attention_mask.shape)
-        print(self.running_mask_self_attention.shape)
         if self._is_stateful:
             self.running_mask_self_attention = torch.cat([self.running_mask_self_attention, self_attention_mask], -1)
             self_attention_mask = self.running_mask_self_attention
