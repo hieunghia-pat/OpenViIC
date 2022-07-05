@@ -266,7 +266,9 @@ class Trainer:
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
-        torch.save(dict_for_saving, os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, "last_model.pth"))
+        torch.save(dict_for_saving, os.path.join(self.config.path.checkpoint_path, 
+                                                    f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                                    "last_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
         
@@ -326,7 +328,9 @@ class Trainer:
                     exit_train = True
 
             if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, "best_model.pth"))
+                self.load_checkpoint(os.path.join(self.config.path.checkpoint_path,
+                                                    f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                                    "best_model.pth"))
 
             self.save_checkpoint({
                 'val_loss': val_loss,
@@ -338,8 +342,12 @@ class Trainer:
             })
 
             if best:
-                copyfile(os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, "last_model.pth"), 
-                            os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, "best_model.pth"))
+                copyfile(os.path.join(self.config.path.checkpoint_path,
+                                        f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                        "last_model.pth"), 
+                            os.path.join(self.config.path.checkpoint_path, 
+                                            f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                            "best_model.pth"))
 
             if exit_train:
                 break
@@ -402,4 +410,6 @@ class Trainer:
                     sample_item["captions"] = generated_captions[0][0]
                     break
 
-        json.dump(sample_json_data, open(os.path.join(self.config.path.checkpoint_path, self.config.model.model_name, f"{split}_results.json"), "w+"), ensure_ascii=False)
+        json.dump(sample_json_data, open(os.path.join(self.config.path.checkpoint_path, 
+                                                        f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                                        f"{split}_results.json"), "w+"), ensure_ascii=False)

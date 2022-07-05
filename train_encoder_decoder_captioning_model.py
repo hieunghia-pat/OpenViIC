@@ -25,22 +25,24 @@ args = parser.parse_args()
 
 config = get_config(args.config_file)
 
-if not os.path.isdir(os.path.join(config.training.checkpoint_path, config.model.name)):
-    os.makedirs(os.path.join(config.training.checkpoint_path, config.model.name))
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # creating checkpoint directory
-if not os.path.isdir(os.path.join(config.training.checkpoint_path, config.model.name)):
-    os.makedirs(os.path.join(config.training.checkpoint_path, config.model.name))
+if not os.path.isdir(os.path.join(config.training.checkpoint_path, 
+                                    f"{config.model.name}_using_{config.training.using_features}")):
+    os.makedirs(os.path.join(config.training.checkpoint_path, 
+                                f"{config.model.name}_using_{config.training.using_features}"))
 
 # Creating vocabulary and dataset
-if not os.path.isfile(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl")):
+if not os.path.isfile(os.path.join(config.training.checkpoint_path, 
+                                    f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl")):
     vocab = Vocab([config.path.train_json_path, config.path.dev_json_path], tokenizer_name=config.dataset.tokenizer, 
                     pretrained_language_model_name=config.model.pretrained_language_model_name)
-    pickle.dump(vocab, open(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl"), "wb"))
+    pickle.dump(vocab, open(os.path.join(config.training.checkpoint_path, 
+                            f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl"), "wb"))
 else:
-    vocab = pickle.load(open(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl"), "rb"))
+    vocab = pickle.load(open(os.path.join(config.training.checkpoint_path, 
+                                            f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl"), "rb"))
 
 # creating iterable dataset
 train_dataset = FeatureDataset(config.path.train_json_path, config.path.image_features_path, vocab) # for training with cross-entropy loss
@@ -81,23 +83,33 @@ trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset
 
 # Training
 if config.training.start_from:
-    trainer.train(os.path.join(config.training.checkpoint_path, config.model.name, config.training.start_from))
+    trainer.train(os.path.join(config.training.checkpoint_path, 
+                                f"{config.model.name}_using_{config.training.using_features}", 
+                                config.training.start_from))
 else:
     trainer.train()
 
 # Inference on Public test (if available)
 if public_test_dict_dataset is not None:
     public_results = trainer.get_predictions(public_test_dict_dataset,
-                                                checkpoint_filename=os.path.join(config.training.checkpoint_path, config.model.name, config.training.start_from),
+                                                checkpoint_filename=os.path.join(config.training.checkpoint_path, 
+                                                                                    f"{config.model.name}_using_{config.training.using_features}", 
+                                                                                    config.training.start_from),
                                                 get_scores=config.training.get_scores)
-    json.dump(public_results, open(os.path.join(config.training.checkpoint_path, config.model.name, "scored_public_results.json"), "w+"), ensure_ascii=False)
+    json.dump(public_results, open(os.path.join(config.training.checkpoint_path, 
+                                                f"{config.model.name}_using_{config.training.using_features}", 
+                                                "scored_public_results.json"), "w+"), ensure_ascii=False)
 
 # Inference on Private test (if available)
 if private_test_dict_dataset is not None:
     private_results = trainer.get_predictions(private_test_dict_dataset,
-                                                checkpoint_filename=os.path.join(config.training.checkpoint_path, config.model.name, config.training.start_from),
+                                                checkpoint_filename=os.path.join(config.training.checkpoint_path, 
+                                                                                    f"{config.model.name}_using_{config.training.using_features}", 
+                                                                                    config.training.start_from),
                                                 get_scores=config.training.get_scores)
-    json.dump(private_results, open(os.path.join(config.path.checkpoint_path, config.model.name, "scored_private_results.json"), "w+"), ensure_ascii=False)
+    json.dump(private_results, open(os.path.join(config.path.checkpoint_path, 
+                                                    f"{config.model.name}_using_{config.training.using_features}", 
+                                                    "scored_private_results.json"), "w+"), ensure_ascii=False)
 
 # Convert to the image order of sample submission
 if config.path.sample_public_test_json_path is not None:
