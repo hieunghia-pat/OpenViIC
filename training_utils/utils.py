@@ -2,8 +2,7 @@ import torch
 from data_utils.feature import Feature
 import numpy as np
 
-# device = "cuda" if torch.cuda.is_available() else "cpu"
-device = "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def get_region_features(sample):
     region_features = sample.region_features
