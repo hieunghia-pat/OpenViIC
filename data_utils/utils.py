@@ -2,7 +2,6 @@ import torch
 from torchvision import transforms
 import re
 from typing import Callable
-from data_utils.feature import Feature
 
 def get_tokenizer(tokenizer):
     if tokenizer is None:
@@ -128,43 +127,39 @@ def collate_fn(samples):
     image_ids = []
     filenames = []
     region_features = []
-    grid_features = []
     region_boxes = []
+    grid_features = []
     grid_boxes = []
     tokens = []
-    shifted_right_tokens = []
     captions = []
+    shifted_right_tokens = []
     max_seq_len = 0
-    
     for sample in samples:
-        image_id = sample.image_id
-        filename = sample.filename
-        region_feature = sample.region_features
-        region_box = sample.region_boxes
-        grid_feature = sample.grid_features
-        grid_box = sample.grid_boxes
-        token = sample.caption # for cross-entropy objective training
-        shifted_right_token = sample.shifted_right_caption # for cross-entropy objective training
-        caption = sample.captions # for self-critical sequential training
+        image_id = sample["image_id"]
+        filename = sample["filename"]
+        region_feature = sample["region_features"]
+        region_box = sample["region_boxes"]
+        grid_feature = sample["grid_features"]
+        grid_box = sample["grid_boxes"]
+        token = sample["caption"] # for cross-entropy objective training
+        shifted_right_token = sample["shifted_right_caption"] # for cross-entropy objective training
+        caption = sample["captions"] # for self-critical sequential training
 
-        if region_feature is not None:
-            region_features.append(torch.tensor(region_feature))
-            if max_seq_len < region_feature.shape[0]:
-                max_seq_len = region_feature.shape[0]
+        region_features.append(torch.tensor(region_feature))
+        if max_seq_len < region_feature.shape[0]:
+            max_seq_len = region_feature.shape[0]
 
-        if grid_feature is not None:
-            grid_features.append(torch.tensor(grid_feature))
-            if max_seq_len < grid_feature.shape[0]:
-                max_seq_len = grid_feature.shape[0]
+        grid_features.append(torch.tensor(grid_feature))
+        if max_seq_len < grid_feature.shape[0]:
+            max_seq_len = grid_feature.shape[0]
+
+        region_boxes.append(torch.tensor(region_box))
+        grid_boxes.append(torch.tensor(grid_box))
 
         if image_id is not None:
             image_ids.append(image_id)
         if filename is not None:
             filenames.append(filename)
-        if region_box is not None:
-            region_boxes.append(torch.tensor(region_box))
-        if grid_box is not None:
-            grid_boxes.append(torch.tensor(grid_box))
         if caption is not None:
             captions.append(caption)
         if token is not None:
@@ -172,43 +167,22 @@ def collate_fn(samples):
         if shifted_right_token is not None:
             shifted_right_tokens.append(shifted_right_token)
 
-    # if use region features
-    if len(region_features) > 0:
-        zero_feature = torch.zeros((1, region_features[0].shape[-1])) # (1, dim)
-        for batch_ith in range(len(samples)):
-            delta = max_seq_len - region_features[batch_ith].shape[0]
-            if delta > 0:
-                zero_feature = torch.zeros((delta, region_features[batch_ith].shape[-1]))
-                region_features[batch_ith] = torch.cat([region_features[batch_ith], zero_feature], dim=0)
-                if len(region_boxes) > 0:
-                    zero_box = torch.zeros((delta, 4))
-                    region_boxes[batch_ith] = torch.cat([region_boxes[batch_ith], zero_box], dim=0)
+    zero_feature = torch.zeros((1, 1))
 
-        region_features = torch.cat([feature.unsqueeze_(0) for feature in region_features], dim=0)
-        if len(region_boxes) > 0:
-            region_boxes = torch.cat([region_box.unsqueeze_(0) for region_box in region_boxes])
-    
-    # if use grid features
-    if len(grid_features) > 0:
-        zero_feature = torch.zeros((1, grid_features[0].shape[-1])) # (1, dim)
-        for batch_ith in range(len(samples)):
-            delta = max_seq_len - grid_features[batch_ith].shape[0]
-            if delta > 0:
-                zero_feature = torch.zeros((delta, grid_features[batch_ith].shape[-1]))
-                grid_features[batch_ith] = torch.cat([grid_features[batch_ith], zero_feature], dim=0)
-                if len(grid_boxes) > 0:
-                    zero_box = torch.zeros((delta, 4))
-                    grid_boxes[batch_ith] = torch.cat([grid_boxes[batch_ith], zero_box], dim=0)
+    for batch_ith in range(len(samples)):
+        region_delta = max_seq_len - region_features[batch_ith].shape[0]
+        if region_delta > 0:
+            region_features[batch_ith] = torch.cat([region_features[batch_ith], zero_feature.expand(region_delta, region_features[batch_ith].shape[-1])], dim=0)
+            region_boxes[batch_ith] = torch.cat([region_boxes[batch_ith], zero_feature.expand(region_delta, 4)], dim=0)
+        grid_delta = max_seq_len - grid_features[batch_ith].shape[0]
+        if grid_delta > 0:
+            grid_features[batch_ith] = torch.cat([grid_features[batch_ith], zero_feature.expand(grid_delta, grid_features[batch_ith].shape[-1])], dim=0)
+            grid_boxes[batch_ith] = torch.cat([grid_boxes[batch_ith], zero_feature.expand(grid_delta, 4)], dim=0)
 
-        grid_features = torch.cat([feature.unsqueeze_(0) for feature in grid_features], dim=0)
-        if len(grid_boxes) > 0:
-            grid_boxes = torch.cat([grid_box.unsqueeze_(0) for grid_box in grid_boxes])
-
-    if len(region_boxes) == 0:
-        region_boxes = None
-
-    if len(grid_boxes) == 0:
-        grid_boxes = None
+    region_features = torch.cat([feature.unsqueeze_(0) for feature in region_features], dim=0)
+    region_boxes = torch.cat([box.unsqueeze_(0) for box in region_boxes])
+    grid_features = torch.cat([feature.unsqueeze_(0) for feature in grid_features], dim=0)
+    grid_boxes = torch.cat([box.unsqueeze_(0) for box in grid_boxes])
 
     if len(image_ids) == 0:
         image_ids = None
@@ -229,7 +203,7 @@ def collate_fn(samples):
     else:
         shifted_right_tokens = None
 
-    return Feature({
+    return {
         "image_ids": image_ids,
         "filenames": filenames,
         "region_features": region_features,
@@ -239,4 +213,4 @@ def collate_fn(samples):
         "tokens": tokens, 
         "shifted_right_tokens": shifted_right_tokens,
         "captions": captions
-    })
+    }

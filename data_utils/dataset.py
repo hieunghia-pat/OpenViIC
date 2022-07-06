@@ -3,12 +3,12 @@ from torch.utils import data
 
 from data_utils.utils import preprocess_caption
 from data_utils.vocab import Vocab
-from data_utils.feature import Feature
 
 import json
 import os
 import numpy as np
 from typing import Dict, List, Union
+from collections import defaultdict
 
 class DictionaryDataset(data.Dataset):
     def __init__(self, json_path: str, image_features_path: str, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
@@ -60,23 +60,28 @@ class DictionaryDataset(data.Dataset):
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
 
-        return Feature(feature)
+        return feature
 
     def __getitem__(self, idx: int):
         image_id = self.image_ids[idx]
         filename = self.filenames[idx]
-        feature = self.load_feature(image_id)
+        features = self.load_feature(image_id)
         captions = self.captions_with_image[idx]
 
-        return Feature({
-            "image_id": image_id,
+        returning_dict = {
+            "image_id": image_id, 
             "filename": filename, 
-            "region_features": feature.region_features,
-            "region_boxes": feature.region_boxes,
-            "grid_features": feature.grid_features,
-            "grid_boxes": feature.grid_boxes,
+            "region_features": features["region_features"], 
+            "region_boxes": features["region_boxes"],
+            "grid_features": features["grid_features"],
+            "grid_boxes": features["grid_boxes"],
             "captions": captions
-        })
+        }
+        result_dict = defaultdict(lambda: None)
+        for key in returning_dict:
+            result_dict[key] = returning_dict[key]
+
+        return result_dict
 
     def __len__(self) -> int:
         return len(self.image_ids)
@@ -127,23 +132,28 @@ class FeatureDataset(data.Dataset):
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
 
-        return Feature(feature)
+        return feature
 
     def __getitem__(self, idx: int):
         caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
         shifted_right_caption = torch.zeros_like(caption).fill_(self.vocab.padding_idx)
         shifted_right_caption[:-1] = caption[1:]
         caption = torch.where(caption == self.vocab.eos_idx, self.vocab.padding_idx, caption) # remove eos_token in caption
-        feature = self.load_feature(self.annotations[idx]["image_id"])
+        features = self.load_feature(self.annotations[idx]["image_id"])
 
-        return Feature({
-            "region_features": feature.region_features, 
-            "region_boxes": feature.region_boxes,
-            "grid_features": feature.grid_features,
-            "grid_boxes": feature.grid_boxes,
+        returning_dict = {
+            "region_features": features["region_features"], 
+            "region_boxes": features["region_boxes"],
+            "grid_features": features["grid_features"],
+            "grid_boxes": features["grid_boxes"],
             "caption": caption, 
             "shifted_right_caption": shifted_right_caption
-        })
+        }
+        result_dict = defaultdict(lambda: None)
+        for key in returning_dict:
+            result_dict[key] = returning_dict[key]
+
+        return result_dict
 
     def __len__(self) -> int:
         return len(self.annotations)
