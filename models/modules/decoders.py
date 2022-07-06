@@ -27,7 +27,8 @@ class DecoderLayer(Module):
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
 
     def forward(self, queries, keys, values, padding_mask, self_attention_mask, enc_attention_mask, **kwargs):
-        self_att = self.self_attn(queries=queries, keys=queries, values=queries, attention_mask=self_attention_mask)
+        self_att = self.self_attn(queries=queries, keys=queries, values=queries, attention_mask=self_attention_mask, **kwargs)
+        self_att = self_att.masked_fill(padding_mask, value=0)
 
         enc_att = self.enc_attn(queries=self_att, keys=keys, values=values, attention_mask=enc_attention_mask, **kwargs)
         enc_att = enc_att.masked_fill(padding_mask, value=0)
@@ -63,12 +64,13 @@ class MeshedDecoderLayer(Module):
             nn.init.constant_(fc_alpha.bias, 0)
 
     def forward(self, queries, keys, values, padding_mask, self_attention_mask, enc_attention_mask, **kwargs):
-        self_att = self.self_att(queries=queries, keys=queries, values=queries, attention_mask=self_attention_mask)
+        self_att = self.self_att(queries=queries, keys=queries, values=queries, attention_mask=self_attention_mask, **kwargs)
+        self_att = self_att.masked_fill(padding_mask, value=0)
 
         enc_atts = []
         for ith in range(self.N_enc):
             enc_att = self.enc_att(queries=self_att, keys=keys[:, ith], values=values[:, ith], 
-                            attention_mask=enc_attention_mask)
+                            attention_mask=enc_attention_mask, **kwargs)
             enc_att = enc_att.masked_fill(padding_mask, value=0)
             enc_atts.append(enc_att)
 
@@ -99,12 +101,14 @@ class AdaptiveDecoderLayer(Module):
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
 
     def forward(self, queries, keys, values, language_signals, padding_mask=None, self_attention_mask=None, enc_attention_mask=None, **kwargs):
-        self_att = self.self_att(queries=queries, keys=queries, values=queries, attention_mask=self_attention_mask)
-        enc_att = self.enc_attn(queries=self_att, keys=keys, values=values, language_signals=language_signals, attention_mask=enc_attention_mask)
-        
+        self_att = self.self_att(queries=queries, keys=queries, values=queries, attention_mask=self_attention_mask, **kwargs)
+        self_att = self_att.masked_fill(padding_mask, value=0)
+
+        enc_att = self.enc_attn(queries=self_att, keys=keys, values=values, language_signals=language_signals, attention_mask=enc_attention_mask, **kwargs)
         enc_att = enc_att.masked_fill(padding_mask, value=0)
 
         ff = self.pwff(enc_att)
+        ff = ff.masked_fill(padding_mask, value=0)
 
         return ff
 
@@ -133,6 +137,7 @@ class MeshedAdaptiveDecoderLayer(Module):
 
     def forward(self, queries, keys, values, language_signals, padding_mask=None, self_attention_mask=None, enc_attention_mask=None, **kwargs):
         self_att = self.self_att(queries=queries, keys=queries, values=queries, attention_mask=self_attention_mask)
+        self_att = self_att.masked_fill(padding_mask, value=0)
 
         enc_atts = []
         for ith in range(self.N_enc):
@@ -149,6 +154,7 @@ class MeshedAdaptiveDecoderLayer(Module):
         for alpha, enc_att in zip(alphas, enc_atts):
             attn += enc_att * alpha
         attn = attn / np.sqrt(self.N_enc)
+        attn = attn.masked_fill(padding_mask, value=0)
 
         ff = self.pwff(attn)
         ff = ff.masked_fill(padding_mask, value=0)
@@ -176,8 +182,6 @@ class Decoder(Module):
         self.register_state('running_seq', torch.zeros((1,)).long())
 
     def forward(self, tokens, enc_outputs, enc_pos_embedding, enc_attention_mask, **kwargs):
-        enc_outputs += enc_pos_embedding
-        
         b_s, seq_len = tokens.shape[:2]
         mask_queries = generate_padding_mask(tokens, self.padding_idx).to(tokens.device)  # (b_s, seq_len)
         self_attention_mask = generate_sequential_mask(seq_len).to(tokens.device)
@@ -193,12 +197,10 @@ class Decoder(Module):
             self.running_seq.add_(1)
             seq = self.running_seq
 
-        out = self.word_embedding(tokens)
-        token_pos = self.pos_embedding(seq)
+        out = self.word_embedding(tokens) + self.pos_embedding(seq)
 
         for layer in self.layers:
-            out = out + token_pos
-            out = layer(queries=out, keys=enc_outputs, values=enc_outputs,
+            out = layer(queries=out, keys=enc_outputs + enc_pos_embedding, values=enc_outputs,
                         padding_mask=mask_queries.unsqueeze(-1), 
                         self_attention_mask=self_attention_mask, 
                         enc_attention_mask=enc_attention_mask)

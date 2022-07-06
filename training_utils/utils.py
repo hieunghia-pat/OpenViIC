@@ -4,8 +4,8 @@ import numpy as np
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def get_region_features(sample):
-    region_features = sample.region_features
-    region_boxes = sample.region_boxes
+    region_features = sample["region_features"]
+    region_boxes = sample["region_boxes"]
 
     assert region_features is not None, "region features is required"
 
@@ -20,13 +20,15 @@ def get_region_features(sample):
         region_boxes.unsqueeze_(0)
 
     return {
+        "device": device,
+        "batch_size": region_features.shape[0],
         "features": region_features.to(device),
         "boxes": region_boxes.to(device)
     }
 
 def get_grid_features(sample):
-    grid_features = sample.grid_features
-    grid_boxes = sample.grid_boxes
+    grid_features = sample["grid_features"]
+    grid_boxes = sample["grid_boxes"]
 
     assert grid_features is not None, "grid features is required"
 
@@ -41,15 +43,17 @@ def get_grid_features(sample):
         grid_boxes.unsqueeze_(0)
 
     return {
+        "device": device,
+        "batch_size": grid_features.shape[0],
         "features": grid_features.to(device),
         "boxes": grid_boxes.to(device)
     }
 
 def get_hybrid_features(sample):
-    region_features = sample.region_features
-    region_boxes = sample.region_boxes
-    grid_features = sample.grid_features
-    grid_boxes = sample.grid_boxes
+    region_features = sample["region_features"]
+    region_boxes = sample["region_boxes"]
+    grid_features = sample["grid_features"]
+    grid_boxes = sample["grid_boxes"]
 
     assert region_features is not None and grid_features is not None, "region features and grid features are required"
 
@@ -74,6 +78,8 @@ def get_hybrid_features(sample):
         grid_boxes.unsqueeze_(0)
 
     return {
+        "device": device,
+        "batch_size": region_features.shape[0],
         "region_features": region_features.to(device),
         "region_boxes": region_boxes.to(device),
         "grid_features": grid_features.to(device),

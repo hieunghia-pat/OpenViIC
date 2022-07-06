@@ -39,7 +39,7 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask, **kwargs):
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
         q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)
@@ -47,8 +47,7 @@ class ScaledDotProductAttention(nn.Module):
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_mask is not None:
-            att = att.masked_fill(attention_mask, -np.inf)
+        att = att.masked_fill(attention_mask, -np.inf)
         att = torch.softmax(att, dim=-1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
@@ -79,7 +78,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         self.d_v = d_v
         self.h = h
 
-    def forward(self, queries, keys, values, attention_mask=None, relative_geometry_weights=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask, relative_geometry_weights, **kwargs):
         assert relative_geometry_weights is not None, "AugmentedGeometryScaledDotProductAttention requires relative_geometry_weights tensor"
 
         b_s, nq = queries.shape[:2]
@@ -89,8 +88,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         a = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_mask is not None:
-            a = a.masked_fill(attention_mask, -np.inf)
+        a = a.masked_fill(attention_mask, -np.inf)
 
         g = relative_geometry_weights
         mn = torch.log(torch.clamp(g, min = 1e-6)) + a
@@ -141,7 +139,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask, **kwargs):
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
 
@@ -153,8 +151,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         v = torch.cat([self.fc_v(values), m_v], 1).view(b_s, nk + self.m, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_mask is not None:
-            att[:, :, :, :nk] = att[:, :, :, :nk].masked_fill(attention_mask, -np.inf)
+        att[:, :, :, :nk] = att[:, :, :, :nk].masked_fill(attention_mask, -np.inf)
         att = torch.softmax(att, -1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
@@ -201,7 +198,7 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_o.bias, 0)
         nn.init.constant_(self.fc_s.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, language_signals=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask, language_signals, **kwargs):
         assert language_signals is not None, "In AdaptiveScaledDotProductAttention: language_signals is None"
 
         b_s, nq = queries.shape[:2]

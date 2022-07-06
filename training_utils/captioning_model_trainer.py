@@ -49,6 +49,7 @@ class Trainer:
             dataset=self.train_dataset,
             batch_size=self.config.dataset.batch_size,
             shuffle=True,
+            num_workers=2,
             collate_fn=collate_fn
         )
         self.val_dataloader = data.DataLoader(
@@ -105,8 +106,8 @@ class Trainer:
                 for it, sample in enumerate(dataloader):
                     visual_inputs = self.get_visual_features(sample)
 
-                    tokens = sample.tokens.to(device)
-                    shifted_right_tokens = sample.shifted_right_tokens.to(device)
+                    tokens = sample["tokens"].to(device)
+                    shifted_right_tokens = sample["shifted_right_tokens"].to(device)
 
                     out = self.model(tokens=tokens, **visual_inputs).contiguous()
                     
@@ -128,7 +129,7 @@ class Trainer:
         with tqdm(desc='Epoch %d - Evaluation' % (self.epoch + 1), unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
                 visual_inputs = self.get_visual_features(sample)
-                caps_gt = sample.captions
+                caps_gt = sample["captions"]
                 
                 with torch.no_grad():
                     out, _ = self.model.beam_search(batch_size=dataloader.batch_size, device=device, out_size=1,
@@ -157,8 +158,8 @@ class Trainer:
             for it, sample in enumerate(self.train_dataloader):
                 visual_inputs = self.get_visual_features(sample)
                 
-                tokens = sample.tokens.to(device)
-                shifted_right_tokens = sample.shifted_right_tokens.to(device)
+                tokens = sample["tokens"].to(device)
+                shifted_right_tokens = sample["shifted_right_tokens"].to(device)
                 
                 out = self.model(tokens=tokens, **visual_inputs).contiguous()
 
@@ -188,7 +189,7 @@ class Trainer:
         with tqdm(desc='Epoch %d - Training with self-critical learning' % (self.epoch + 1), unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dict_dataloader):
                 visual_inputs = self.get_visual_features(sample)
-                caps_gt = sample.captions
+                caps_gt = sample["captions"]
 
                 outs, log_probs = self.model.beam_search(batch_size=self.train_dict_dataloader.batch_size, device=device,
                                                             max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,

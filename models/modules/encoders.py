@@ -20,7 +20,7 @@ class EncoderLayer(nn.Module):
     def forward(self, queries, keys, values, attention_mask, **kwargs):
         att = self.mhatt(queries=queries, keys=keys, values=values, attention_mask=attention_mask, **kwargs)
         ff = self.pwff(att)
-        ff = ff.masked_fill(attention_mask.squeeze().unsqueeze(-1), value=0)
+        # ff = ff.masked_fill(attention_mask.squeeze().unsqueeze(-1), value=0)
 
         return ff
 
@@ -64,8 +64,8 @@ class Encoder(nn.Module):
         if self.multi_level_output:
             outs = torch.cat(outs, dim=1)
             return outs, padding_masks, pos_embedding
-        else:
-            return out, padding_masks, pos_embedding
+        
+        return out, padding_masks, pos_embedding
 
 class AugmentedMemoryEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
@@ -99,16 +99,15 @@ class AugmentedMemoryEncoder(nn.Module):
             outs = []
         pos_embedding = self.pos_embedding(out)
         for layer in self.layers:
-            out = out + pos_embedding
-            out = layer(queries=out, keys=out, values=out, attention_mask=padding_masks)
+            out = layer(queries=out + pos_embedding, keys=out + pos_embedding, values=out, attention_mask=padding_masks)
             if self.multi_level_output:
                 outs.append(out.unsqueeze(1))
 
         if self.multi_level_output:
             outs = torch.cat(outs, dim=1)
             return outs, padding_masks, pos_embedding
-        else:
-            return out, padding_masks, pos_embedding
+        
+        return out, padding_masks, pos_embedding
 
 class AugmentedGeometryEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
@@ -168,8 +167,7 @@ class AugmentedGeometryEncoder(nn.Module):
 
         pos_embedding = self.pos_embedding(out)
         for layer in self.layers:
-            out = out + pos_embedding
-            out = layer(queries=out, keys=out, values=out, 
+            out = layer(queries=out + pos_embedding, keys=out + pos_embedding, values=out, 
                         relative_geometry_weights=relative_geometry_weights, 
                         attention_mask=padding_masks)
             if self.multi_level_output:
@@ -178,8 +176,8 @@ class AugmentedGeometryEncoder(nn.Module):
         if self.multi_level_output:
             outs = torch.cat(outs, dim=1)
             return outs, padding_masks, pos_embedding
-        else:
-            return out, padding_masks, pos_embedding
+        
+        return out, padding_masks, pos_embedding
 
 class DualCollaborativeLevelEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
@@ -336,8 +334,8 @@ class DualCollaborativeLevelEncoder(nn.Module):
         # If 'multi_level_output' is applied.
         if self.multi_level_output:
             return outs, padding_mask, region_pos_embedding
-        else:
-            return out, padding_mask, region_pos_embedding
+        
+        return out, padding_mask, region_pos_embedding
 
 Encoders = {
     "encoder": Encoder,
