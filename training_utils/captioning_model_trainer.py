@@ -211,26 +211,26 @@ class Trainer:
 
     def lambda_lr(self, s):
         if s <= 3:
-            lr = self.config.xe_base_lr * s / 4
+            lr = self.config.training.xe_base_lr * s / 4
         elif s <= 10:
-            lr = self.config.xe_base_lr
+            lr = self.config.training.xe_base_lr
         elif s <= 12:
-            lr = self.config.xe_base_lr * 0.2
+            lr = self.config.training.xe_base_lr * 0.2
         else:
-            lr = self.config.xe_base_lr * 0.2 * 0.2
+            lr = self.config.training.xe_base_lr * 0.2 * 0.2
         
         return lr
     
     def lambda_lr_rl(self, s):
-        refine_epoch = self.config.refine_epoch_rl 
+        refine_epoch = self.config.training.refine_epoch_rl 
         if s <= refine_epoch:
-            lr = self.config.rl_base_lr
+            lr = self.config.training.rl_base_lr
         elif s <= refine_epoch + 3:
-            lr = self.config.rl_base_lr * 0.2
+            lr = self.config.training.rl_base_lr * 0.2
         elif s <= refine_epoch + 6:
-            lr = self.config.rl_base_lr * 0.2 * 0.2
+            lr = self.config.training.rl_base_lr * 0.2 * 0.2
         else:
-            lr = self.config.rl_base_lr * 0.2 * 0.2 * 0.2
+            lr = self.config.training.rl_base_lr * 0.2 * 0.2 * 0.2
         
         return lr
 
