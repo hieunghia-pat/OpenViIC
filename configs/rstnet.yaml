@@ -15,6 +15,7 @@ training:
   warmup: 10000
   xe_base_lr: 0.001
   rl_base_lr: 0.000005
+  refine_epoch_rl: 28
   get_scores: False
   training_beam_size: 5
   evaluating_beam_size: 5
