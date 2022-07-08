@@ -72,7 +72,6 @@ class BeamSearch(object):
 
         self.model.apply_to_states(self._expand_state(selected_beam, cur_beam_size))
 
-        # reorder the seq_logprob as well as the seq_mask and outputs to match the newest selected beam
         self.seq_logprob = selected_logprob.unsqueeze(-1)
         self.seq_mask = torch.gather(self.seq_mask, 1, selected_beam.unsqueeze(-1))
         outputs = list(torch.gather(o, 1, selected_beam.unsqueeze(-1)) for o in outputs)
@@ -119,11 +118,9 @@ class BeamSearch(object):
         log_probs = torch.gather(log_probs, 1, sort_idxs.expand(self.b_s, self.beam_size, self.max_len))
         if return_probs:
             all_log_probs = torch.cat(self.all_log_probs, 2)
-            all_log_probs = torch.gather(all_log_probs, 
-                                            dim=1, 
-                                            index=sort_idxs.unsqueeze(-1).expand(self.b_s, self.beam_size,
-                                                                            self.max_len,
-                                                                            all_log_probs.shape[-1]))
+            all_log_probs = torch.gather(all_log_probs, 1, sort_idxs.unsqueeze(-1).expand(self.b_s, self.beam_size,
+                                                                                          self.max_len,
+                                                                                          all_log_probs.shape[-1]))
 
         outputs = outputs.contiguous()[:, :out_size]
         log_probs = log_probs.contiguous()[:, :out_size]
