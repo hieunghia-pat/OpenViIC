@@ -9,8 +9,6 @@ from data_utils.dataset import *
 import evaluation
 from evaluation import Cider, PTBTokenizer
 
-import config
-
 import multiprocessing
 from tqdm import tqdm
 import itertools

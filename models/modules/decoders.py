@@ -181,7 +181,7 @@ class Decoder(Module):
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
-    def forward(self, tokens, enc_outputs, enc_pos_embedding, enc_attention_mask, **kwargs):
+    def forward(self, tokens, enc_outputs, enc_attention_mask, **kwargs):
         b_s, seq_len = tokens.shape[:2]
         mask_queries = generate_padding_mask(tokens, self.padding_idx).to(tokens.device)  # (b_s, seq_len)
         self_attention_mask = generate_sequential_mask(seq_len).to(tokens.device)
@@ -200,7 +200,7 @@ class Decoder(Module):
         out = self.word_embedding(tokens) + self.pos_embedding(seq)
 
         for layer in self.layers:
-            out = layer(queries=out, keys=enc_outputs + enc_pos_embedding, values=enc_outputs,
+            out = layer(queries=out, keys=enc_outputs, values=enc_outputs,
                         padding_mask=mask_queries.unsqueeze(-1), 
                         self_attention_mask=self_attention_mask, 
                         enc_attention_mask=enc_attention_mask)

@@ -1,5 +1,6 @@
 import torch
 from data_utils.types import *
+from models.utils import get_batch_size, get_device
 
 class BeamSearch(object):
     def __init__(self, model, max_len: int, eos_idx: int, beam_size: int):
@@ -28,21 +29,6 @@ class BeamSearch(object):
             return s
 
         return fn
-
-    def _expand_visual(self, tensor: TensorOrSequence, cur_beam_size: int, selected_beam: torch.Tensor):
-        tensor_shape = tensor.shape # (bs, seq_len, d_model)
-        tensor_exp_shape = (self.b_s, cur_beam_size) + tensor_shape[1:] # (bs, cur_beam_size, seq_len, d_model)
-        tensor_red_shape = (self.b_s * self.beam_size,) + tensor_shape[1:] # (bs * beam_size, seq_len, d_model)
-        selected_beam_red_size = (self.b_s, self.beam_size) + tuple(1 for _ in range(len(tensor_exp_shape) - 2)) # (bs, beam_size, 1, 1)
-        selected_beam_exp_size = (self.b_s, self.beam_size) + tensor_exp_shape[2:] # (bs, beam_size, seq_len, d_model)
-        tensor_exp = tensor.view(tensor_exp_shape)
-        selected_beam_exp = selected_beam.view(selected_beam_red_size).expand(selected_beam_exp_size)
-        tensor = torch.gather(tensor_exp, dim=1, index=selected_beam_exp).view(tensor_red_shape)    # copy from visual_exp with shape (bs, cur_beam_size, seq_len, d_model)
-                                                                                                    # to visual with shape (bs, beam_size, seq_len, d_model) along axis 1
-                                                                                                    # at the beginning cur_beam_size is 1 as the beam search tree will expand from bos_idx
-                                                                                                    # to new branch that has beam_size leaves
-        
-        return tensor # (bs * beam_size, seq_len, d_model)
 
     def select(self, candidate_logprob):
         selected_logprob, selected_idx = torch.sort(candidate_logprob.view(self.b_s, -1), -1, descending=True)  # flatten the candicate_lobprob from (bs, beam_size, vocab_size) 
@@ -94,9 +80,9 @@ class BeamSearch(object):
 
         return outputs
 
-    def apply(self, batch_size, device, out_size=1, return_probs=False, **visual_inputs):
-        self.b_s = batch_size
-        self.device = device
+    def apply(self, out_size=1, return_probs=False, **visual_inputs):
+        self.b_s = get_batch_size(visual_inputs)
+        self.device = get_device(visual_inputs)
         self.seq_mask = torch.ones((self.b_s, self.beam_size, 1), device=self.device)
         self.seq_logprob = torch.zeros((self.b_s, 1, 1), device=self.device)    # (bs, beam_size, 1)
                                                                                 # at the beginning the beam search tree has a root of bos_idx

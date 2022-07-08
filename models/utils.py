@@ -6,6 +6,18 @@ from data_utils.types import *
 import numpy as np
 import copy
 
+def get_batch_size(x: dict):
+    if "features" in x:
+        return x["features"].shape[0]
+    else:
+        return x["region_features"].shape[0]
+
+def get_device(x: dict):
+    if "features" in x:
+        return x["features"].device
+    else:
+        return x["region_features"].device
+
 def positional_embedding(input, d_model) -> torch.Tensor:
     input = input.view(-1, 1)
     dim = torch.arange(d_model // 2, dtype=torch.float32,
