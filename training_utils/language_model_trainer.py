@@ -209,8 +209,8 @@ class Trainer:
             print("Validation scores", scores)
             val_f1 = scores["f1"]
 
-            if self.test_dict_dataloader is not None:
-                scores = self.evaluate_metrics(self.test_dict_dataloader)
+            if self.test_dataloader is not None:
+                scores = self.evaluate_metrics(self.test_dataloader)
                 print("Evaluation scores", scores)
 
             # Prepare for next epoch
@@ -222,32 +222,18 @@ class Trainer:
             else:
                 patience += 1
 
-            switch_to_rl = False
             exit_train = False
 
             if patience == 5:
-                if not use_rl:
-                    use_rl = True
-                    switch_to_rl = True
-                    patience = 0
-                    self.optim = Adam(self.model.parameters(), lr=5e-6)
-                    print("Switching to RL")
-                else:
-                    print('patience reached.')
-                    exit_train = True
-
-            if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(self.config.training.checkpoint_path,
-                                                    f"{self.config.model.name}_using_{self.config.training.using_features}",
-                                                    "best_language_model.pth"))
+                print('patience reached.')
+                exit_train = True
 
             self.save_checkpoint({
                 'val_loss': val_loss,
                 'val_f1': val_f1,
                 'patience': patience,
                 'best_val_f1': best_val_f1,
-                'best_test_f1': best_test_f1,
-                'use_rl': use_rl,
+                'best_test_f1': best_test_f1
             })
 
             if best:
