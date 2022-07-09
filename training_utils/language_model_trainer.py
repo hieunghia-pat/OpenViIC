@@ -8,8 +8,8 @@ from models.transformers import EncoderDecoderTransformer
 from data_utils.dataset import *
 import evaluation
 from evaluation import Cider, PTBTokenizer
+from training_utils.utils import get_visual_getter
 
-import multiprocessing
 from tqdm import tqdm
 import itertools
 from typing import Tuple, Union
@@ -20,60 +20,97 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Trainer:
     def __init__(self,  model: EncoderDecoderTransformer, 
-                        train_dataset: FeatureDataset,
-                        val_dataset: FeatureDataset,
-                        test_dataset: Union[FeatureDataset, None],
+                        train_datasets: Tuple[FeatureDataset, DictionaryDataset],
+                        val_datasets: Tuple[FeatureDataset, DictionaryDataset],
+                        test_datasets: Tuple[Union[FeatureDataset, None], Union[DictionaryDataset, None]],
                         vocab: Vocab,
+                        config,
                         collate_fn=collate_fn):
         self.model = model
         self.vocab = vocab
+        self.config = config
+
+        self.get_visual_features = get_visual_getter("region")
 
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
+
+        self.optim_rl = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
+        self.scheduler_rl = LambdaLR(self.optim_rl, self.lambda_lr_rl)
         
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
         
         self.epoch = 0
 
-        self.train_dataset = train_dataset
-        self.val_dataset = val_dataset
+        self.train_dataset, self.train_dict_dataset = train_datasets
+        self.val_dataset, self.val_dict_dataset = val_datasets
 
         # creating iterable-dataset data loader
         self.train_dataloader = data.DataLoader(
             dataset=self.train_dataset,
-            batch_size=config.batch_size,
+            batch_size=self.config.dataset.batch_size,
             shuffle=True,
+            num_workers=self.config.dataset.workers,
             collate_fn=collate_fn
         )
         self.val_dataloader = data.DataLoader(
             dataset=self.val_dataset,
-            batch_size=config.batch_size,
+            batch_size=self.config.dataset.batch_size,
+            shuffle=True,
+            num_workers=self.config.dataset.workers,
+            collate_fn=collate_fn
+        )
+
+        # creating dictionary iterable-dataset data loader
+        self.train_dict_dataloader = data.DataLoader(
+            dataset=self.train_dict_dataset,
+            batch_size=self.config.dataset.batch_size // self.config.training.training_beam_size,
+            shuffle=True,
+            collate_fn=collate_fn
+        )
+        self.val_dict_dataloader = data.DataLoader(
+            dataset=self.val_dict_dataset,
+            batch_size=self.config.dataset.batch_size // self.config.training.training_beam_size,
             shuffle=True,
             collate_fn=collate_fn
         )
         
-        self.test_dataset = test_dataset
+        self.test_dataset, self.test_dict_dataset = test_datasets
 
         if self.test_dataset is not None:
             self.test_dataloader = data.DataLoader(
                 dataset=self.test_dataset,
-                batch_size=config.batch_size,
+                batch_size=self.config.dataset.batch_size,
                 shuffle=True,
+                num_workers=self.config.dataset.workers,
                 collate_fn=collate_fn
             )
         else:
             self.test_dataloader = None
 
+        if self.test_dict_dataset is not None:
+            self.test_dict_dataloader = data.DataLoader(
+                dataset=self.test_dict_dataset,
+                batch_size=self.config.dataset.batch_size // self.config.training.training_beam_size,
+                shuffle=True,
+                collate_fn=collate_fn
+            )
+        else:
+            self.test_dict_dataloader = None
+
+        self.train_cider = Cider(PTBTokenizer.tokenize(self.train_dataset.captions))
+
     def evaluate_loss(self, dataloader: data.DataLoader):
         # Calculating validation loss
         self.model.eval()
         running_loss = .0
-        with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Validation' % (self.epoch + 1), unit='it', total=len(dataloader)) as pbar:
             with torch.no_grad():
                 for it, sample in enumerate(dataloader):
+                    visual_inputs = self.get_visual_features(sample)
                     tokens = sample["tokens"].to(device)
                     shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                    out, _ = self.model(tokens)
+                    out = self.model(tokens=tokens, **visual_inputs).contiguous()
                     loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
@@ -87,26 +124,25 @@ class Trainer:
 
     def evaluate_metrics(self, dataloader: data.DataLoader):
         self.model.eval()
-        total_matched_tokens = 0
-        total_tokens = 0
-        with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
+        gen = {}
+        gts = {}
+        with tqdm(desc='Epoch %d - Evaluation' % (self.epoch + 1), unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
-                tokens = sample["tokens"].to(device)
-                shifted_right_tokens = sample["shifted_right_tokens"].to(device)
+                visual_inputs = self.get_visual_features(sample)
+                caps_gt = sample["captions"]
                 with torch.no_grad():
-                    out, _ = self.model(tokens)
-                    out = out.argmax(dim=-1).contiguous()
-                bs, seq_len = shifted_right_tokens.shape[:2]
-                total_tokens += float(bs * seq_len)
-                total_matched_tokens += (out == shifted_right_tokens).sum().item()
-                
+                    out, _ = self.model.beam_search(max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                                                beam_size=self.config.training.evaluating_beam_size, out_size=1, **visual_inputs)
+                caps_gen = self.vocab.decode_caption(out, join_words=False)
+                for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
+                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                    gen['%d_%d' % (it, i)] = [gen_i, ]
+                    gts['%d_%d' % (it, i)] = gts_i
                 pbar.update()
 
-        scores = {
-            "total_matched_tokens": total_matched_tokens,
-            "total_tokens": total_tokens,
-            "accuracy": total_matched_tokens / total_tokens
-        }
+        gts = evaluation.PTBTokenizer.tokenize(gts)
+        gen = evaluation.PTBTokenizer.tokenize(gen)
+        scores, _ = evaluation.compute_scores(gts, gen)
 
         return scores
 
@@ -115,11 +151,12 @@ class Trainer:
         self.model.train()
 
         running_loss = .0
-        with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Training with cross-entropy loss' % (self.epoch + 1), unit='it', total=len(self.train_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dataloader):
+                visual_inputs = self.get_visual_features(sample)
                 tokens = sample["tokens"].to(device)
                 shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                out, _ = self.model(tokens)
+                out = self.model(tokens=tokens, **visual_inputs).contiguous()
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                 loss.backward()
@@ -133,9 +170,29 @@ class Trainer:
                 self.scheduler.step()
 
     def lambda_lr(self, s):
-        warm_up = config.warmup
-        s += 1
-        return (self.model.d_model ** -.5) * min(s ** -.5, s * warm_up ** -1.5)
+        if s <= 3:
+            lr = self.config.training.xe_base_lr * s / 4
+        elif s <= 10:
+            lr = self.config.training.xe_base_lr
+        elif s <= 12:
+            lr = self.config.training.xe_base_lr * 0.2
+        else:
+            lr = self.config.training.xe_base_lr * 0.2 * 0.2
+        
+        return lr
+    
+    def lambda_lr_rl(self, s):
+        refine_epoch = self.config.training.refine_epoch_rl 
+        if s <= refine_epoch:
+            lr = self.config.training.rl_base_lr
+        elif s <= refine_epoch + 3:
+            lr = self.config.training.rl_base_lr * 0.2
+        elif s <= refine_epoch + 6:
+            lr = self.config.training.rl_base_lr * 0.2 * 0.2
+        else:
+            lr = self.config.training.rl_base_lr * 0.2 * 0.2 * 0.2
+        
+        return lr
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):
@@ -148,16 +205,23 @@ class Trainer:
         np.random.set_state(checkpoint['numpy_rng_state'])
         random.setstate(checkpoint['random_rng_state'])
 
-        self.optim.load_state_dict(checkpoint['optimizer'])
-        self.scheduler.load_state_dict(checkpoint['scheduler'])
+        use_rl = checkpoint["use_rl"]
+
+        if not use_rl:
+            self.optim.load_state_dict(checkpoint['optimizer'])
+            self.scheduler.load_state_dict(checkpoint['scheduler'])
+        else:
+            self.optim_rl.load_state_dict(checkpoint['optimizer'])
+            self.scheduler_rl.load_state_dict(checkpoint['scheduler'])
 
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-        print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best accuracy on val {checkpoint['best_val_acc']} - best accuracy on test {checkpoint['best_test_acc']}")
+        print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
 
         return {
-            "best_val_acc": checkpoint['best_val_acc'],
-            "best_test_acc": checkpoint['best_test_acc'],
+            "use_rl": checkpoint['use_rl'],
+            "best_val_cider": checkpoint['best_val_cider'],
+            "best_test_cider": checkpoint['best_test_cider'],
             "patience": checkpoint['patience'],
             "epoch": checkpoint["epoch"]
         }
@@ -175,63 +239,95 @@ class Trainer:
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
-        dict_for_saving["optimizer"] = self.optim.state_dict()
-        dict_for_saving["scheduler"] = self.scheduler.state_dict()
+        use_rl = dict_for_saving["use_rl"]
 
-        torch.save(dict_for_saving, os.path.join(config.checkpoint_path, config.model_name, "last_language_model.pth"))
+        if use_rl:
+            dict_for_saving["optimizer"] = self.optim_rl.state_dict()
+            dict_for_saving["scheduler"] = self.scheduler_rl.state_dict()
+        else:
+            dict_for_saving["optimizer"] = self.optim.state_dict()
+            dict_for_saving["scheduler"] = self.scheduler.state_dict()
+
+        torch.save(dict_for_saving, os.path.join(self.config.training.checkpoint_path, 
+                                                    f"{self.config.model.name}_using_{self.config.training.using_features}", 
+                                                    "last_language_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
         
         if checkpoint_filename is not None and os.path.isfile(checkpoint_filename):
             checkpoint = self.load_checkpoint(checkpoint_filename)
-            best_val_acc = checkpoint["best_val_acc"]
-            best_test_acc = checkpoint["best_test_acc"]
+            use_rl = checkpoint["use_rl"]
+            best_val_cider = checkpoint["best_val_cider"]
+            best_test_cider = checkpoint["best_test_cider"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
         else:
-            best_val_acc = .0
-            best_test_acc = .0
+            use_rl = False
+            best_val_cider = .0
+            best_test_cider = .0
             patience = 0
 
         while True:
-            self.train_xe()
+            if not use_rl:
+                self.train_xe()
+            else:
+                self.train_scst()
 
             val_loss = self.evaluate_loss(self.val_dataloader)
 
             # val scores
-            scores = self.evaluate_metrics(self.val_dataloader)
+            scores = self.evaluate_metrics(self.val_dict_dataloader)
             print("Validation scores", scores)
-            val_acc = scores['accuracy']
+            val_cider = scores['CIDEr']
 
-            if self.test_dataloader is not None:
-                scores = self.evaluate_metrics(self.test_dataloader)
+            if self.test_dict_dataloader is not None:
+                scores = self.evaluate_metrics(self.test_dict_dataloader)
                 print("Evaluation scores", scores)
 
             # Prepare for next epoch
             best = False
-            if val_acc >= best_val_acc:
-                best_val_acc = val_acc
+            if val_cider >= best_val_cider:
+                best_val_cider = val_cider
                 patience = 0
                 best = True
             else:
                 patience += 1
 
+            switch_to_rl = False
             exit_train = False
 
             if patience == 5:
-                print('patience reached.')
-                exit_train = True
+                if not use_rl:
+                    use_rl = True
+                    switch_to_rl = True
+                    patience = 0
+                    self.optim = Adam(self.model.parameters(), lr=5e-6)
+                    print("Switching to RL")
+                else:
+                    print('patience reached.')
+                    exit_train = True
+
+            if switch_to_rl and not best:
+                self.load_checkpoint(os.path.join(self.config.training.checkpoint_path,
+                                                    f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                                    "best_language_model.pth"))
 
             self.save_checkpoint({
                 'val_loss': val_loss,
-                'val_acc': val_acc,
+                'val_cider': val_cider,
                 'patience': patience,
-                'best_val_acc': best_val_acc,
-                'best_test_acc': best_test_acc
+                'best_val_cider': best_val_cider,
+                'best_test_cider': best_test_cider,
+                'use_rl': use_rl,
             })
 
             if best:
-                copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_language_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_language_model.pth"))
+                copyfile(os.path.join(self.config.training.checkpoint_path,
+                                        f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                        "last_language_model.pth"), 
+                            os.path.join(self.config.training.checkpoint_path, 
+                                            f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                            "best_language_model.pth"))
 
             if exit_train:
                 break

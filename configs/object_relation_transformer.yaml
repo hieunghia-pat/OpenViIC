@@ -56,6 +56,7 @@ model:
 ## dataset configuration
 dataset:
   batch_size: 32
+  workers: 2
   tokenizer: null
   word_embedding: null
   min_freq: 1

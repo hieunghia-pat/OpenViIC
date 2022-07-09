@@ -64,6 +64,7 @@ model:
 ## dataset configuration
 dataset:
   batch_size: 32
+  workers: 2
   tokenizer: null # vncorenlp
                   # pyvi
                   # spacy
