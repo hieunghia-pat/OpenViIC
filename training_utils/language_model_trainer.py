@@ -6,13 +6,11 @@ from data_utils.vocab import Vocab
 from data_utils.utils import *
 from models.transformers import EncoderDecoderTransformer
 from data_utils.dataset import *
-import evaluation
-from evaluation import Cider, PTBTokenizer
+from evaluation import compute_language_scores
 from training_utils.utils import get_visual_getter
 
 from tqdm import tqdm
-import itertools
-from typing import Tuple, Union
+from typing import Tuple
 import random
 from shutil import copyfile
 
@@ -20,9 +18,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Trainer:
     def __init__(self,  model: EncoderDecoderTransformer, 
-                        train_datasets: Tuple[FeatureDataset, DictionaryDataset],
-                        val_datasets: Tuple[FeatureDataset, DictionaryDataset],
-                        test_datasets: Tuple[Union[FeatureDataset, None], Union[DictionaryDataset, None]],
+                        train_dataset: FeatureDataset,
+                        val_dataset: FeatureDataset,
+                        test_dataset: Tuple[FeatureDataset, None],
                         vocab: Vocab,
                         config,
                         collate_fn=collate_fn):
@@ -30,20 +28,17 @@ class Trainer:
         self.vocab = vocab
         self.config = config
 
-        self.get_visual_features = get_visual_getter("region")
+        self.get_visual_features = get_visual_getter(config.training.using_features)
 
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
-
-        self.optim_rl = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
-        self.scheduler_rl = LambdaLR(self.optim_rl, self.lambda_lr_rl)
         
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
         
         self.epoch = 0
 
-        self.train_dataset, self.train_dict_dataset = train_datasets
-        self.val_dataset, self.val_dict_dataset = val_datasets
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
 
         # creating iterable-dataset data loader
         self.train_dataloader = data.DataLoader(
@@ -60,22 +55,8 @@ class Trainer:
             num_workers=self.config.dataset.workers,
             collate_fn=collate_fn
         )
-
-        # creating dictionary iterable-dataset data loader
-        self.train_dict_dataloader = data.DataLoader(
-            dataset=self.train_dict_dataset,
-            batch_size=self.config.dataset.batch_size // self.config.training.training_beam_size,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
-        self.val_dict_dataloader = data.DataLoader(
-            dataset=self.val_dict_dataset,
-            batch_size=self.config.dataset.batch_size // self.config.training.training_beam_size,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
         
-        self.test_dataset, self.test_dict_dataset = test_datasets
+        self.test_dataset = test_dataset
 
         if self.test_dataset is not None:
             self.test_dataloader = data.DataLoader(
@@ -88,18 +69,6 @@ class Trainer:
         else:
             self.test_dataloader = None
 
-        if self.test_dict_dataset is not None:
-            self.test_dict_dataloader = data.DataLoader(
-                dataset=self.test_dict_dataset,
-                batch_size=self.config.dataset.batch_size // self.config.training.training_beam_size,
-                shuffle=True,
-                collate_fn=collate_fn
-            )
-        else:
-            self.test_dict_dataloader = None
-
-        self.train_cider = Cider(PTBTokenizer.tokenize(self.train_dataset.captions))
-
     def evaluate_loss(self, dataloader: data.DataLoader):
         # Calculating validation loss
         self.model.eval()
@@ -107,10 +76,9 @@ class Trainer:
         with tqdm(desc='Epoch %d - Validation' % (self.epoch + 1), unit='it', total=len(dataloader)) as pbar:
             with torch.no_grad():
                 for it, sample in enumerate(dataloader):
-                    visual_inputs = self.get_visual_features(sample)
                     tokens = sample["tokens"].to(device)
                     shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                    out = self.model(tokens=tokens, **visual_inputs).contiguous()
+                    out = self.model(tokens).contiguous()
                     loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
@@ -124,25 +92,18 @@ class Trainer:
 
     def evaluate_metrics(self, dataloader: data.DataLoader):
         self.model.eval()
-        gen = {}
-        gts = {}
         with tqdm(desc='Epoch %d - Evaluation' % (self.epoch + 1), unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
                 visual_inputs = self.get_visual_features(sample)
-                caps_gt = sample["captions"]
+                gt_ids = sample["tokens"]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
                                                 beam_size=self.config.training.evaluating_beam_size, out_size=1, **visual_inputs)
-                caps_gen = self.vocab.decode_caption(out, join_words=False)
-                for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
-                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gen['%d_%d' % (it, i)] = [gen_i, ]
-                    gts['%d_%d' % (it, i)] = gts_i
+                predicted_ids = out.argmax(dim=-1)
+                captions_gt = self.vocab.decode_caption(gt_ids)
+                captions_gen = self.vocab.decode_caption(predicted_ids)
+                scores = compute_language_scores(captions_gt, captions_gen)
                 pbar.update()
-
-        gts = evaluation.PTBTokenizer.tokenize(gts)
-        gen = evaluation.PTBTokenizer.tokenize(gen)
-        scores, _ = evaluation.compute_scores(gts, gen)
 
         return scores
 
@@ -153,10 +114,9 @@ class Trainer:
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % (self.epoch + 1), unit='it', total=len(self.train_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dataloader):
-                visual_inputs = self.get_visual_features(sample)
                 tokens = sample["tokens"].to(device)
                 shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                out = self.model(tokens=tokens, **visual_inputs).contiguous()
+                out = self.model(tokens).contiguous()
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                 loss.backward()
@@ -180,19 +140,6 @@ class Trainer:
             lr = self.config.training.xe_base_lr * 0.2 * 0.2
         
         return lr
-    
-    def lambda_lr_rl(self, s):
-        refine_epoch = self.config.training.refine_epoch_rl 
-        if s <= refine_epoch:
-            lr = self.config.training.rl_base_lr
-        elif s <= refine_epoch + 3:
-            lr = self.config.training.rl_base_lr * 0.2
-        elif s <= refine_epoch + 6:
-            lr = self.config.training.rl_base_lr * 0.2 * 0.2
-        else:
-            lr = self.config.training.rl_base_lr * 0.2 * 0.2 * 0.2
-        
-        return lr
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):
@@ -205,23 +152,16 @@ class Trainer:
         np.random.set_state(checkpoint['numpy_rng_state'])
         random.setstate(checkpoint['random_rng_state'])
 
-        use_rl = checkpoint["use_rl"]
-
-        if not use_rl:
-            self.optim.load_state_dict(checkpoint['optimizer'])
-            self.scheduler.load_state_dict(checkpoint['scheduler'])
-        else:
-            self.optim_rl.load_state_dict(checkpoint['optimizer'])
-            self.scheduler_rl.load_state_dict(checkpoint['scheduler'])
+        self.optim.load_state_dict(checkpoint['optimizer'])
+        self.scheduler.load_state_dict(checkpoint['scheduler'])
 
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-        print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
+        print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best f1 on val {checkpoint['best_val_f1']} - best f1 on test {checkpoint['best_test_f1']}")
 
         return {
-            "use_rl": checkpoint['use_rl'],
-            "best_val_cider": checkpoint['best_val_cider'],
-            "best_test_cider": checkpoint['best_test_cider'],
+            "best_val_f1": checkpoint['best_val_f1'],
+            "best_test_f1": checkpoint['best_test_f1'],
             "patience": checkpoint['patience'],
             "epoch": checkpoint["epoch"]
         }
@@ -233,20 +173,13 @@ class Trainer:
             'numpy_rng_state': np.random.get_state(),
             'random_rng_state': random.getstate(),
             'epoch': self.epoch,
-            'state_dict': self.model.state_dict()
+            'state_dict': self.model.state_dict(),
+            "optimizer": self.optim.state_dict(),
+            "scheduler": self.scheduler.state_dict()
         }
 
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
-
-        use_rl = dict_for_saving["use_rl"]
-
-        if use_rl:
-            dict_for_saving["optimizer"] = self.optim_rl.state_dict()
-            dict_for_saving["scheduler"] = self.scheduler_rl.state_dict()
-        else:
-            dict_for_saving["optimizer"] = self.optim.state_dict()
-            dict_for_saving["scheduler"] = self.scheduler.state_dict()
 
         torch.save(dict_for_saving, os.path.join(self.config.training.checkpoint_path, 
                                                     f"{self.config.model.name}_using_{self.config.training.using_features}", 
@@ -256,29 +189,24 @@ class Trainer:
         
         if checkpoint_filename is not None and os.path.isfile(checkpoint_filename):
             checkpoint = self.load_checkpoint(checkpoint_filename)
-            use_rl = checkpoint["use_rl"]
-            best_val_cider = checkpoint["best_val_cider"]
-            best_test_cider = checkpoint["best_test_cider"]
+            best_val_f1 = checkpoint["best_val_f1"]
+            best_test_f1 = checkpoint["best_test_f1"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
         else:
-            use_rl = False
-            best_val_cider = .0
-            best_test_cider = .0
+            best_val_f1 = .0
+            best_test_f1 = .0
             patience = 0
 
         while True:
-            if not use_rl:
-                self.train_xe()
-            else:
-                self.train_scst()
+            self.train_xe()
 
             val_loss = self.evaluate_loss(self.val_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.val_dict_dataloader)
             print("Validation scores", scores)
-            val_cider = scores['CIDEr']
+            val_f1 = scores["f1"]
 
             if self.test_dict_dataloader is not None:
                 scores = self.evaluate_metrics(self.test_dict_dataloader)
@@ -286,8 +214,8 @@ class Trainer:
 
             # Prepare for next epoch
             best = False
-            if val_cider >= best_val_cider:
-                best_val_cider = val_cider
+            if val_f1 >= best_val_f1:
+                best_val_f1 = val_f1
                 patience = 0
                 best = True
             else:
@@ -314,10 +242,10 @@ class Trainer:
 
             self.save_checkpoint({
                 'val_loss': val_loss,
-                'val_cider': val_cider,
+                'val_f1': val_f1,
                 'patience': patience,
-                'best_val_cider': best_val_cider,
-                'best_test_cider': best_test_cider,
+                'best_val_f1': best_val_f1,
+                'best_test_f1': best_test_f1,
                 'use_rl': use_rl,
             })
 

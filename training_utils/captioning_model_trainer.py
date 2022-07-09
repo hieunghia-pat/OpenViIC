@@ -8,7 +8,8 @@ from models.transformers import EncoderDecoderTransformer
 from models.utils import get_batch_size
 from data_utils.dataset import *
 import evaluation
-from evaluation import Cider, PTBTokenizer
+from evaluation import Cider
+from evaluation.tokenizer import PTBTokenizer
 from training_utils.utils import get_visual_getter
 
 import multiprocessing
@@ -32,7 +33,7 @@ class Trainer:
         self.vocab = vocab
         self.config = config
 
-        self.get_visual_features = get_visual_getter("region")
+        self.get_visual_features = get_visual_getter(config.training.using_features)
 
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)

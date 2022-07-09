@@ -5,10 +5,10 @@ import numpy as np
 import random
 import argparse
 
-from training_utils.captioning_model_trainer import Trainer
+from training_utils.language_model_trainer import Trainer
 from configs.utils import get_config
 from data_utils.vocab import Vocab
-from data_utils.dataset import FeatureDataset, DictionaryDataset
+from data_utils.dataset import FeatureDataset
 from data_utils.utils import collate_fn
 from models.language_models import get_language_model
 
@@ -51,26 +51,12 @@ if config.path.public_test_json_path is not None:
 else:
     public_test_dataset = None
 
-# creating dictionary dataset
-train_dict_dataset = DictionaryDataset(config.path.train_json_path, config.path.image_features_path, vocab) # for training with self-critical learning
-val_dict_dataset = DictionaryDataset(config.path.dev_json_path, config.path.image_features_path, vocab) # for calculating metricsn validation set
-
-if config.path.public_test_json_path is not None:
-    public_test_dict_dataset = DictionaryDataset(config.path.public_test_json_path, config.path.image_features_path, vocab=vocab)
-else:
-    public_test_dict_dataset = None
-
-if config.path.private_test_json_path is not None:
-    private_test_dict_dataset = DictionaryDataset(config.path.private_test_json_path, config.path.image_features_path, vocab=vocab)
-else:
-    private_test_dict_dataset = None
-
 # init Transformer model.
 model = get_language_model(vocab, config)
 
 # Define Trainer
-trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),
-                    test_datasets=(public_test_dataset, public_test_dict_dataset), vocab=vocab, config=config, collate_fn=collate_fn)
+trainer = Trainer(model=model, train_dataset=train_dataset, val_dataset=val_dataset,
+                    test_dataset=public_test_dataset, vocab=vocab, config=config, collate_fn=collate_fn)
 
 # Training
 if config.training.start_from:
