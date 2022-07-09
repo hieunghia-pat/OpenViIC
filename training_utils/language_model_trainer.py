@@ -100,8 +100,8 @@ class Trainer:
                     out, _ = self.model(gt_ids)
                     out = out.contiguous()
                 predicted_ids = out.argmax(dim=-1)
-                captions_gt = self.vocab.decode_caption(gt_ids)
-                captions_gen = self.vocab.decode_caption(predicted_ids)
+                captions_gt = self.vocab.decode_caption(gt_ids, join_words=False)
+                captions_gen = self.vocab.decode_caption(predicted_ids, join_words=False)
                 scores = compute_language_scores(captions_gt, captions_gen)
                 pbar.update()
 
@@ -205,7 +205,7 @@ class Trainer:
             val_loss = self.evaluate_loss(self.val_dataloader)
 
             # val scores
-            scores = self.evaluate_metrics(self.val_dict_dataloader)
+            scores = self.evaluate_metrics(self.val_dataloader)
             print("Validation scores", scores)
             val_f1 = scores["f1"]
 

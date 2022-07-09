@@ -29,9 +29,9 @@ def compute_language_scores(captions_gt, captions_gen):
             caption_gen = caption_gen + ["<pad>"]*delta_len
 
         accuracy += accuracy_score(caption_gt, caption_gen)
-        precision += precision_score(caption_gt, caption_gen)
-        recall += recall_score(caption_gt, caption_gen)
-        f1 += f1_score(caption_gt, caption_gen)
+        precision += precision_score(caption_gt, caption_gen, average="micro")
+        recall += recall_score(caption_gt, caption_gen, average="micro")
+        f1 += f1_score(caption_gt, caption_gen, average="micro")
 
     return {
         "accuracy": accuracy / len(captions_gt),
