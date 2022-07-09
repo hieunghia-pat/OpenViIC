@@ -33,13 +33,12 @@ def get_tokenizer(tokenizer):
     
     if tokenizer == "vncorenlp":
         try:
-            from vncorenlp import VnCoreNLP
-            # annotator = VnCoreNLP(r"data_utils/vncorenlp/VnCoreNLP-1.1.1.jar", port=9000, annotators="wseg", max_heap_size='-Xmx500m')
-            annotator = VnCoreNLP(address="http://127.0.0.1", port=9000, max_heap_size='-Xmx500m')
+            import py_vncorenlp
+            rdrsegmenter = py_vncorenlp.VnCoreNLP(annotators=["wseg"], save_dir="data_utils/vncorenlp")
 
             def tokenize(s: str):
-                words = annotator.tokenize(s)[0]
-                return " ".join(words)
+                words = rdrsegmenter.word_segment(s)[0]
+                return words
 
             return tokenize
         except ImportError:
