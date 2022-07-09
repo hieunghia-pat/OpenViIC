@@ -14,7 +14,8 @@ from typing import Tuple
 import random
 from shutil import copyfile
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cpu"
 
 class Trainer:
     def __init__(self,  model: EncoderDecoderTransformer, 
@@ -78,7 +79,8 @@ class Trainer:
                 for it, sample in enumerate(dataloader):
                     tokens = sample["tokens"].to(device)
                     shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                    out = self.model(tokens).contiguous()
+                    out, _ = self.model(tokens)
+                    out = out.contiguous()
                     loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
@@ -94,9 +96,10 @@ class Trainer:
         self.model.eval()
         with tqdm(desc='Epoch %d - Evaluation' % (self.epoch + 1), unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
-                gt_ids = sample["tokens"]
+                gt_ids = sample["tokens"].to(device)
                 with torch.no_grad():
-                    out = self.model(gt_ids).contiguous()
+                    out, _ = self.model(gt_ids)
+                    out = out.contiguous()
                 predicted_ids = out.argmax(dim=-1)
                 captions_gt = self.vocab.decode_caption(gt_ids)
                 captions_gen = self.vocab.decode_caption(predicted_ids)
@@ -114,7 +117,8 @@ class Trainer:
             for it, sample in enumerate(self.train_dataloader):
                 tokens = sample["tokens"].to(device)
                 shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                out = self.model(tokens).contiguous()
+                out, _ = self.model(tokens)
+                out = out.contiguous()
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
                 loss.backward()

@@ -11,10 +11,10 @@ from models.modules.containers import Module
 from transformers import AutoTokenizer
 
 class BERTModel(Module):
-    def __init__(self, vocab: Vocab, pretrained_language_model_name, padding_idx=0, language_model_hidden_size=768,
+    def __init__(self, vocab: Vocab, pretrained_language_model_name, language_model_hidden_size=768,
                     d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, max_len=54, dropout=.1):
         super(BERTModel, self).__init__()
-        self.padding_idx = padding_idx
+        self.padding_idx = vocab.padding_idx
         self.d_model = d_model
 
         self.language_model = BertModel.from_pretrained(pretrained_language_model_name, return_dict=True)
@@ -39,6 +39,11 @@ class BERTModel(Module):
         # List -> tensor.
         pretrained_input_ids = torch.tensor(pretrained_input_ids).to(input_ids.device)
 
+        if attention_mask is None:
+            attention_mask = torch.ones_like(input_ids).to(bool).to(input_ids.device)
+        if token_type_ids is None:
+            token_type_ids = torch.zeros_like(input_ids).long().to(input_ids.device)
+
         b_s, seq_len = input_ids.shape
         mask_queries = generate_padding_mask(input_ids, self.padding_idx).to(input_ids.device)  # (b_s, seq_len)
         mask_self_attention = generate_sequential_mask(seq_len).to(input_ids.device)
@@ -47,11 +52,6 @@ class BERTModel(Module):
                 
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(input_ids.device)  # (b_s, seq_len)
         seq = seq.masked_fill(mask_queries, 0)
-
-        if attention_mask is None:
-            attention_mask = torch.ones_like(input_ids).to(bool)
-        if token_type_ids is None:
-            token_type_ids = torch.zeros_like(input_ids).long()
 
         bert_output = self.language_model(
             input_ids=input_ids,
@@ -69,11 +69,11 @@ class BERTModel(Module):
         return out, language_feature
 
 class PhoBERTModel(Module):
-    def __init__(self, vocab: Vocab, pretrained_language_model_name, padding_idx=1, language_model_hidden_size=768,
+    def __init__(self, vocab: Vocab, pretrained_language_model_name, language_model_hidden_size=768,
                     d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, max_len=54, dropout=.1):
         super(PhoBERTModel, self).__init__()
         self.vocab = vocab
-        self.padding_idx = padding_idx
+        self.padding_idx = vocab.padding_idx
         self.d_model = d_model
 
         self.language_model = RobertaModel.from_pretrained(pretrained_language_model_name, return_dict=True)
@@ -99,12 +99,23 @@ class PhoBERTModel(Module):
         pretrained_input_ids = []
         
         for input_id in input_ids:
-            pretrained_input_id = [self.vocab.pretrained_language_idx_mapping[str(ori_id.item())] for ori_id in input_id]
+            pretrained_input_id = [self.vocab.pretrained_language_idx_mapping[ori_id.item()] for ori_id in input_id]
             pretrained_input_ids.append(pretrained_input_id)
 
         # List -> tensor.
         pretrained_input_ids = torch.tensor(pretrained_input_ids).to(input_ids.device)
-        
+
+        if attention_mask is None:
+            attention_mask = torch.ones_like(pretrained_input_ids).to(torch.bool).to(input_ids.device)
+        if token_type_ids is None:
+            token_type_ids = torch.zeros_like(pretrained_input_ids).long().to(input_ids.device)
+
+        bert_output = self.language_model(
+            input_ids=pretrained_input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask
+        )
+
         # Masking
         b_s, seq_len = input_ids.shape
         mask_queries = generate_padding_mask(input_ids, self.padding_idx).to(input_ids.device)  # (b_s, seq_len)
@@ -115,22 +126,14 @@ class PhoBERTModel(Module):
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(input_ids.device)  # (b_s, seq_len)
         seq = seq.masked_fill(mask_queries, 0)
 
-        if attention_mask is None:
-            attention_mask = torch.ones_like(pretrained_input_ids).to(torch.bool)
-        if token_type_ids is None:
-            token_type_ids = torch.zeros_like(pretrained_input_ids).long()
-
-        bert_output = self.language_model(
-            input_ids=pretrained_input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask
-        )
-        
         language_feature = self.proj_to_caption_model(bert_output.last_hidden_state)
         language_feature = language_feature + self.pos_emb(seq)
 
         # fine tuning the pretrained BERT-based model
-        language_feature = self.encoder_layer(language_feature, language_feature, language_feature, attention_mask=mask_self_attention)
+        language_feature = self.encoder_layer(queries=language_feature,
+                                                keys=language_feature, 
+                                                values=language_feature, 
+                                                attention_mask=mask_self_attention)
 
         logits = self.proj_to_vocab(language_feature)
         out = F.log_softmax(logits, dim=-1)
@@ -145,8 +148,8 @@ def get_pretrained_language_model(model: str):
     return Pretrained_language_models[model]
 
 def get_language_model(vocab, config):
-    language_model = Pretrained_language_models[config.model.pretrained_language_model]
-    return language_model(vocab, config.model.pretrained_language_model_name, padding_idx=1, 
-                            language_model_hidden_size=config.model.language_model_hidden_size,
-                            d_model=config.model.d_model, d_k=config.model.d_k, d_v=config.model.d_v, h=config.model.nheads,
+    language_model = Pretrained_language_models[config.model.transformer.decoder.args.pretrained_language_model]
+    return language_model(vocab, config.model.transformer.decoder.args.pretrained_language_model_name,
+                            language_model_hidden_size=config.model.transformer.decoder.args.language_model_hidden_size,
+                            d_model=config.model.d_model, d_k=config.model.d_k, d_v=config.model.d_v, h=config.model.nhead,
                             d_ff=config.model.d_ff, max_len=vocab.max_caption_length, dropout=config.model.dropout)

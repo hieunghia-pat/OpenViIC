@@ -4,7 +4,7 @@ path:
   dev_json_path : features/annotations/UIT-ViIC/uitviic_captions_val2017.json
   public_test_json_path : features/annotations/UIT-ViIC/uitviic_captions_test2017.json
   private_test_json_path: features/annotations/vieCap4H/viecap4h_captions_private_test2017.json
-  image_features_path : features/region_features/UIT-ViIC/faster_rcnn
+  image_features_path : features/UIT-ViIC/faster_rcnn_x152++
   images_path : null
 
 ## configuration for training

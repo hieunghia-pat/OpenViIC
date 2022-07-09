@@ -34,7 +34,7 @@ if not os.path.isdir(os.path.join(config.training.checkpoint_path,
 if not os.path.isfile(os.path.join(config.training.checkpoint_path, 
                                     f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl")):
     vocab = Vocab([config.path.train_json_path, config.path.dev_json_path], tokenizer_name=config.dataset.tokenizer, 
-                    pretrained_language_model_name=config.model.decoder.args.pretrained_language_model_name)
+                    pretrained_language_model_name=config.model.transformer.decoder.args.pretrained_language_model_name)
     pickle.dump(vocab, open(os.path.join(config.training.checkpoint_path, 
                             f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl"), "wb"))
 else:
@@ -52,7 +52,7 @@ else:
     public_test_dataset = None
 
 # init Transformer model.
-model = get_language_model(vocab, config)
+model = get_language_model(vocab, config).to(device)
 
 # Define Trainer
 trainer = Trainer(model=model, train_dataset=train_dataset, val_dataset=val_dataset,
