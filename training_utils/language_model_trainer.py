@@ -94,11 +94,9 @@ class Trainer:
         self.model.eval()
         with tqdm(desc='Epoch %d - Evaluation' % (self.epoch + 1), unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
-                visual_inputs = self.get_visual_features(sample)
                 gt_ids = sample["tokens"]
                 with torch.no_grad():
-                    out, _ = self.model.beam_search(max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                beam_size=self.config.training.evaluating_beam_size, out_size=1, **visual_inputs)
+                    out = self.model(gt_ids).contiguous()
                 predicted_ids = out.argmax(dim=-1)
                 captions_gt = self.vocab.decode_caption(gt_ids)
                 captions_gen = self.vocab.decode_caption(predicted_ids)
