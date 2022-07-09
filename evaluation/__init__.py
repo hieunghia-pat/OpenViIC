@@ -22,7 +22,8 @@ def compute_language_scores(captions_gt, captions_gen):
     f1 = 0
     for caption_gt, caption_gen in zip(captions_gt, captions_gen):
         if len(caption_gt) < len(caption_gen):
-            caption_gen = caption_gen[:len(caption_gt)]
+            delta_len = len(caption_gen) - len(caption_gt)
+            caption_gt = caption_gt + ["<pad>"]*delta_len
         
         if len(caption_gt) > len(caption_gen):
             delta_len = len(caption_gt) - len(caption_gen)
