@@ -17,10 +17,11 @@ class EncoderLayer(nn.Module):
                                         **attention_module_kwargs)
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
 
-    def forward(self, queries, keys, values, attention_mask, **kwargs):
+    def forward(self, queries, keys, values, attention_mask, padding_mask=None, **kwargs):
         att = self.mhatt(queries=queries, keys=keys, values=values, attention_mask=attention_mask, **kwargs)
         ff = self.pwff(att)
-        ff = ff.masked_fill(attention_mask.squeeze().unsqueeze(-1), value=0)
+        if padding_mask is not None:
+            ff = ff.masked_fill(padding_mask, value=0)
 
         return ff
 

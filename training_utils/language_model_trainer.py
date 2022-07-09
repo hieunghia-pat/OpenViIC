@@ -14,8 +14,7 @@ from typing import Tuple
 import random
 from shutil import copyfile
 
-# device = "cuda" if torch.cuda.is_available() else "cpu"
-device = "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Trainer:
     def __init__(self,  model: EncoderDecoderTransformer, 

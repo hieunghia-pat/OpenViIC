@@ -62,7 +62,11 @@ class BERTModel(Module):
         language_feature = language_feature + self.pos_emb(seq)
 
         # fine tuning the pretrained BERT-based model
-        language_feature = self.encoder_layer(language_feature, language_feature, language_feature, attention_mask=mask_self_attention)
+        language_feature = self.encoder_layer(queries=language_feature,
+                                                keys=language_feature, 
+                                                values=language_feature,
+                                                padding_mask=mask_queries.unsqueeze(-1),
+                                                attention_mask=mask_self_attention)
 
         logits = self.proj_to_vocab(language_feature)
         out = F.log_softmax(logits, dim=-1)
@@ -132,7 +136,8 @@ class PhoBERTModel(Module):
         # fine tuning the pretrained BERT-based model
         language_feature = self.encoder_layer(queries=language_feature,
                                                 keys=language_feature, 
-                                                values=language_feature, 
+                                                values=language_feature,
+                                                padding_mask=mask_queries.unsqueeze(-1),
                                                 attention_mask=mask_self_attention)
 
         logits = self.proj_to_vocab(language_feature)
