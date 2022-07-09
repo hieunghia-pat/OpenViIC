@@ -31,7 +31,7 @@ def compute_language_scores(captions_gt, captions_gen):
         accuracy += accuracy_score(caption_gt, caption_gen)
         precision += precision_score(caption_gt, caption_gen, average="macro", zero_division=0)
         recall += recall_score(caption_gt, caption_gen, average="macro", zero_division=0)
-        f1 += f1_score(caption_gt, caption_gen, average="macro", zero_division=0)
+        f1 += f1_score(caption_gt, caption_gen, average="macro")
 
     return {
         "accuracy": accuracy / len(captions_gt),
