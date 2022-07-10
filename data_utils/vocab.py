@@ -125,7 +125,13 @@ class Vocab(object):
         '''
         captions = []
         for vec in caption_vecs:
-            caption = " ".join([self.itos[idx] for idx in vec.tolist() if self.itos[idx] not in self.specials])
+            words = []
+            for idx in vec.tolist():
+                if self.itos[idx] not in self.specials:
+                    words.append(self.itos[idx])
+                if idx == self.eos_idx:
+                    break
+            caption = " ".join(words)
             if join_words:
                 captions.append(caption)
             else:
