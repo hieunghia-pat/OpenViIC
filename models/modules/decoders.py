@@ -101,7 +101,7 @@ class AdaptiveDecoderLayer(Module):
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
 
     def forward(self, queries, keys, values, language_signals, padding_mask=None, self_attention_mask=None, enc_attention_mask=None, **kwargs):
-        self_att = self.self_att(queries=queries, keys=queries, values=queries, attention_mask=self_attention_mask, **kwargs)
+        self_att = self.self_attn(queries=queries, keys=queries, values=queries, attention_mask=self_attention_mask, **kwargs)
         self_att = self_att.masked_fill(padding_mask, value=0)
 
         enc_att = self.enc_attn(queries=self_att, keys=keys, values=values, language_signals=language_signals, attention_mask=enc_attention_mask, **kwargs)
@@ -278,8 +278,8 @@ class AdaptiveDecoder(Module):
 
         # load and froze the language model
         language_model = get_pretrained_language_model(pretrained_language_model)
-        self.language_model = language_model(vocab, pretrained_language_model_name, padding_idx=1, 
-                                            language_model_hidden_size=language_model_hidden_size, d_model=d_model, 
+        self.language_model = language_model(vocab, pretrained_language_model_name, d_model=d_model,
+                                            language_model_hidden_size=language_model_hidden_size,
                                             d_k=d_k, d_v=d_v, h=h, d_ff=d_ff, max_len=max_len, dropout=dropout)
 
         if os.path.isfile(pretrained_language_model_path):
@@ -361,8 +361,8 @@ class MeshedAdaptiveDecoder(Module):
 
         # load and froze the language model
         language_model = get_pretrained_language_model(pretrained_language_model)
-        self.language_model = language_model(vocab, pretrained_language_model_name, padding_idx=1, 
-                                            language_model_hidden_size=language_model_hidden_size, d_model=d_model, 
+        self.language_model = language_model(vocab, pretrained_language_model_name, d_model=d_model,
+                                            language_model_hidden_size=language_model_hidden_size,
                                             d_k=d_k, d_v=d_v, h=h, d_ff=d_ff, max_len=max_len, dropout=dropout)
 
         if os.path.isfile(pretrained_language_model_path):

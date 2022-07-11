@@ -143,8 +143,8 @@ class Trainer:
                     gts['%d_%d' % (it, i)] = gts_i
                 pbar.update()
 
-        gts = evaluation.PTBTokenizer.tokenize(gts)
-        gen = evaluation.PTBTokenizer.tokenize(gen)
+        gts = PTBTokenizer.tokenize(gts)
+        gen = PTBTokenizer.tokenize(gen)
         scores, _ = evaluation.compute_scores(gts, gen)
 
         return scores
@@ -192,7 +192,7 @@ class Trainer:
                 # Rewards
                 caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=True)
                 caps_gt = list(itertools.chain(*([c, ] * self.config.training.training_beam_size for c in caps_gt)))
-                caps_gen, caps_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [caps_gen, caps_gt])
+                caps_gen, caps_gt = tokenizer_pool.map(PTBTokenizer.tokenize, [caps_gen, caps_gt])
                 reward = self.train_cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
                 reward = torch.from_numpy(reward).to(device).view(get_batch_size(visual_inputs), self.config.training.training_beam_size)
                 reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
@@ -403,8 +403,8 @@ class Trainer:
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
                     
-                gts = evaluation.PTBTokenizer.tokenize(gts)
-                gens = evaluation.PTBTokenizer.tokenize(gens)
+                gts = PTBTokenizer.tokenize(gts)
+                gens = PTBTokenizer.tokenize(gens)
                 if get_scores:
                     scores, _ = evaluation.compute_scores(gts, gens)
                 else:
