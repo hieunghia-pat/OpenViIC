@@ -145,8 +145,10 @@ class PhoBERTModel(Module):
         return out, language_feature
 
 Pretrained_language_models = {
-    "bert": BERTModel,
-    "phobert": PhoBERTModel
+    "bert-base": BERTModel,
+    "bert-large": BERTModel,
+    "phobert-base": PhoBERTModel,
+    "phobert-large": PhoBERTModel
 }
 
 def get_pretrained_language_model(model: str):

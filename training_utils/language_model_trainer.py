@@ -183,18 +183,20 @@ class Trainer:
             dict_for_saving[key] = value
 
         torch.save(dict_for_saving, os.path.join(self.config.training.checkpoint_path, 
-                                                    f"{self.config.model.name}_using_{self.config.training.using_features}", 
+                                                    f"{self.config.model.transformer.decoder.args.pretrained_language_model}",
                                                     "last_language_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
         
         if checkpoint_filename is not None and os.path.isfile(checkpoint_filename):
+            print("Loading from previous trained language model ...")
             checkpoint = self.load_checkpoint(checkpoint_filename)
             best_val_f1 = checkpoint["best_val_f1"]
             best_test_f1 = checkpoint["best_test_f1"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
         else:
+            print("Creating the language model ...")
             best_val_f1 = .0
             best_test_f1 = .0
             patience = 0
@@ -238,10 +240,10 @@ class Trainer:
 
             if best:
                 copyfile(os.path.join(self.config.training.checkpoint_path,
-                                        f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                        f"{self.config.model.transformer.decoder.args.pretrained_language_model}",
                                         "last_language_model.pth"), 
                             os.path.join(self.config.training.checkpoint_path, 
-                                            f"{self.config.model.name}_using_{self.config.training.using_features}",
+                                            f"{self.config.model.transformer.decoder.args.pretrained_language_model}",
                                             "best_language_model.pth"))
 
             if exit_train:

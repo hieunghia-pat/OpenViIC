@@ -65,7 +65,7 @@ trainer = Trainer(model=model, train_dataset=train_dataset, val_dataset=val_data
 # Training
 if config.training.start_from:
     trainer.train(os.path.join(config.training.checkpoint_path, 
-                                f"{config.model.name}_using_{config.training.using_features}", 
+                                f"{config.model.transformer.decoder.args.pretrained_language_model}",
                                 config.training.start_from))
 else:
     trainer.train()
