@@ -3,7 +3,7 @@ path:
   train_json_path : features/annotations/UIT-ViIC/uitviic_captions_train2017.json
   dev_json_path : features/annotations/UIT-ViIC/uitviic_captions_val2017.json
   public_test_json_path : features/annotations/UIT-ViIC/uitviic_captions_test2017.json
-  private_test_json_path: features/annotations/vieCap4H/viecap4h_captions_private_test2017.json
+  private_test_json_path: null
   image_features_path : features/UIT-ViIC/faster_rcnn_x152++
   images_path : null
 
@@ -47,14 +47,14 @@ model:
         ## pretrained language model components
         pretrained_language_model_name : vinai/phobert-base
         pretrained_language_model : phobert
-        pretrained_language_model_path : saved_models/phobert_base/best_model.pth
+        pretrained_language_model_path : saved_models/rstnet_using_grid/best_language_model.pth
         language_model_hidden_size : 768
       module: adaptive-decoder
 
 ## dataset configuration
 dataset:
-  batch_size: 32
+  batch_size: 16
   workers: 2
-  tokenizer: null
+  tokenizer: vncorenlp
   word_embedding: null
   min_freq: 1

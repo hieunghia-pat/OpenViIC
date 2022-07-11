@@ -36,15 +36,18 @@ if not os.path.isdir(os.path.join(config.training.checkpoint_path,
 # Creating vocabulary and dataset
 if not os.path.isfile(os.path.join(config.training.checkpoint_path, 
                                     f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl")):
+    print("Creating vocab ...")
     vocab = Vocab([config.path.train_json_path, config.path.dev_json_path], tokenizer_name=config.dataset.tokenizer, 
                     pretrained_language_model_name=config.model.pretrained_language_model_name)
     pickle.dump(vocab, open(os.path.join(config.training.checkpoint_path, 
                             f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl"), "wb"))
 else:
+    print("Loading vocab ...")
     vocab = pickle.load(open(os.path.join(config.training.checkpoint_path, 
                                             f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl"), "rb"))
 
 # creating iterable dataset
+print("Creating datasets ...")
 train_dataset = FeatureDataset(config.path.train_json_path, config.path.image_features_path, vocab) # for training with cross-entropy loss
 
 val_dataset = FeatureDataset(config.path.dev_json_path, config.path.image_features_path, vocab) # for training with cross-entropy loss
@@ -75,6 +78,7 @@ encoder = get_encoder(vocab, config)
 decoder = get_decoder(vocab, config)
 
 # init Transformer model.
+print("Create the captioning model ...")
 model = EncoderDecoderTransformer(vocab.bos_idx, encoder, decoder).to(device)
 
 # Define Trainer
