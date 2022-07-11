@@ -438,8 +438,8 @@ def get_decoder(vocab, config):
     pretrained_language_model_path = config.model.transformer.decoder.args.pretrained_language_model_path
     if language_model_name is not None:
         config.model.transformer.decoder.args.pretrained_language_model_path = os.path.join(checkpoint_path, 
-                                                                                                language_model_name,
-                                                                                                pretrained_language_model_path)
+                                                                                            language_model_name,
+                                                                                            pretrained_language_model_path)
 
     return decoder(vocab=vocab, max_len=vocab.max_caption_length, N_dec=config.model.nlayers, 
                     padding_idx=vocab.padding_idx, d_model=config.model.d_model, d_k=config.model.d_k,

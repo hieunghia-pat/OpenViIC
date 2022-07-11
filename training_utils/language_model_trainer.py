@@ -197,6 +197,8 @@ class Trainer:
             self.epoch = checkpoint["epoch"]
         else:
             print("Creating the language model ...")
+            os.mkdir(os.path.join(self.config.training.checkpoint_path, 
+                                    f"{self.config.model.transformer.decoder.args.pretrained_language_model}"))
             best_val_f1 = .0
             best_test_f1 = .0
             patience = 0
