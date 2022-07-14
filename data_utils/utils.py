@@ -1,7 +1,6 @@
 import torch
 from torchvision import transforms
 import re
-from typing import Callable
 
 def get_tokenizer(tokenizer):
     if tokenizer is None:
@@ -54,7 +53,7 @@ def get_tokenizer(tokenizer):
                   "See the docs at https://github.com/vncorenlp/VnCoreNLP for more information.")
             raise
 
-def preprocess_caption(caption, tokenizer: Callable):
+def preprocess_caption(caption, tokenizer: str):
     caption = re.sub(r"[“”]", "\"", caption)
     caption = re.sub(r"!", " ! ", caption)
     caption = re.sub(r"\?", " ? ", caption)
@@ -74,7 +73,7 @@ def preprocess_caption(caption, tokenizer: Callable):
     caption = re.sub(r"\&", " & ", caption)
     caption = re.sub(r"\*", " * ", caption)
     # tokenize the caption
-    caption = tokenizer(caption)
+    caption = get_tokenizer(tokenizer)(caption)
     caption = " ".join(caption.strip().split()) # remove duplicated spaces
     tokens = caption.strip().split()
     

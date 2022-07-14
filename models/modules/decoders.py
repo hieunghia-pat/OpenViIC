@@ -283,14 +283,14 @@ class AdaptiveDecoder(Module):
                                             d_k=d_k, d_v=d_v, h=h, d_ff=d_ff, max_len=max_len, dropout=dropout)
 
         if os.path.isfile(pretrained_language_model_path):
+            print("In AdaptiveDecoder: Loading the pretrained language model ..")
             language_model_checkpoint = torch.load(pretrained_language_model_path)
             self.language_model.load_state_dict(language_model_checkpoint["state_dict"])
             # frozen the language model
             for param in self.language_model.parameters():
                 param.requires_grad = False
-
         else:
-            raise Exception("AdaptiveDecoder requires the pretrained language model")
+            print("In AdaptiveDecoder: Fine-tuning the language model while training the captioning model")
 
         self.max_len = max_len
         self.padding_idx = padding_idx
@@ -369,13 +369,14 @@ class MeshedAdaptiveDecoder(Module):
                                             d_k=d_k, d_v=d_v, h=h, d_ff=d_ff, max_len=max_len, dropout=dropout)
 
         if os.path.isfile(pretrained_language_model_path):
+            print("In AdaptiveDecoder: Loading the pretrained language model ..")
             language_model_checkpoint = torch.load(pretrained_language_model_path)
             self.language_model.load_state_dict(language_model_checkpoint["state_dict"])
             # frozen the language model
             for param in self.language_model.parameters():
                 param.requires_grad = False
         else:
-            raise Exception("MeshedAdaptiveDecoder requires the pretrained language model")
+            print("In AdaptiveDecoder: Fine-tuning the language model while training the captioning model")
 
         self.max_len = max_len
         self.padding_idx = padding_idx
@@ -433,7 +434,7 @@ Decoders = {
 
 def get_decoder(vocab, config):
     decoder = Decoders[config.model.transformer.decoder.module]
-    checkpoint_path = config.checkpoint_path
+    checkpoint_path = config.training.checkpoint_path
     language_model_name = config.model.transformer.decoder.args.pretrained_language_model
     pretrained_language_model_path = config.model.transformer.decoder.args.pretrained_language_model_path
     if language_model_name is not None:

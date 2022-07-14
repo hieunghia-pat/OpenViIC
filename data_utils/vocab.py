@@ -41,7 +41,7 @@ class Vocab(object):
                 returns a Tensor of the same size. Default: torch.Tensor.zero_
             vectors_cache: directory for cached vectors. Default: '.vector_cache'
         """
-        self.tokenizer = get_tokenizer(tokenizer_name)
+        self.tokenizer = tokenizer_name
         
         self.token_encoder = None
 

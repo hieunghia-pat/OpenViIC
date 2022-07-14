@@ -296,6 +296,7 @@ class Trainer:
     def train(self, checkpoint_filename: str = None):
         
         if checkpoint_filename is not None and os.path.isfile(checkpoint_filename):
+            print("Loading the captioning model ...")
             checkpoint = self.load_checkpoint(checkpoint_filename)
             use_rl = checkpoint["use_rl"]
             best_val_cider = checkpoint["best_val_cider"]
@@ -303,6 +304,7 @@ class Trainer:
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
         else:
+            print("Creating captioning model ...")
             use_rl = False
             best_val_cider = .0
             best_test_cider = .0

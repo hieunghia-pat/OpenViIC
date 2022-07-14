@@ -38,7 +38,7 @@ if not os.path.isfile(os.path.join(config.training.checkpoint_path,
                                     f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl")):
     print("Creating vocab ...")
     vocab = Vocab([config.path.train_json_path, config.path.dev_json_path], tokenizer_name=config.dataset.tokenizer, 
-                    pretrained_language_model_name=config.model.pretrained_language_model_name)
+                    pretrained_language_model_name=config.model.transformer.decoder.args.pretrained_language_model_name)
     pickle.dump(vocab, open(os.path.join(config.training.checkpoint_path, 
                             f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl"), "wb"))
 else:
