@@ -73,7 +73,7 @@ def preprocess_caption(caption, tokenizer: str):
     caption = re.sub(r"\&", " & ", caption)
     caption = re.sub(r"\*", " * ", caption)
     # tokenize the caption
-    caption = get_tokenizer(tokenizer)(caption)
+    caption = get_tokenizer(tokenizer)(caption.lower())
     caption = " ".join(caption.strip().split()) # remove duplicated spaces
     tokens = caption.strip().split()
     

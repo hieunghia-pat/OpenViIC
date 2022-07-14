@@ -2,7 +2,7 @@ import torch
 
 from data_utils.vector import Vectors
 from data_utils.vector import pretrained_aliases
-from data_utils.utils import get_tokenizer, preprocess_caption, unk_init
+from data_utils.utils import preprocess_caption, unk_init
 
 from transformers import AutoTokenizer
 
@@ -42,40 +42,60 @@ class Vocab(object):
             vectors_cache: directory for cached vectors. Default: '.vector_cache'
         """
         self.tokenizer = tokenizer_name
-        
-        self.token_encoder = None
-
-        self.padding_token = padding_token
-        self.bos_token = bos_token
-        self.eos_token = eos_token
-        self.unk_token = unk_token
+        max_size = None if max_size is None else max_size + len(self.itos)
 
         self.make_vocab(json_dirs)
         counter = self.freqs.copy()
     
         min_freq = max(min_freq, 1)
 
-        specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-        self.itos = specials
-        # frequencies of special tokens are not counted when building vocabulary
-        # in frequency order
-        for tok in specials:
-            del counter[tok]
-
-        max_size = None if max_size is None else max_size + len(self.itos)
-
         # sort by frequency, then alphabetically
         words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
         words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
 
-        for word, freq in words_and_frequencies:
-            if freq < min_freq or len(self.itos) == max_size:
-                break
-            self.itos.append(word)
+        if pretrained_language_model_name is not None:
+            # get vocab from the pretrained language model
+            self.itos = defaultdict()
+            token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
+            
+            # get special tokens
+            self.padding_token = token_encoder.pad_token
+            self.bos_token = token_encoder.bos_token
+            self.eos_token = token_encoder.eos_token
+            self.unk_token = token_encoder.unk_token
+            self.itos[token_encoder.pad_token_id] = token_encoder.pad_token
+            self.itos[token_encoder.bos_token_id] = token_encoder.bos_token
+            self.itos[token_encoder.eos_token_id] = token_encoder.eos_token
+            self.itos[token_encoder.unk_token_id] = token_encoder.unk_token
+            # get vocab from loaded words
+            for word, freq in words_and_frequencies:
+                if freq < min_freq or len(self.itos) == max_size:
+                    break
+                id = token_encoder.convert_tokens_to_ids(word)
+                assert isinstance(id, int), f"{pretrained_language_model_name} encodes {word} as a list {id}"
+                if id not in self.itos: # this token is not the unk token
+                    self.itos[id] = word
+        else:
+            self.padding_token = padding_token
+            self.bos_token = bos_token
+            self.eos_token = eos_token
+            self.unk_token = unk_token
+            specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
+            itos = specials
+            # frequencies of special tokens are not counted when building vocabulary
+            # in frequency order
+            for tok in specials:
+                del counter[tok]
+
+            for word, freq in words_and_frequencies:
+                if freq < min_freq or len(itos) == max_size:
+                    break
+                itos.append(word)
+            self.itos = {i: tok for i, tok in enumerate(itos)}
 
         self.stoi = defaultdict()
         # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+        self.stoi.update({tok: i for i, tok in self.itos.items()})
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
@@ -87,18 +107,6 @@ class Vocab(object):
         self.vectors = None
         if vectors is not None:
             self.load_vectors(vectors, unk_init=unk_init, cache=vectors_cache)
-
-        if pretrained_language_model_name is not None:
-            # convert from original idx into Pre-trained model idx for training language mode.
-            self.pretrained_language_idx_mapping = defaultdict()
-            self.token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
-            self.pretrained_language_idx_mapping.update({ori_idx: self.token_encoder.convert_tokens_to_ids(tok) for ori_idx, tok in enumerate(self.itos)})
-            
-            # convert special tokens
-            self.pretrained_language_idx_mapping[self.padding_idx] = self.token_encoder.convert_tokens_to_ids(self.token_encoder.pad_token)
-            self.pretrained_language_idx_mapping[self.bos_idx] = self.token_encoder.convert_tokens_to_ids(self.token_encoder.bos_token)
-            self.pretrained_language_idx_mapping[self.eos_idx] = self.token_encoder.convert_tokens_to_ids(self.token_encoder.eos_token)
-            self.pretrained_language_idx_mapping[self.unk_idx] = self.token_encoder.convert_tokens_to_ids(self.token_encoder.unk_token)
 
     def make_vocab(self, json_dirs):
         self.freqs = Counter()
