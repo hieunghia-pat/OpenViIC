@@ -49,9 +49,9 @@ model:
         use_aoa: False
         N_enc: 3
         ## pretrained language model components
-        pretrained_language_model_name : vinai/phobert-base
-        pretrained_language_model : phobert-base
-        pretrained_language_model_path : best_language_model.pth
+        pretrained_language_model_name : null
+        pretrained_language_model : null
+        pretrained_language_model_path : null
         language_model_hidden_size : 768
       module: meshed-decoder
 
