@@ -13,7 +13,7 @@ training:
   start_from: null
   learning_rate: 1.0
   warmup: 10000
-  xe_base_lr: 0.001
+  xe_base_lr: 0.0001
   rl_base_lr: 0.000005
   refine_epoch_rl: 28
   get_scores: False
@@ -35,11 +35,6 @@ model:
   d_feature : 2048
   dropout : .5
   embedding_dim : 300
-  ## pretrained language model components
-  pretrained_language_model_name : null
-  pretrained_language_model : null
-  pretrained_language_model_path : null
-  language_model_hidden_size : 768
 
   transformer:
     encoder:
@@ -53,6 +48,11 @@ model:
       args:
         use_aoa: False
         N_enc: 3
+        ## pretrained language model components
+        pretrained_language_model_name : vinai/phobert-base
+        pretrained_language_model : phobert-base
+        pretrained_language_model_path : best_language_model.pth
+        language_model_hidden_size : 768
       module: meshed-decoder
 
 ## dataset configuration
