@@ -63,18 +63,9 @@ class Vocab(object):
             self.bos_token = token_encoder.bos_token
             self.eos_token = token_encoder.eos_token
             self.unk_token = token_encoder.unk_token
-            self.itos[token_encoder.pad_token_id] = token_encoder.pad_token
-            self.itos[token_encoder.bos_token_id] = token_encoder.bos_token
-            self.itos[token_encoder.eos_token_id] = token_encoder.eos_token
-            self.itos[token_encoder.unk_token_id] = token_encoder.unk_token
-            # get vocab from loaded words
-            for word, freq in words_and_frequencies:
-                if freq < min_freq or len(self.itos) == max_size:
-                    break
-                id = token_encoder.convert_tokens_to_ids(word)
-                assert isinstance(id, int), f"{pretrained_language_model_name} encodes {word} as a list {id}"
-                if id not in self.itos: # this token is not the unk token
-                    self.itos[id] = word
+            self.stoi = token_encoder.get_vocab()
+            # stoi is simply a reverse dict for itos
+            self.itos = {i: tok for tok, i in self.stoi.items()}
         else:
             self.padding_token = padding_token
             self.bos_token = bos_token
@@ -93,9 +84,9 @@ class Vocab(object):
                 itos.append(word)
             self.itos = {i: tok for i, tok in enumerate(itos)}
 
-        self.stoi = defaultdict()
-        # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in self.itos.items()})
+            self.stoi = defaultdict()
+            # stoi is simply a reverse dict for itos
+            self.stoi.update({tok: i for i, tok in self.itos.items()})
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]

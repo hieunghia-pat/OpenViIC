@@ -88,7 +88,7 @@ class PhoBERTModel(Module):
         mask_self_attention = generate_sequential_mask(seq_len).to(input_ids.device)
         mask_self_attention = mask_self_attention.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
         mask_self_attention = torch.logical_or(mask_self_attention, mask_queries.unsqueeze(1).unsqueeze(1))
-                
+
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(input_ids.device)  # (b_s, seq_len)
         seq = seq.masked_fill(mask_queries, 0)
 

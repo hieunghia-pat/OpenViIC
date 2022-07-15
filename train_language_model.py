@@ -26,22 +26,22 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # creating checkpoint directory
 if not os.path.isdir(os.path.join(config.training.checkpoint_path, 
-                                    f"{config.model.name}_using_{config.training.using_features}")):
+                                    f"{config.model.transformer.decoder.args.pretrained_language_model}")):
     os.makedirs(os.path.join(config.training.checkpoint_path, 
-                                f"{config.model.name}_using_{config.training.using_features}"))
+                                f"{config.model.transformer.decoder.args.pretrained_language_model}"))
 
 # Creating vocabulary and dataset
 if not os.path.isfile(os.path.join(config.training.checkpoint_path, 
-                                    f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl")):
+                                    f"{config.model.transformer.decoder.args.pretrained_language_model}", "vocab.pkl")):
     print("Creating vocab ...")
     vocab = Vocab([config.path.train_json_path, config.path.dev_json_path], tokenizer_name=config.dataset.tokenizer, 
                     pretrained_language_model_name=config.model.transformer.decoder.args.pretrained_language_model_name)
     pickle.dump(vocab, open(os.path.join(config.training.checkpoint_path, 
-                            f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl"), "wb"))
+                            f"{config.model.transformer.decoder.args.pretrained_language_model}", "vocab.pkl"), "wb"))
 else:
     print("Loading vocab ...")
     vocab = pickle.load(open(os.path.join(config.training.checkpoint_path, 
-                                            f"{config.model.name}_using_{config.training.using_features}", "vocab.pkl"), "rb"))
+                                            f"{config.model.transformer.decoder.args.pretrained_language_model}", "vocab.pkl"), "rb"))
 
 # creating iterable dataset
 print("Creating datasets ...")
