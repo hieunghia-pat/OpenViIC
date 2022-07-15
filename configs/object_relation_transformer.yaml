@@ -18,7 +18,7 @@ training:
   refine_epoch_rl: 28
   get_scores: False
   training_beam_size: 5
-  evaluating_beam_size: 5
+  evaluating_beam_size: 3
   using_features: region  # region
                           # grid
                           # region+grid
