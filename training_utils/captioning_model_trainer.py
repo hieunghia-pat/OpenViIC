@@ -1,6 +1,5 @@
 from torch.nn import NLLLoss
-from torch.optim import Adam
-from torch.optim.lr_scheduler import LambdaLR
+from optimizers.nero import Nero
 
 from data_utils.vocab import Vocab
 from data_utils.utils import *
@@ -35,8 +34,7 @@ class Trainer:
 
         self.get_visual_features = get_visual_getter(config.training.using_features)
 
-        self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
-        self.scheduler = LambdaLR(self.optim, self.lambda_lr)
+        self.optim = Nero(self.model.parameters(), lr=config.training.lr)
         
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
         
@@ -167,7 +165,6 @@ class Trainer:
 
                 pbar.set_postfix(loss=running_loss / (it + 1))
                 pbar.update()
-                self.scheduler.step()
     
     def train_scst(self):
         # Training with self-critical learning
@@ -198,7 +195,6 @@ class Trainer:
                 loss = loss.mean()
                 loss.backward()
                 self.optim.step()
-                self.scheduler.step()
 
                 running_loss += loss.item()
                 running_reward += reward.mean().item()
@@ -206,11 +202,6 @@ class Trainer:
                 pbar.set_postfix(loss=running_loss / (it + 1), reward=running_reward / (it + 1),
                                 reward_baseline=running_reward_baseline / (it + 1))
                 pbar.update()
-
-    def lambda_lr(self, step):
-        warm_up = self.config.training.warmup
-        step += 1
-        return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):

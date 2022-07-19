@@ -11,11 +11,7 @@ path:
 training:
   checkpoint_path: saved_models
   start_from: null
-  learning_rate: 1.0
-  warmup: 10000
-  xe_base_lr: 0.0001
-  rl_base_lr: 0.000005
-  refine_epoch_rl: 28
+  learning_rate: 0.01
   get_scores: False
   training_beam_size: 5
   evaluating_beam_size: 5
