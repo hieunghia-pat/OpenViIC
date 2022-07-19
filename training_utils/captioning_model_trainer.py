@@ -102,11 +102,11 @@ class Trainer:
         with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             with torch.no_grad():
                 for it, sample in enumerate(dataloader):
-                    features = sample["features"].to(device)
-                    boxes = sample["boxes"]
+                    features = sample["grid_features"].to(device)
+                    boxes = None
                     if boxes is not None:
                         boxes = boxes.to(device)
-                    grid_sizes = sample["grid_sizes"]
+                    grid_sizes = [(7, 7)]
                     tokens = sample["tokens"].to(device)
                     shifted_right_tokens = sample["shifted_right_tokens"].to(device)
                     out = self.model(features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
@@ -127,11 +127,11 @@ class Trainer:
         gts = {}
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
-                features = sample["features"].to(device)
-                boxes = sample["boxes"]
+                features = sample["grid_features"].to(device)
+                boxes = None
                 if boxes is not None:
                     boxes = boxes.to(device)
-                grid_sizes = sample["grid_sizes"]
+                grid_sizes = [(7, 7)]
                 caps_gt = sample["captions"]
                 with torch.no_grad():
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
@@ -156,11 +156,11 @@ class Trainer:
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dataloader):
-                features = sample["features"].to(device)
-                boxes = sample["boxes"]
+                features = sample["grid_features"].to(device)
+                boxes = None
                 if boxes is not None:
                     boxes = boxes.to(device)
-                grid_sizes = sample["grid_sizes"]
+                grid_sizes = [(7, 7)]
                 tokens = sample["tokens"].to(device)
                 shifted_right_tokens = sample["shifted_right_tokens"].to(device)
                 out = self.model(features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
@@ -189,11 +189,11 @@ class Trainer:
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dict_dataloader):
-                features = sample["features"].to(device)
-                boxes = sample["boxes"]
+                features = sample["grid_features"].to(device)
+                boxes = None
                 if boxes is not None:
                     boxes = boxes.to(device)
-                grid_sizes = sample["grid_sizes"]
+                grid_sizes = [(7, 7)]
                 caps_gt = sample["captions"]
                 outs, log_probs = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
                                                     beam_size=config.training_beam_size, out_size=config.training_beam_size)
