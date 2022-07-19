@@ -60,38 +60,28 @@ class DictionaryDataset(data.Dataset):
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
 
-        if "boxes" in feature:
-            boxes = feature["boxes"]
-        else:
-            boxes = None
-
-        if "grid_size" in feature:
-            grid_size = feature["grid_size"]
-        else:
-            grid_size = None
-
-        return feature["features"], boxes, grid_size
+        return feature
 
     def __getitem__(self, idx: int):
         image_id = self.image_ids[idx]
         filename = self.filenames[idx]
-        features, boxes, grid_size = self.load_feature(image_id)
+        features = self.load_feature(image_id)
         captions = self.captions_with_image[idx]
 
-        returning_dict = defaultdict(lambda: None)
-        result_dict = {
+        returning_dict = {
             "image_id": image_id, 
             "filename": filename, 
-            "features": features, 
-            "boxes": boxes,
-            "grid_size": grid_size, 
+            "region_features": features["region_features"], 
+            "region_boxes": features["region_boxes"],
+            "grid_features": features["grid_features"],
+            "grid_boxes": features["grid_boxes"],
             "captions": captions
         }
+        result_dict = defaultdict(lambda: None)
+        for key in returning_dict:
+            result_dict[key] = returning_dict[key]
 
-        for key, value in result_dict.items():
-            returning_dict[key] = value
-
-        return returning_dict
+        return result_dict
 
     def __len__(self) -> int:
         return len(self.image_ids)
@@ -108,7 +98,6 @@ class FeatureDataset(data.Dataset):
         # captions
         self.annotations = self.load_json(json_data)
 
-        # images
         self.image_features_path = image_features_path
 
     @property
@@ -126,7 +115,8 @@ class FeatureDataset(data.Dataset):
                 if image["id"] == ann["image_id"]:
                     annotation = {
                         "caption": preprocess_caption(ann["caption"], self.vocab.tokenizer),
-                        "image_id": ann["image_id"]
+                        "image_id": ann["image_id"],
+                        "file_name": image["file_name"].split('.')[0]
                     }
                     break
 
@@ -142,38 +132,28 @@ class FeatureDataset(data.Dataset):
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
 
-        if "boxes" in feature:
-            boxes = feature["boxes"]
-        else:
-            boxes = None
-
-        if "grid_size" in feature:
-            grid_size = feature["grid_size"]
-        else:
-            grid_size = None
-
-        return feature["features"], boxes, grid_size
+        return feature
 
     def __getitem__(self, idx: int):
         caption = self.vocab.encode_caption(self.annotations[idx]["caption"])
         shifted_right_caption = torch.zeros_like(caption).fill_(self.vocab.padding_idx)
         shifted_right_caption[:-1] = caption[1:]
         caption = torch.where(caption == self.vocab.eos_idx, self.vocab.padding_idx, caption) # remove eos_token in caption
-        features, boxes, grid_size = self.load_feature(self.annotations[idx]["image_id"])
+        features = self.load_feature(self.annotations[idx]["image_id"])
 
-        result_dict = {
-            "features": features, 
-            "boxes": boxes,
-            "grid_size": grid_size,
+        returning_dict = {
+            "region_features": features["region_features"], 
+            "region_boxes": features["region_boxes"],
+            "grid_features": features["grid_features"],
+            "grid_boxes": features["grid_boxes"],
             "caption": caption, 
             "shifted_right_caption": shifted_right_caption
         }
+        result_dict = defaultdict(lambda: None)
+        for key in returning_dict:
+            result_dict[key] = returning_dict[key]
 
-        returning_dict = defaultdict(lambda: None)
-        for key, value in result_dict.items():
-            returning_dict[key] = value
-
-        return returning_dict
+        return result_dict
 
     def __len__(self) -> int:
         return len(self.annotations)

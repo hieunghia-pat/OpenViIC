@@ -122,9 +122,10 @@ def unk_init(token, dim):
 def collate_fn(samples):
     image_ids = []
     filenames = []
-    features = []
-    boxes = []
-    grid_sizes = []
+    region_features = []
+    region_boxes = []
+    grid_features = []
+    grid_boxes = []
     tokens = []
     captions = []
     shifted_right_tokens = []
@@ -132,58 +133,58 @@ def collate_fn(samples):
     for sample in samples:
         image_id = sample["image_id"]
         filename = sample["filename"]
-        feature = sample["features"]
-        box = sample["boxes"]
-        grid_size = sample["grid_size"]
+        region_feature = sample["region_features"]
+        region_box = sample["region_boxes"]
+        grid_feature = sample["grid_features"]
+        grid_box = sample["grid_boxes"]
         token = sample["caption"] # for cross-entropy objective training
         shifted_right_token = sample["shifted_right_caption"] # for cross-entropy objective training
         caption = sample["captions"] # for self-critical sequential training
 
-        if max_seq_len < feature.shape[0]:
-            max_seq_len = feature.shape[0]
+        region_features.append(torch.tensor(region_feature))
+        if max_seq_len < region_feature.shape[0]:
+            max_seq_len = region_feature.shape[0]
+
+        grid_features.append(torch.tensor(grid_feature))
+        if max_seq_len < grid_feature.shape[0]:
+            max_seq_len = grid_feature.shape[0]
+
+        region_boxes.append(torch.tensor(region_box))
+        grid_boxes.append(torch.tensor(grid_box))
 
         if image_id is not None:
             image_ids.append(image_id)
         if filename is not None:
             filenames.append(filename)
-        if box is not None:
-            boxes.append(torch.tensor(box))
-        if grid_size is not None:
-            grid_sizes.append(grid_size)
         if caption is not None:
             captions.append(caption)
         if token is not None:
             tokens.append(token)
         if shifted_right_token is not None:
             shifted_right_tokens.append(shifted_right_token)
-        features.append(torch.tensor(feature))
 
-    zero_feature = torch.zeros_like(features[-1][-1]).unsqueeze(0) # (1, dim)
-    if len(boxes) > 0:
-        zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
-    else:
-        zero_box = None
+    zero_feature = torch.zeros((1, 1))
+
     for batch_ith in range(len(samples)):
-        for ith in range(features[batch_ith].shape[0], max_seq_len):
-            features[batch_ith] = torch.cat([features[batch_ith], zero_feature], dim=0)
-            if zero_box is not None:
-                boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
+        region_delta = max_seq_len - region_features[batch_ith].shape[0]
+        if region_delta > 0:
+            region_features[batch_ith] = torch.cat([region_features[batch_ith], zero_feature.expand(region_delta, region_features[batch_ith].shape[-1])], dim=0)
+            region_boxes[batch_ith] = torch.cat([region_boxes[batch_ith], zero_feature.expand(region_delta, 4)], dim=0)
+        grid_delta = max_seq_len - grid_features[batch_ith].shape[0]
+        if grid_delta > 0:
+            grid_features[batch_ith] = torch.cat([grid_features[batch_ith], zero_feature.expand(grid_delta, grid_features[batch_ith].shape[-1])], dim=0)
+            grid_boxes[batch_ith] = torch.cat([grid_boxes[batch_ith], zero_feature.expand(grid_delta, 4)], dim=0)
 
-    features = torch.cat([feature.unsqueeze_(0) for feature in features], dim=0)
+    region_features = torch.cat([feature.unsqueeze_(0) for feature in region_features], dim=0)
+    region_boxes = torch.cat([box.unsqueeze_(0) for box in region_boxes])
+    grid_features = torch.cat([feature.unsqueeze_(0) for feature in grid_features], dim=0)
+    grid_boxes = torch.cat([box.unsqueeze_(0) for box in grid_boxes])
 
     if len(image_ids) == 0:
         image_ids = None
     
     if len(filenames) == 0:
         filenames = None
-    
-    if len(boxes) > 0:
-        boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
-    else:
-        boxes = None
-
-    if len(grid_sizes) == 0:
-        grid_sizes = None
     
     if len(captions) == 0:
         captions = None
@@ -201,9 +202,10 @@ def collate_fn(samples):
     return {
         "image_ids": image_ids,
         "filenames": filenames,
-        "features": features, 
-        "boxes": boxes,
-        "grid_sizes": grid_sizes,
+        "region_features": region_features,
+        "region_boxes": region_boxes,
+        "grid_features": grid_features, 
+        "grid_boxes": grid_boxes,
         "tokens": tokens, 
         "shifted_right_tokens": shifted_right_tokens,
         "captions": captions
