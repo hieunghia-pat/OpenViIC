@@ -1,7 +1,6 @@
 from torch.nn import NLLLoss
-from torch.optim import Adam
-from torch.optim.lr_scheduler import LambdaLR
 
+from optimizers.nero import Nero
 from data_utils.vocab import Vocab
 from data_utils.utils import *
 from models.transformers import EncoderDecoderTransformer
@@ -30,8 +29,7 @@ class Trainer:
 
         self.get_visual_features = get_visual_getter(config.training.using_features)
 
-        self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
-        self.scheduler = LambdaLR(self.optim, self.lambda_lr)
+        self.optim = Nero(model.parameters(), lr=self.config.training.learning_rate)
         
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
         
@@ -128,12 +126,6 @@ class Trainer:
 
                 pbar.set_postfix(loss=running_loss / (it + 1))
                 pbar.update()
-                self.scheduler.step()
-
-    def lambda_lr(self, step):
-        warm_up = self.config.training.warmup
-        step += 1
-        return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):
@@ -147,8 +139,6 @@ class Trainer:
         random.setstate(checkpoint['random_rng_state'])
 
         self.optim.load_state_dict(checkpoint['optimizer'])
-        self.scheduler.load_state_dict(checkpoint['scheduler'])
-
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
         print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best f1 on val {checkpoint['best_val_f1']} - best f1 on test {checkpoint['best_test_f1']}")
@@ -168,8 +158,7 @@ class Trainer:
             'random_rng_state': random.getstate(),
             'epoch': self.epoch,
             'state_dict': self.model.state_dict(),
-            "optimizer": self.optim.state_dict(),
-            "scheduler": self.scheduler.state_dict()
+            "optimizer": self.optim.state_dict()
         }
 
         for key, value in dict_for_updating.items():

@@ -215,8 +215,6 @@ class Trainer:
         random.setstate(checkpoint['random_rng_state'])
 
         self.optim.load_state_dict(checkpoint['optimizer'])
-        self.scheduler.load_state_dict(checkpoint['scheduler'])
-
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
         print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
@@ -243,7 +241,6 @@ class Trainer:
             dict_for_saving[key] = value
 
         dict_for_saving["optimizer"] = self.optim.state_dict()
-        dict_for_saving["scheduler"] = self.scheduler.state_dict()
 
         torch.save(dict_for_saving, os.path.join(self.config.training.checkpoint_path, 
                                                     f"{self.config.model.name}_using_{self.config.training.using_features}", 
@@ -300,7 +297,7 @@ class Trainer:
                     use_rl = True
                     switch_to_rl = True
                     patience = 0
-                    self.optim = Adam(self.model.parameters(), lr=5e-6)
+                    self.optim = Nero(self.model.parameters(), lr=self.config.training.learning_rate)
                     print("Switching to RL")
                 else:
                     print('patience reached.')
