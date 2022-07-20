@@ -276,12 +276,12 @@ class Trainer:
             patience = 0
 
         while True:
-            if not use_rl:
-                self.train_xe()
-            else:
-                self.train_scst()
+            # if not use_rl:
+            #     self.train_xe()
+            # else:
+            #     self.train_scst()
 
-            val_loss = self.evaluate_loss(self.val_dataloader)
+            # val_loss = self.evaluate_loss(self.val_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.val_dict_dataloader)

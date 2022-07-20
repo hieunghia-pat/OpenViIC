@@ -3,10 +3,30 @@ import torch.nn as nn
 from torch.nn import functional as F
 from transformers import BertModel, RobertaModel
 
-from models.modules.encoders import EncoderLayer
+from models.modules.attentions import MultiHeadAttention
+from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
 from models.modules.containers import Module
 
+class LanguageEncoderLayer(Module):
+    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
+                 use_aoa=False, attention_module=None, attention_module_kwargs=None):
+        super(LanguageEncoderLayer, self).__init__()
+        self.identity_map_reordering = identity_map_reordering
+        self.mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
+                                        use_aoa=use_aoa, can_be_stateful=True,
+                                        attention_module=attention_module,
+                                        attention_module_kwargs=attention_module_kwargs)
+        self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
+
+    def forward(self, queries, keys, values, boxes=None, grid_sizes=None, positional_emb=None, attention_mask=None, attention_weights=None):
+        if positional_emb is not None:
+            queries += positional_emb
+            keys += positional_emb
+        att = self.mhatt(queries, keys, values, boxes=boxes, grid_sizes=grid_sizes, attention_mask=attention_mask, attention_weights=attention_weights)
+        ff = self.pwff(att)
+
+        return ff
 
 class BERTModel(Module):
     def __init__(self, pretrained_language_model_name, padding_idx=0, bert_hidden_size=768, vocab_size=10201,
@@ -24,7 +44,7 @@ class BERTModel(Module):
         self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
-        self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
+        self.encoder_layer = LanguageEncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
         self.proj_to_vocab = nn.Linear(d_model, vocab_size)
 
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).byte())
@@ -85,7 +105,7 @@ class PhoBERTModel(Module):
         self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
-        self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
+        self.encoder_layer = LanguageEncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
         self.proj_to_vocab = nn.Linear(d_model, vocab_size)
 
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).byte())

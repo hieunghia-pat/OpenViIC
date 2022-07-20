@@ -69,6 +69,7 @@ class BeamSearch(object):
         outputs = []
         with self.model.statefulness(self.b_s):
             for t in range(self.max_len):
+                print(f"t={t}")
                 visual, outputs = self.iter(t, visual, boxes, grid_size, outputs, return_probs, **kwargs)
 
         # Sort result
