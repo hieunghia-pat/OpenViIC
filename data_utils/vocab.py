@@ -2,7 +2,7 @@ import torch
 
 from data_utils.vector import Vectors
 from data_utils.vector import pretrained_aliases
-from data_utils.utils import get_tokenizer, preprocess_caption, unk_init
+from data_utils.utils import preprocess_caption, unk_init
 
 from transformers import AutoTokenizer
 
