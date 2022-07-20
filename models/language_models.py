@@ -4,7 +4,7 @@ from torch.nn import functional as F
 from transformers import BertModel, RobertaModel
 
 from data_utils.vocab import Vocab
-from models.modules.encoders import EncoderLayer
+from models.modules.encoders import LanguageEncoderLayer
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
 from models.modules.containers import Module
 
@@ -25,7 +25,7 @@ class BERTModel(Module):
         self.proj_to_caption_model = nn.Linear(language_model_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
-        self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
+        self.encoder_layer = LanguageEncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
         self.proj_to_vocab = nn.Linear(d_model, len(vocab))
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None):
@@ -90,7 +90,7 @@ class PhoBERTModel(Module):
         self.proj_to_caption_model = nn.Linear(language_model_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
-        self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
+        self.encoder_layer = LanguageEncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
         self.proj_to_vocab = nn.Linear(d_model, len(vocab))
 
         self.pretrained_padding_idx = self.token_encoder.convert_tokens_to_ids(self.token_encoder.pad_token)
