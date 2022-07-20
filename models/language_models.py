@@ -4,9 +4,11 @@ from torch.nn import functional as F
 from transformers import BertModel, RobertaModel
 
 from data_utils.vocab import Vocab
-from models.modules.encoders import EncoderLayer
+from models.modules.encoders import LanguageEncoderLayer
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
 from models.modules.containers import Module
+
+from transformers import AutoTokenizer
 
 class BERTModel(Module):
     def __init__(self, vocab: Vocab, pretrained_language_model_name, language_model_hidden_size=768,
@@ -23,10 +25,25 @@ class BERTModel(Module):
         self.proj_to_caption_model = nn.Linear(language_model_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
-        self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
+        self.encoder_layer = LanguageEncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
         self.proj_to_vocab = nn.Linear(d_model, len(vocab))
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None):
+        # Mapping from original ids to pre-trained model ids.
+        pretrained_input_ids = []
+        
+        for input_id in input_ids:
+            pretrained_input_id = [self.vocab.pretrained_language_idx_mapping[str(ori_id.item())] for ori_id in input_id]
+            pretrained_input_ids.append(pretrained_input_id)
+
+        # List -> tensor.
+        pretrained_input_ids = torch.tensor(pretrained_input_ids).to(input_ids.device)
+
+        if attention_mask is None:
+            attention_mask = torch.ones_like(input_ids).to(bool).to(input_ids.device)
+        if token_type_ids is None:
+            token_type_ids = torch.zeros_like(input_ids).long().to(input_ids.device)
+
         b_s, seq_len = input_ids.shape
         mask_queries = generate_padding_mask(input_ids, self.padding_idx).to(input_ids.device)  # (b_s, seq_len)
         mask_self_attention = generate_sequential_mask(seq_len).to(input_ids.device)
@@ -35,11 +52,6 @@ class BERTModel(Module):
                 
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(input_ids.device)  # (b_s, seq_len)
         seq = seq.masked_fill(mask_queries, 0)
-
-        if attention_mask is None:
-            attention_mask = torch.ones_like(input_ids).to(bool).to(input_ids.device)
-        if token_type_ids is None:
-            token_type_ids = torch.zeros_like(input_ids).long().to(input_ids.device)
 
         bert_output = self.language_model(
             input_ids=input_ids,
@@ -69,6 +81,8 @@ class PhoBERTModel(Module):
         self.d_model = d_model
 
         self.language_model = RobertaModel.from_pretrained(pretrained_language_model_name, return_dict=True)
+
+        self.token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
         # frozen the language model
         for param in self.language_model.parameters():
             param.requires_grad = False
@@ -76,13 +90,37 @@ class PhoBERTModel(Module):
         self.proj_to_caption_model = nn.Linear(language_model_hidden_size, d_model)
 
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, padding_idx=0), freeze=True)
-        self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
+        self.encoder_layer = LanguageEncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
         self.proj_to_vocab = nn.Linear(d_model, len(vocab))
+
+        self.pretrained_padding_idx = self.token_encoder.convert_tokens_to_ids(self.token_encoder.pad_token)
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None):
         '''
         Forward language model.
         '''
+        # Mapping from original ids to pre-trained model ids.
+        pretrained_input_ids = []
+        
+        for input_id in input_ids:
+            pretrained_input_id = [self.vocab.pretrained_language_idx_mapping[ori_id.item()] for ori_id in input_id]
+            pretrained_input_ids.append(pretrained_input_id)
+
+        # List -> tensor.
+        pretrained_input_ids = torch.tensor(pretrained_input_ids).to(input_ids.device)
+
+        if attention_mask is None:
+            attention_mask = torch.ones_like(pretrained_input_ids).to(torch.bool).to(input_ids.device)
+        if token_type_ids is None:
+            token_type_ids = torch.zeros_like(pretrained_input_ids).long().to(input_ids.device)
+
+        bert_output = self.language_model(
+            input_ids=pretrained_input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask
+        )
+
+        # Masking
         b_s, seq_len = input_ids.shape
         mask_queries = generate_padding_mask(input_ids, self.padding_idx).to(input_ids.device)  # (b_s, seq_len)
         mask_self_attention = generate_sequential_mask(seq_len).to(input_ids.device)
@@ -92,16 +130,6 @@ class PhoBERTModel(Module):
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(input_ids.device)  # (b_s, seq_len)
         seq = seq.masked_fill(mask_queries, 0)
 
-        if attention_mask is None:
-            attention_mask = torch.ones_like(input_ids).to(bool).to(input_ids.device)
-        if token_type_ids is None:
-            token_type_ids = torch.zeros_like(input_ids).long().to(input_ids.device)
-
-        bert_output = self.language_model(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask
-        )
         language_feature = self.proj_to_caption_model(bert_output.last_hidden_state)
         language_feature = language_feature + self.pos_emb(seq)
 

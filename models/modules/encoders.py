@@ -1,10 +1,31 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+
+from models.modules.containers import Module
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import AugmentedGeometryScaledDotProductAttention, AugmentedMemoryScaledDotProductAttention, MultiHeadAttention, ScaledDotProductAttention
 from models.utils import generate_padding_mask, get_combine_masks, box_relational_embedding, clones
 from models.modules.embeddings import SinusoidPositionalEmbedding
+
+class LanguageEncoderLayer(Module):
+    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
+                 use_aoa=False, attention_module=None, attention_module_kwargs=None):
+        super(LanguageEncoderLayer, self).__init__()
+        self.identity_map_reordering = identity_map_reordering
+        self.mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
+                                        use_aoa=use_aoa, can_be_stateful=True,
+                                        attention_module=attention_module,
+                                        attention_module_kwargs=attention_module_kwargs)
+        self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
+
+    def forward(self, queries, keys, values, padding_mask=None, attention_mask=None, **kwargs):
+        att = self.mhatt(queries=queries, keys=keys, values=values, attention_mask=attention_mask, **kwargs)
+        ff = self.pwff(att)
+        if padding_mask is not None:
+            ff = ff.masked_fill(padding_mask, value=0)
+
+        return ff
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,

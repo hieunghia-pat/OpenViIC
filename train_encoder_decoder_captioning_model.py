@@ -78,7 +78,6 @@ encoder = get_encoder(vocab, config)
 decoder = get_decoder(vocab, config)
 
 # init Transformer model.
-print("Defining captioning model ...")
 model = EncoderDecoderTransformer(vocab.bos_idx, encoder, decoder).to(device)
 
 # Define Trainer
