@@ -1,5 +1,5 @@
 import torch
-from data_utils.types import *
+from data_utils.typing import *
 
 class BeamSearch(object):
     def __init__(self, model, b_s: int, max_len: int, eos_idx: int, beam_size: int, device):
