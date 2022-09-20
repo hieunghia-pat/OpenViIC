@@ -8,7 +8,7 @@ from utils.instances import Instances
 from .base_transformer import BaseTransformer
 
 @META_ARCHITECTURE.register()
-class StandardStranformerUsingRegion(BaseTransformer):
+class StandardTransformerUsingRegion(BaseTransformer):
     def __init__(self, config, vocab):
         super().__init__(vocab)
 
@@ -48,7 +48,7 @@ class StandardStranformerUsingRegion(BaseTransformer):
         return encoder_features, vision_padding_mask
 
 @META_ARCHITECTURE.register()
-class StandardStranformerUsingGrid(BaseTransformer):
+class StandardTransformerUsingGrid(BaseTransformer):
     def __init__(self, config, vocab):
         super().__init__(vocab)
 
@@ -56,7 +56,7 @@ class StandardStranformerUsingGrid(BaseTransformer):
 
         self.vision_embedding = build_vision_embedding(config.VISION_EMBEDDING)
         self.encoder = build_encoder(config.ENCODER)
-        self.decoder = build_decoder(config.DECODER)
+        self.decoder = build_decoder(config.DECODER, vocab)
 
     def forward(self, input_features: Instances):
         vision_features = input_features.grid_features

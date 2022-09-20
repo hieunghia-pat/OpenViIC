@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from data_utils.types import *
+from data_utils.typing import *
 
 import numpy as np
 import copy

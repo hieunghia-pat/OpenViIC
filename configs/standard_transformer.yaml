@@ -36,8 +36,8 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: MeshedMemoryTransformer
-  NAME: m2_region_x152++
+  ARCHITECTURE: StandardTranformerUsingRegion
+  NAME: standard_transformer_region_x152++
   DEVICE: cuda
   VISION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
@@ -49,14 +49,13 @@ MODEL:
     D_MODEL: 512
     LAYERS: 3
     SELF_ATTENTION:
-      ARCHITECTURE: AugmentedMemoryScaledDotProductAttention
+      ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8
       D_MODEL: 512
       D_KEY: 64
       D_VALUE: 64
       D_FF: 2048
       D_FEATURE: 2048
-      MEMORY: 40
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1

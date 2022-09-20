@@ -5,19 +5,20 @@ from utils.logging_utils import setup_logger
 from data_utils.vocab import Vocab
 from data_utils.dataset import FeatureDataset, DictionaryDataset
 from .base_trainer import BaseTrainer
-from builders.task_builder import META_TASK
+from builders.trainer_builder import META_TRAINER
 import evaluation
-from evaluation import Cider
+from evaluation import Cider, PTBTokenizer
 
 import os
 import numpy as np
 from tqdm import tqdm
 import itertools
 from shutil import copyfile
+import multiprocessing
 
 logger = setup_logger()
 
-@META_TASK.register()
+@META_TRAINER.register()
 class enTrainer(BaseTrainer):
     def __init__(self, config):
         super().__init__(config)
@@ -31,7 +32,7 @@ class enTrainer(BaseTrainer):
         self.training_beam_size = config.TRAINING.TRAINING_BEAM_SIZE
         self.evaluating_beam_size = config.TRAINING.EVALUATING_BEAM_SIZE
         self.patience = config.TRAINING.PATIENCE
-        self.train_cider = Cider({f"{idx}": answer for idx, answer in enumerate(self.train_dataset.answers)})
+        self.train_cider = Cider(PTBTokenizer.tokenize(self.train_dataset.captions))
 
     def load_vocab(self, config):
         vocab = Vocab(config.DATASET)
@@ -62,8 +63,8 @@ class enTrainer(BaseTrainer):
                     with torch.no_grad():
                         out = self.model(items).contiguous()
                     
-                    shifted_right_answer_tokens = items.shifted_right_answer_tokens
-                    loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
+                    shifted_right_caption_tokens = items.shifted_right_caption_tokens
+                    loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_caption_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
 
@@ -84,14 +85,16 @@ class enTrainer(BaseTrainer):
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=dataloader.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
-                answers_gt = items.answer
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
-                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                caps_gt = items.caption
+                caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=False)
+                for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
                 pbar.update()
 
+        gts = PTBTokenizer.tokenize(gts)
+        gen = PTBTokenizer.tokenize(gen)
         scores, _ = evaluation.compute_scores(gts, gens)
 
         return scores
@@ -104,9 +107,9 @@ class enTrainer(BaseTrainer):
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
                 out = self.model(items).contiguous()
-                shifted_right_answer_tokens = items.shifted_right_answer_tokens
+                shifted_right_caption_tokens = items.shifted_right_caption_tokens
                 self.optim.zero_grad()
-                loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
+                loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_caption_tokens.view(-1))
                 loss.backward()
 
                 self.optim.step()
@@ -119,6 +122,7 @@ class enTrainer(BaseTrainer):
 
     def train_scst(self):
         # design especially for self-critical sequential learning
+        tokenizer_pool = multiprocessing.Pool()
         running_reward = .0
         running_reward_baseline = .0
 
@@ -134,13 +138,12 @@ class enTrainer(BaseTrainer):
                 self.optim.zero_grad()
 
                 # Rewards
-                bs = items.question_tokens.shape[0]
-                answers_gt = items.answer
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
-                answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
-                gens = {f"{idx}": answer_gen for idx, answer_gen in enumerate(answers_gen)}
-                gts = {f"{idx}": answer_gt for idx, answer_gt in enumerate(answers_gt)}
-                reward = self.train_cider.compute_score(gts, gens)[1].astype(np.float32)
+                bs = len(items.caption)
+                caps_gt = items.caption
+                caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=True)
+                caps_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in caps_gt)))
+                caps_gen, caps_gt = tokenizer_pool.map(PTBTokenizer.tokenize, [caps_gen, caps_gt])
+                reward = self.train_cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
                 reward = torch.from_numpy(reward).to(self.device).view(bs, self.config.training.training_beam_size)
                 reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
                 loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
@@ -244,12 +247,12 @@ class enTrainer(BaseTrainer):
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, beam_size=self.evaluating_beam_size, out_size=1)
 
-                answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
-                answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
+                caps_gt = items.caption
+                caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=True)
+                caps_gt = list(itertools.chain(*([c, ] * self.training_beam_size for c in caps_gt)))
                 gts = {}
                 gens = {}
-                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i

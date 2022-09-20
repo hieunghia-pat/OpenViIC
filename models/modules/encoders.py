@@ -40,7 +40,7 @@ class Encoder(nn.Module):
 @META_ENCODER.register()
 class GeometricEncoder(nn.Module):
     def __init__(self, config):
-        super(Encoder, self).__init__()
+        super(GeometricEncoder, self).__init__()
         
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
 

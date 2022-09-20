@@ -16,7 +16,7 @@ class MeshedMemoryTransformer(BaseTransformer):
 
         self.vision_embedding = build_vision_embedding(config.VISION_EMBEDDING)
         self.encoder = build_encoder(config.ENCODER)
-        self.decoder = build_decoder(config.DECODER)
+        self.decoder = build_decoder(config.DECODER, vocab)
 
     def forward(self, input_features: Instances):
         vision_features = input_features.region_features

@@ -38,7 +38,7 @@ class BaseDataset(data.Dataset):
                     annotation = {
                         "caption": preprocess_caption(ann["caption"], self.vocab.tokenizer),
                         "image_id": ann["image_id"],
-                        "filename": image["filename"]
+                        "filename": image["file_name"]
                     }
                     break
 
@@ -127,7 +127,7 @@ class FeatureDataset(BaseDataset):
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
-        caption = self.vocab.encode_question(item["caption"])
+        caption = self.vocab.encode_caption(item["caption"])
 
         shifted_right_caption = torch.zeros_like(caption).fill_(self.vocab.padding_idx)
         shifted_right_caption[:-1] = caption[1:]
@@ -136,7 +136,7 @@ class FeatureDataset(BaseDataset):
         features = self.load_features(self.annotations[idx]["image_id"])
 
         return Instances(
-            question_tokens=caption,
+            caption_tokens=caption,
             shifted_right_caption_tokens=shifted_right_caption,
             **features,
         )

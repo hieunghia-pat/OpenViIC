@@ -1,6 +1,4 @@
-from tasks.base_task import BaseTask
-from tasks.open_ended_task import OpenEndedTask
-from tasks.classification_task import ClassificationTask
+from trainers.base_trainer import BaseTrainer
 from models.modules.attentions import (
     ScaledDotProductAttention,
     AugmentedGeometryScaledDotProductAttention,
@@ -9,8 +7,7 @@ from models.modules.attentions import (
 )
 from models.modules.encoders import (
     Encoder,
-    CoAttentionEncoder,
-    CrossModalityEncoder
+    GeometricEncoder
 )
 from models.modules.decoders import (
     Decoder,
@@ -23,4 +20,10 @@ from models.modules.text_embeddings import (
     UsualEmbedding,
     LSTMTextEmbedding
 )
-from models.extended_mcan import ExtendedMCAN
+from models.standard_stransformer import (
+    StandardTransformerUsingRegion,
+    StandardTransformerUsingGrid
+)
+from models.object_relation_transformer import ObjectRelationTransformer
+from models.meshed_memory_transformer import MeshedMemoryTransformer
+from models.unified_transformer import UnifiedTransformer

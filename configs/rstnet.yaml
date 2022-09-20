@@ -1,60 +1,92 @@
-## configuration for paths
-path:
-  train_json_path : features/annotations/UIT-ViIC/uitviic_captions_train2017.json
-  dev_json_path : features/annotations/UIT-ViIC/uitviic_captions_val2017.json
-  public_test_json_path : features/annotations/UIT-ViIC/uitviic_captions_test2017.json
-  private_test_json_path: null
-  image_features_path : features/UIT-ViIC/faster_rcnn_x152++
-  images_path : null
+TRAINER: ViTrainer
 
-## configuration for training
-training:
-  checkpoint_path: saved_models
-  start_from: null
-  learning_rate: 1.0
-  warmup: 10000
-  xe_base_lr: 0.0001
-  rl_base_lr: 0.000005
-  refine_epoch_rl: 28
-  get_scores: False
-  training_beam_size: 5
-  evaluating_beam_size: 3
-  using_features: grid
+DATASET:
+  BATCH_SIZE: 20
+  WORKERS: 2
+  MIN_FREQ: 1
+  VOCAB:
+    TOKENIZER: null
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+    BOS_TOKEN: <bos>
+    EOS_TOKEN: <eos>
+    PAD_TOKEN: <pad>
+    UNK_TOKEN: <unk>
+    USE_MAPPING: False
+    PRETRAINED_LANGUAGE_MODEL: null
+  JSON_PATH:
+    TRAIN: features/UIT-ViIC/annotations/uitviic_captions_train2017.json
+    DEV: features/UIT-ViIC/annotations/uitviic_captions_val2017.json
+    TEST: features/UIT-ViIC/annotations/uitviic_captions_test2017.json
+  FEATURE_PATH:
+    FEATURES: features/UIT-ViIC/features/faster_rcnn_x152++
+    IMAGE: null
 
-## model configuration
-model:
-  name: rstnet
-  nhead : 8
-  nlayers : 3
-  d_model : 512
-  d_k : 64
-  d_v : 64
-  d_ff : 2048
-  d_feature : 2048
-  dropout : .5
-  embedding_dim : 300
+TRAINING:
+  CHECKPOINT_PATH: saved_models
+  LEARNING_RATE: 1.
+  RL_LEARNING_RATE: 0.000005
+  WARMUP: 10000
+  GET_SCORES: False
+  TRAINING_BEAM_SIZE: 5
+  EVALUATING_BEAM_SIZE: 3
+  PATIENCE: 5
 
-  transformer:
-    encoder:
-      args:
-        use_aoa: False
-        multi_level_output: False
-      module: augmented-geometry-encoder
-
-    decoder:
-      args:
-        use_aoa: False
-        ## pretrained language model components
-        pretrained_language_model_name : vinai/phobert-base
-        pretrained_language_model : phobert-base
-        pretrained_language_model_path : best_language_model.pth
-        language_model_hidden_size : 768
-      module: adaptive-decoder
-
-## dataset configuration
-dataset:
-  batch_size: 32
-  workers: 2
-  tokenizer: vncorenlp
-  word_embedding: null
-  min_freq: 1
+MODEL:
+  ARCHITECTURE: StandardStranformerUsingRegion
+  NAME: standard_transformer_region_x152++
+  DEVICE: cuda
+  VISION_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
+    D_FEATURE: 1024
+    D_MODEL: 512
+    DROPOUT: 0.1
+  ENCODER:
+    ARCHITECTURE: Encoder
+    D_MODEL: 512
+    LAYERS: 3
+    SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+  DECODER:
+    ARCHITECTURE: Decoder
+    D_MODEL: 512
+    LAYERS: 3
+    ATTENTION:
+      SELF_ATTENTION:
+        ARCHITECTURE: ScaledDotProductAttention
+        HEAD: 8
+        D_MODEL: 512
+        D_KEY: 64
+        D_VALUE: 64
+        D_FF: 2048
+        D_FEATURE: 2048
+        USE_AOA: False
+        CAN_BE_STATEFUL: True
+        DROPOUT: .1
+      ENC_ATTENTION:
+        ARCHITECTURE: ScaledDotProductAttention
+        HEAD: 8
+        D_MODEL: 512
+        D_KEY: 64
+        D_VALUE: 64
+        D_FF: 2048
+        D_FEATURE: 2048
+        USE_AOA: False
+        CAN_BE_STATEFUL: False
+        DROPOUT: .1
+    TEXT_EMBEDDING:
+      ARCHITECTURE: UsualEmbedding
+      D_MODEL: 512
+      D_EMBEDDING: 300
+      WORD_EMBEDDING: null
+      WORD_EMBEDDING_CACHE: null
+      DROPOUT: 0.1

@@ -1,17 +1,16 @@
 import torch
 from torch import nn
 
-from data_utils.vocab import Vocab
 from models.modules.containers import Module
 from models.modules.beam_search import BeamSearch
 from utils.instances import Instances
 
 class BaseTransformer(Module):
-    def __init__(self, vocab: Vocab):
+    def __init__(self, vocab):
         super(BaseTransformer, self).__init__()
 
         self.vocab = vocab
-        self.max_len = vocab.max_answer_length
+        self.max_len = vocab.max_caption_length
         self.eos_idx = vocab.eos_idx
 
         self.register_state('encoder_features', None)

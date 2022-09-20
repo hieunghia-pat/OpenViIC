@@ -1,13 +1,12 @@
 from torch import nn
 
-from data_utils.vocab import Vocab
 from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.word_embedding_builder import build_word_embedding
 from models.utils import generate_sequential_mask, generate_padding_mask
 
 @META_TEXT_EMBEDDING.register()
 class UsualEmbedding(nn.Module):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super(UsualEmbedding, self).__init__()
 
         self.padding_idx = vocab.padding_idx
@@ -33,7 +32,7 @@ class UsualEmbedding(nn.Module):
 
 @META_TEXT_EMBEDDING.register()
 class LSTMTextEmbedding(nn.Module):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super(LSTMTextEmbedding, self).__init__()
 
         self.embedding = nn.Embedding(len(vocab), config.D_EMBEDDING, padding_idx=vocab.padding_idx)
