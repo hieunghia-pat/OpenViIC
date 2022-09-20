@@ -1,6 +1,7 @@
+from typing import List
 import torch
-from torchvision import transforms
 import re
+from utils.instances import Instances
 
 def get_tokenizer(tokenizer):
     if tokenizer is None:
@@ -68,7 +69,6 @@ def preprocess_caption(caption, tokenizer: str):
     caption = re.sub(r"\]", " ] ", caption)
     caption = re.sub(r"/", " / ", caption)
     caption = re.sub(r"\.", " . ", caption)
-    caption = re.sub(r".\. *\. *\. *", " ... ", caption)
     caption = re.sub(r"\$", " $ ", caption)
     caption = re.sub(r"\&", " & ", caption)
     caption = re.sub(r"\*", " * ", caption)
@@ -78,14 +78,6 @@ def preprocess_caption(caption, tokenizer: str):
     tokens = caption.strip().split()
     
     return tokens
-
-def get_transform(target_size):
-    return transforms.Compose([
-        transforms.Resize(target_size),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225]),
-    ])
 
 def reporthook(t):
     """
@@ -125,94 +117,5 @@ def unk_init(token, dim):
         return torch.ones(dim) * 2
     return torch.ones(dim) * 3
 
-def collate_fn(samples):
-    image_ids = []
-    filenames = []
-    region_features = []
-    region_boxes = []
-    grid_features = []
-    grid_boxes = []
-    tokens = []
-    captions = []
-    shifted_right_tokens = []
-    max_seq_len = 0
-    for sample in samples:
-        image_id = sample["image_id"]
-        filename = sample["filename"]
-        region_feature = sample["region_features"]
-        region_box = sample["region_boxes"]
-        grid_feature = sample["grid_features"]
-        grid_box = sample["grid_boxes"]
-        token = sample["caption"] # for cross-entropy objective training
-        shifted_right_token = sample["shifted_right_caption"] # for cross-entropy objective training
-        caption = sample["captions"] # for self-critical sequential training
-
-        region_features.append(torch.tensor(region_feature))
-        if max_seq_len < region_feature.shape[0]:
-            max_seq_len = region_feature.shape[0]
-
-        grid_features.append(torch.tensor(grid_feature))
-        if max_seq_len < grid_feature.shape[0]:
-            max_seq_len = grid_feature.shape[0]
-
-        region_boxes.append(torch.tensor(region_box))
-        grid_boxes.append(torch.tensor(grid_box))
-
-        if image_id is not None:
-            image_ids.append(image_id)
-        if filename is not None:
-            filenames.append(filename)
-        if caption is not None:
-            captions.append(caption)
-        if token is not None:
-            tokens.append(token)
-        if shifted_right_token is not None:
-            shifted_right_tokens.append(shifted_right_token)
-
-    zero_feature = torch.zeros((1, 1))
-
-    for batch_ith in range(len(samples)):
-        region_delta = max_seq_len - region_features[batch_ith].shape[0]
-        if region_delta > 0:
-            region_features[batch_ith] = torch.cat([region_features[batch_ith], zero_feature.expand(region_delta, region_features[batch_ith].shape[-1])], dim=0)
-            region_boxes[batch_ith] = torch.cat([region_boxes[batch_ith], zero_feature.expand(region_delta, 4)], dim=0)
-        grid_delta = max_seq_len - grid_features[batch_ith].shape[0]
-        if grid_delta > 0:
-            grid_features[batch_ith] = torch.cat([grid_features[batch_ith], zero_feature.expand(grid_delta, grid_features[batch_ith].shape[-1])], dim=0)
-            grid_boxes[batch_ith] = torch.cat([grid_boxes[batch_ith], zero_feature.expand(grid_delta, 4)], dim=0)
-
-    region_features = torch.cat([feature.unsqueeze_(0) for feature in region_features], dim=0)
-    region_boxes = torch.cat([box.unsqueeze_(0) for box in region_boxes])
-    grid_features = torch.cat([feature.unsqueeze_(0) for feature in grid_features], dim=0)
-    grid_boxes = torch.cat([box.unsqueeze_(0) for box in grid_boxes])
-
-    if len(image_ids) == 0:
-        image_ids = None
-    
-    if len(filenames) == 0:
-        filenames = None
-    
-    if len(captions) == 0:
-        captions = None
-
-    if len(tokens) > 0:
-        tokens = torch.cat([token.unsqueeze_(0) for token in tokens], dim=0)
-    else:
-        tokens = None
-    
-    if len(shifted_right_tokens) > 0:
-        shifted_right_tokens = torch.cat([token.unsqueeze_(0) for token in shifted_right_tokens], dim=0)
-    else:
-        shifted_right_tokens = None
-
-    return {
-        "image_ids": image_ids,
-        "filenames": filenames,
-        "region_features": region_features,
-        "region_boxes": region_boxes,
-        "grid_features": grid_features, 
-        "grid_boxes": grid_boxes,
-        "tokens": tokens, 
-        "shifted_right_tokens": shifted_right_tokens,
-        "captions": captions
-    }
+def collate_fn(samples: List[Instances]):
+    return Instances.cat(samples)

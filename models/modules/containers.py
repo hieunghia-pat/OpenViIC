@@ -1,6 +1,6 @@
 from torch import nn
 from contextlib import contextmanager
-from models.utils import *
+from data_utils.typing import TensorOrNone
 
 class Module(nn.Module):
     def __init__(self):
@@ -72,6 +72,7 @@ class Module(nn.Module):
 
 class ModuleList(nn.ModuleList, Module):
     pass
+
 
 class ModuleDict(nn.ModuleDict, Module):
     pass
