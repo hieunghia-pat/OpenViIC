@@ -44,7 +44,7 @@ class DualFeatureEmbedding(nn.Module):
         return (region_features, region_masks), (grid_features, grid_masks)
 
 @META_VISION_EMBEDDING.register()
-class DualFeatureEmbedding(nn.Module):
+class GeometricDualFeatureEmbedding(nn.Module):
     def __init__(self, config):
         super().__init__()
 
