@@ -108,16 +108,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, queries, keys, values, boxes, attention_mask=None, **kwargs):
-        # embedding geometric information from boxes coordinates
-        relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
-        flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, self.d_g)
-        bs, nk, _, _ = relative_geometry_embeddings.shape
-        box_size_per_head = [bs, 1, nk, nk]
-        relative_geometry_weights_per_head = [fc_g(flatten_relative_geometry_embeddings).view(box_size_per_head) for fc_g in self.fc_gs]
-        relative_geometry_weights = torch.cat(relative_geometry_weights_per_head, dim=1) # (bs, h, nk, nk)
-        relative_geometry_weights = F.relu(relative_geometry_weights)
-        
+    def forward(self, queries, keys, values, relative_geometry_weights, attention_mask=None, **kwargs):
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
         q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)

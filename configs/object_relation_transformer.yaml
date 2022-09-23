@@ -48,6 +48,7 @@ MODEL:
     ARCHITECTURE: GeometricEncoder
     D_MODEL: 512
     LAYERS: 3
+    TRIGNOMETRIC_EMBEDDING: False
     SELF_ATTENTION:
       ARCHITECTURE: AugmentedGeometryScaledDotProductAttention
       HEAD: 8
@@ -57,7 +58,6 @@ MODEL:
       D_FF: 2048
       D_FEATURE: 2048
       USE_AOA: False
-      TRIGNOMETRIC_EMBEDDING: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
   DECODER:
