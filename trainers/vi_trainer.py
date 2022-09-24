@@ -82,9 +82,9 @@ class viTrainer(BaseTrainer):
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs, _ = self.model.beam_search(items, batch_size=dataloader.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
+                    outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
-                caps_gt = items.caption
+                caps_gt = items.captions
                 caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -103,10 +103,6 @@ class viTrainer(BaseTrainer):
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
-                print(items.region_features.shape)
-                print(items.caption_tokens.shape)
-                print(items.shifted_right_caption_tokens.shape)
-                raise
                 out = self.model(items).contiguous()
                 shifted_right_caption_tokens = items.shifted_right_caption_tokens
                 self.optim.zero_grad()
@@ -132,14 +128,14 @@ class viTrainer(BaseTrainer):
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, items in enumerate(self.train_dict_dataloader):
                 items = items.to(self.device)
-                outs, log_probs = self.model.beam_search(items, batch_size=self.train_dict_dataloader.batch_size, 
+                outs, log_probs = self.model.beam_search(items, batch_size=items.batch_size, 
                                                             beam_size=self.training_beam_size, out_size=self.training_beam_size)
                 
                 self.optim.zero_grad()
 
                 # Rewards
-                bs = len(items.caption)
-                caps_gt = items.caption
+                bs = len(items.captions)
+                caps_gt = items.captions
                 caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=True)
                 caps_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in caps_gt)))
                 gens = {f"{idx}": cap_gen for idx, cap_gen in enumerate(caps_gen)}
@@ -183,12 +179,12 @@ class viTrainer(BaseTrainer):
 
             # val scores
             scores = self.evaluate_metrics(self.val_dict_dataloader)
-            logger.info("Validation scores", scores)
+            logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
             if self.test_dict_dataloader is not None:
                 scores = self.evaluate_metrics(self.test_dict_dataloader)
-                logger.info("Evaluation scores", scores)
+                logger.info("Evaluation scores %s", scores)
 
             # Prepare for next epoch
             best = False
@@ -248,7 +244,7 @@ class viTrainer(BaseTrainer):
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, beam_size=self.evaluating_beam_size, out_size=1)
 
-                caps_gt = items.caption
+                caps_gt = items.captions
                 caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=True)
                 caps_gt = list(itertools.chain(*([c, ] * self.training_beam_size for c in caps_gt)))
                 gts = {}

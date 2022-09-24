@@ -82,6 +82,14 @@ class Instances:
         """
         return self._fields
 
+    @property
+    def batch_size(self) -> int:
+        for k in self._fields:
+            if isinstance(self._fields[k], torch.Tensor):
+                return self._fields[k].shape[0]
+
+        return 0
+
     # Tensor-like methods
     def to(self, *args: Any, **kwargs: Any) -> "Instances":
         """
@@ -161,10 +169,17 @@ class Instances:
         assert all(isinstance(i, Instances) for i in instance_lists)
         assert len(instance_lists) > 0
         if len(instance_lists) == 1:
-            return instance_lists[0].unsqueeze(dim=0)
+            ret = Instances()
+            for k, v in instance_lists[0].get_fields().items():
+                if isinstance(v, list):
+                    ret.set(k, [v])
+                elif isinstance(v, torch.Tensor):
+                    ret.set(k, v.unsqueeze(dim=0))
+            
+            return ret
 
         ret = Instances()
-        for key in instance_lists[0]._fields.keys():
+        for key in instance_lists[0].get_fields().keys():
             values = [instance.get(key) for instance in instance_lists]
             v0 = values[0]
             if isinstance(v0, np.ndarray):
@@ -174,8 +189,6 @@ class Instances:
             if isinstance(v0, torch.Tensor):
                 values = pad_values(values)
                 values = torch.cat(values, dim=0)
-            elif isinstance(v0, list):
-                values = list(itertools.chain(*values))
             elif hasattr(type(v0), "cat"):
                 values = type(v0).cat(values)
             else:
