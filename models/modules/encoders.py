@@ -15,10 +15,10 @@ class EncoderLayer(nn.Module):
         self.mhatt = MultiHeadAttention(config)
         self.pwff = PositionWiseFeedForward(config)
 
-    def forward(self, queries, keys, values, attention_mask, **kwargs):
-        att = self.mhatt(queries=queries, keys=keys, values=values, attention_mask=attention_mask, **kwargs)
+    def forward(self, queries, keys, values, padding_mask, attention_mask, **kwargs):
+        att = self.mhatt(queries=queries, keys=keys, values=values, padding_mask=padding_mask, attention_mask=attention_mask, **kwargs)
         ff = self.pwff(att)
-        ff = ff.masked_fill(attention_mask.squeeze().unsqueeze(-1), value=0)
+        ff = ff.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
 
         return ff
 
@@ -37,11 +37,11 @@ class Encoder(nn.Module):
         features = input_features.features
         padding_mask = input_features.features_padding_mask
         
-        out = self.layer_norm(features)
+        out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
-            out = layer(queries=out, keys=out, values=out, attention_mask=padding_mask)
+            out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=padding_mask)
 
-        return out
+        return 
 
 @META_ENCODER.register()
 class GeometricEncoder(nn.Module):
@@ -88,7 +88,8 @@ class GeometricEncoder(nn.Module):
             out = layer(queries=out, 
                         keys=out, 
                         values=out, 
-                        relative_geometry_weights=relative_geometry_weights, 
+                        relative_geometry_weights=relative_geometry_weights,
+                        padding_mask=padding_mask,
                         attention_mask=padding_mask)
 
         return out
@@ -164,6 +165,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
                                         values=region_features, 
                                         keys=region_features, 
                                         relative_geometry_weights=relative_geometry_weights[:, :, :n_regions, :n_regions],
+                                        padding_mask=region_padding_mask,
                                         attention_mask=region_padding_mask)
 
             #self-attention on grid feature
@@ -171,6 +173,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
                                     values=grid_features, 
                                     keys=grid_features,
                                     relative_geometry_weights=relative_geometry_weights[:, :, n_regions:, n_regions:],
+                                    padding_mask=grid_padding_mask,
                                     attention_mask=grid_padding_mask)
 
             # prepare the combined output
@@ -182,6 +185,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
                                 keys=combined_features, 
                                 values=combined_features, 
                                 relative_geometry_weights=relative_geometry_weights[:, :, :n_regions, :],
+                                padding_mask=region2all_mask,
                                 attention_mask=region2all_mask)
 
             # locally contrained cross-attention for grid
@@ -189,6 +193,7 @@ class DualCollaborativeLevelEncoder(nn.Module):
                                 keys=combined_features, 
                                 values=combined_features, 
                                 relative_geometry_weights=relative_geometry_weights[:, :, n_regions:, :],
+                                padding_mask=grid2all_mask,
                                 attention_mask=grid2all_mask)
 
         out = torch.cat([region_features, grid_features], dim=1)

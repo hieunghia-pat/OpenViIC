@@ -1,6 +1,7 @@
 import itertools
 from typing import Any, Dict, List, Union
 import torch
+import numpy as np
 
 from .logging_utils import setup_logger
 
@@ -94,6 +95,34 @@ class Instances:
             ret.set(k, v)
         return ret
 
+    # Tensor-like methods
+    def unsqueeze(self, *args: Any, **kwargs) -> "Instances":
+        """
+        Returns:
+            Instances: all fields are called with a `unsqueeze(dim)`, if the field has this method.
+        """
+        ret = Instances()
+        for k, v in self._fields.items():
+            if hasattr(v, "unsqueeze"):
+                v = v.unsqueeze(*args, **kwargs)
+            ret.set(k, v)
+        
+        return ret
+
+    # Tensor-like methods
+    def squeeze(self, *args: Any, **kwargs) -> "Instances":
+        """
+        Returns:
+            Instances: all fields are called with a `squeeze(dim)`, if the field has this method.
+        """
+        ret = Instances()
+        for k, v in self._fields.items():
+            if hasattr(v, "squeeze"):
+                v = v.squeeze(*args, **kwargs)
+            ret.set(k, v)
+        
+        return ret
+
     def __getitem__(self, item: Union[int, slice, torch.BoolTensor]) -> "Instances":
         """
         Args:
@@ -132,12 +161,16 @@ class Instances:
         assert all(isinstance(i, Instances) for i in instance_lists)
         assert len(instance_lists) > 0
         if len(instance_lists) == 1:
-            return instance_lists[0]
+            return instance_lists[0].unsqueeze(dim=0)
 
         ret = Instances()
         for key in instance_lists[0]._fields.keys():
             values = [instance.get(key) for instance in instance_lists]
             v0 = values[0]
+            if isinstance(v0, np.ndarray):
+                values = [torch.tensor(value) for value in values]
+                values = pad_values(values)
+                values = torch.cat(values, dim=0)
             if isinstance(v0, torch.Tensor):
                 values = pad_values(values)
                 values = torch.cat(values, dim=0)
