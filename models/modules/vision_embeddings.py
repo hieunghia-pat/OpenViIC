@@ -14,7 +14,6 @@ class FeatureEmbedding(nn.Module):
 
     def forward(self, features):
         masks = generate_padding_mask(features, padding_idx=0).to(features.device)
-
         features = self.proj(features)
         features = self.dropout(features)
 

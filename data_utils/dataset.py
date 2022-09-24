@@ -91,6 +91,9 @@ class DictionaryDataset(data.Dataset):
         
         return features
 
+    def __len__(self):
+        return len(self.image_ids)
+
     def load_json(self, json_data: Dict) -> List[Dict]:
         examples = {}
         filenames = {}
@@ -118,7 +121,6 @@ class DictionaryDataset(data.Dataset):
         captions = self.captions_with_image[idx]
 
         return Instances(
-            image_id=image_id,
             filename=filename,
             captions=captions,
             **features

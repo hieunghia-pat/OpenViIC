@@ -1,4 +1,6 @@
 from trainers.base_trainer import BaseTrainer
+from trainers.en_trainer import enTrainer
+from trainers.vi_trainer import viTrainer
 from models.modules.attentions import (
     ScaledDotProductAttention,
     AugmentedGeometryScaledDotProductAttention,

@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from torch import functional as F
+from torch.nn import functional as F
 
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.pos_embeddings import SinusoidPositionalEmbedding
@@ -54,9 +54,11 @@ class GeometricEncoder(nn.Module):
         self.d_model = config.D_MODEL
         self.trignometric_embedding = config.TRIGNOMETRIC_EMBEDDING
         if self.trignometric_embedding:
-            self.d_g = config.D_MODEL // config.HEAD
+            self.d_g = config.D_MODEL // config.SELF_ATTENTION.HEAD
         else:
             self.d_g = 4
+
+        self.fc_gs = clones(nn.Linear(self.d_g, 1), config.SELF_ATTENTION.HEAD)
         
         self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
 
@@ -83,7 +85,7 @@ class GeometricEncoder(nn.Module):
         relative_geometry_weights = torch.cat(relative_geometry_weights_per_head, dim=1) # (bs, h, nk, nk)
         relative_geometry_weights = F.relu(relative_geometry_weights)
         
-        out = self.layer_norm(features)
+        out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
             out = layer(queries=out, 
                         keys=out, 
