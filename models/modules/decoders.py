@@ -24,7 +24,7 @@ class DecoderLayer(Module):
         enc_att = self.enc_attn(self_att, keys, values, padding_mask=self_padding_mask, attention_mask=enc_attention_mask, **kwargs)
 
         ff = self.pwff(enc_att)
-        ff = ff.masked_fill(self_padding_mask.squeeze().unsqueeze(-1), value=0)
+        ff = ff.masked_fill(self_padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
         
         return ff
 

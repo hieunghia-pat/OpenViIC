@@ -1,8 +1,8 @@
 TRAINER: viTrainer
 
 DATASET:
-  BATCH_SIZE: 20
-  WORKERS: 2
+  BATCH_SIZE: 60
+  WORKERS: 0
   MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
@@ -41,7 +41,7 @@ MODEL:
   DEVICE: cuda
   VISION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
-    D_FEATURE: 1024
+    D_FEATURE: 2048
     D_MODEL: 512
     DROPOUT: 0.1
   ENCODER:
@@ -56,7 +56,6 @@ MODEL:
       D_KEY: 64
       D_VALUE: 64
       D_FF: 2048
-      D_FEATURE: 2048
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
@@ -72,7 +71,6 @@ MODEL:
         D_KEY: 64
         D_VALUE: 64
         D_FF: 2048
-        D_FEATURE: 2048
         USE_AOA: False
         CAN_BE_STATEFUL: True
         DROPOUT: .1
@@ -83,7 +81,6 @@ MODEL:
         D_KEY: 64
         D_VALUE: 64
         D_FF: 2048
-        D_FEATURE: 2048
         USE_AOA: False
         CAN_BE_STATEFUL: False
         DROPOUT: .1

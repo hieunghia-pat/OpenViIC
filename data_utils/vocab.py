@@ -119,7 +119,7 @@ class Vocab(object):
             else:
                 captions.append(caption.strip().split())
 
-        return
+        return captions
 
     def __eq__(self, other):
         if self.freqs != other.freqs:

@@ -1,11 +1,9 @@
 import torch
 from torch import nn
-from torch.nn import functional as F
 import numpy as np
 from builders.attention_builder import build_attention, META_ATTENTION
 
 from models.modules.containers import Module
-from models.utils import clones, box_relational_embedding
 
 @META_ATTENTION.register()
 class ScaledDotProductAttention(nn.Module):
@@ -43,7 +41,7 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask=None):
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
         q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)
@@ -72,19 +70,11 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         h = config.HEAD
         d_k = config.D_KEY
         d_v = config.D_VALUE
-        trignometric_embedding = config.TRIGNOMETRIC_EMBEDDING
-
-        self.trignometric_embedding = trignometric_embedding
-        if trignometric_embedding:
-            self.d_g = d_model // h
-        else:
-            self.d_g = 4
 
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
         self.fc_v = nn.Linear(d_model, h * d_v)
         self.fc_o = nn.Linear(h * d_v, d_model)
-        self.fc_gs = clones(nn.Linear(self.d_g, 1), h)
 
         self.d_model = d_model
         self.d_k = d_k
@@ -98,17 +88,13 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         nn.init.xavier_uniform_(self.fc_k.weight)
         nn.init.xavier_uniform_(self.fc_v.weight)
         nn.init.xavier_uniform_(self.fc_o.weight)
-        for fc_g in self.fc_gs:
-            nn.init.xavier_uniform_(fc_g.weight)
 
         nn.init.constant_(self.fc_q.bias, 0)
         nn.init.constant_(self.fc_k.bias, 0)
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
-        for fc_g in self.fc_gs:
-            nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, queries, keys, values, relative_geometry_weights, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, relative_geometry_weights, attention_mask=None):
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
         q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)
@@ -169,7 +155,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask=None):
         '''
         Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -315,7 +301,7 @@ class MultiHeadAttention(Module):
             self.running_values = torch.cat([self.running_values, values], 1)
             values = self.running_values
 
-        out = self.attention(queries, keys, values, attention_mask, **kwargs)
+        out = self.attention(queries, keys, values, attention_mask=attention_mask, **kwargs)
         out = out.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
         
         # normalization after residual connection
@@ -329,4 +315,4 @@ class MultiHeadAttention(Module):
             out = i * g
             out = out.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
             
-        return 
+        return out
