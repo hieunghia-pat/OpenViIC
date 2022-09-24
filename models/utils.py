@@ -1,32 +1,27 @@
 import torch
 from torch import nn
 
-from data_utils.types import *
-from configs.constants import *
+from data_utils.typing import *
 
+import numpy as np
 import copy
-from yacs.config import CfgNode
 
-from data_utils.vocab import Vocab
-from models.modules.transformer import Transformer
-
-def get_batch_size(x: TensorOrSequence) -> int:
-    if isinstance(x, torch.Tensor):
-        b_s = x.size(0)
+def get_batch_size(x: dict):
+    if "features" in x:
+        return x["features"].shape[0]
     else:
-        b_s = x[0].size(0)
-    return b_s
+        return x["region_features"].shape[0]
 
-def get_device(x: TensorOrSequence) -> int:
-    if isinstance(x, torch.Tensor):
-        b_s = x.device
+def get_device(x: dict):
+    if "features" in x:
+        return x["features"].device
     else:
-        b_s = x[0].device
-    return b_s
+        return x["region_features"].device
 
 def positional_embedding(input, d_model) -> torch.Tensor:
     input = input.view(-1, 1)
-    dim = torch.arange(d_model // 2, dtype=torch.float32, device=input.device).view(1, -1)
+    dim = torch.arange(d_model // 2, dtype=torch.float32,
+                       device=input.device).view(1, -1)
     sin = torch.sin(input / 10000 ** (2 * dim / d_model))
     cos = torch.cos(input / 10000 ** (2 * dim / d_model))
 
@@ -34,6 +29,7 @@ def positional_embedding(input, d_model) -> torch.Tensor:
     out[:, ::2] = sin
     out[:, 1::2] = cos
     return out
+
 
 def sinusoid_encoding_table(max_len, d_model, padding_idx=None) -> torch.Tensor:
     pos = torch.arange(max_len, dtype=torch.float32)
@@ -43,17 +39,27 @@ def sinusoid_encoding_table(max_len, d_model, padding_idx=None) -> torch.Tensor:
         out[padding_idx] = 0
     return out
 
+
 def clones(module, n):
     "Produce N identical layers."
     return nn.ModuleList([copy.deepcopy(module) for _ in range(n)])
 
-def generate_padding_mask(sequences: torch.IntTensor, padding_idx: int) -> torch.BoolTensor:
-    '''
-        sequences: (bs, seq_len)
-    '''
-    mask = (sequences == padding_idx) # (b_s, seq_len)
 
+def generate_padding_mask(sequences: TensorOrNone, padding_idx: int) -> torch.BoolTensor:
+    '''
+        sequences: (bs, seq_len) or (bs, seq_len, dim)
+    '''
+    if sequences is None:
+        return None
+
+    if len(sequences.shape) == 2:  # (bs, seq_len)
+        __seq = sequences.unsqueeze(dim=-1)  # (bs, seq_len, 1)
+    else: # (bs, deq_len, dim)
+        __seq = sequences
+
+    mask = (torch.sum(__seq, dim=-1) == padding_idx)  # (b_s, seq_len)
     return mask
+
 
 def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
     '''
@@ -66,7 +72,7 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
 
 def get_relative_pos(x, batch_size, norm_len):
     x = x.view(1, -1, 1).expand(batch_size, -1, -1)
-    return  x / norm_len
+    return x / norm_len
 
 def get_grids_position(batch_size, seq_len, grid_size):
     assert seq_len == grid_size[0] * grid_size[1]
@@ -88,9 +94,65 @@ def get_grids_position(batch_size, seq_len, grid_size):
     rpx_max = get_relative_pos(px_max, batch_size, grid_size[0])
     rpy_max = get_relative_pos(py_max, batch_size, grid_size[1])
 
-    boxes = torch.cat([rpx_min, rpy_min, rpx_max, rpy_max], dim=-1) # (bs, n, 4)
+    boxes = torch.cat([rpx_min, rpy_min, rpx_max, rpy_max], dim=-1)  # (bs, n, 4)
 
     return boxes
+
+def lower_bound(nums, target):
+    start = 0
+    end = len(nums) - 1
+    pos = 0
+    while start <= end:
+        mid = int((start+end)/2)
+        if nums[mid] <= target:
+            pos = mid
+            start = mid + 1
+        else:
+            end = mid - 1
+    return pos
+
+def get_grids_by_corner(box, grid_size=7) -> torch.Tensor:
+    '''
+        box: (4, )
+    '''
+    grids = np.arange(grid_size) / grid_size
+
+    x_min, y_min, x_max, y_max = box
+
+    x1 = lower_bound(grids, x_min)
+    y1 = lower_bound(grids, y_min)
+    top_left = y1*grid_size + x1
+
+    x2 = lower_bound(grids,x_max)
+    top_right = y1*grid_size + x2
+
+    y3  = lower_bound(grids, y_max)
+    bot_left = y3*grid_size + x1
+
+    res = np.ones((grid_size*grid_size))
+
+    width = top_right - top_left + 1
+    for i in range(top_left, bot_left+1, grid_size):
+        res[i:i+width] = 0
+    
+    return torch.tensor(res).bool() # (grid_size*grid_size, )
+
+def get_combine_masks(boxes, grid_size=7) -> torch.Tensor:
+    '''
+        boxes: (bs, n, 4)
+    '''
+
+    bs, n, _ = boxes.shape
+    masks = []
+    for batch in range(bs):
+        masks_per_batch = []
+        for ith in range(n):
+            mask = get_grids_by_corner(boxes[batch, ith], grid_size)
+            masks_per_batch.append(mask.unsqueeze(0))
+        masks_per_batch = torch.cat(masks_per_batch, dim=0) # (n, grid_size*grid_size)
+        masks.append(masks_per_batch.unsqueeze(0))
+
+    return torch.cat(masks, dim=0).unsqueeze(1).unsqueeze(1) # (bs, 1, n, grid_size*grid_size)
 
 def box_relational_embedding(f_g, dim_g=64, wave_len=1000, trignometric_embedding=True):
     """
@@ -153,56 +215,3 @@ def box_relational_embedding(f_g, dim_g=64, wave_len=1000, trignometric_embeddin
         embedding = position_mat
         
     return embedding # (batch_size, max_nr_bounding_boxes, max_nr_bounding_boxes, dim_g)
-
-def get_encoder(model_config: CfgNode, encoder_config: CfgNode, vocab: Vocab):
-    encoder = encoders[encoder_config.encoder_module]
-    encoder_self_attention = attentions[encoder_config.encoder_self_attention_module]
-    encoder_self_attention_args = dict(encoder_config.encoder_self_attention_args)
-    encoder_args = dict(encoder_config.encoder_args)
-
-    return encoder(N=model_config.nlayers, padding_idx=vocab.padding_idx, d_in=model_config.d_feature, d_model=model_config.d_model, d_k=model_config.d_k, 
-                    d_v=model_config.d_v, d_ff=model_config.d_ff, dropout=model_config.dropout, 
-                    attention_module=encoder_self_attention, 
-                    attention_module_kwargs=encoder_self_attention_args, 
-                    **encoder_args)
-
-def get_decoder(model_config: CfgNode, decoder_config: CfgNode, vocab: Vocab):
-    decoder = decoders[decoder_config.decoder_module]
-    decoder_self_attention = attentions[decoder_config.decoder_self_attention_module]
-    decoder_self_attention_args = dict(decoder_config.decoder_self_attention_args)
-    decoder_enc_attention = attentions[decoder_config.decoder_enc_attention_module]
-    decoder_enc_attention_args = dict(decoder_config.decoder_enc_attention_args)
-    decoder_args = {
-        **dict(decoder_config.decoder_args),
-        **dict(decoder_config.language_model)
-    }
-
-    return decoder(vocab_size=len(vocab), max_len=vocab.max_caption_length, N_dec=model_config.nlayers, padding_idx=vocab.padding_idx,
-                            d_model=model_config.d_model, d_k=model_config.d_k, d_v=model_config.d_v, d_ff=model_config.d_ff, dropout=model_config.dropout,
-                            self_att_module=decoder_self_attention, enc_att_module=decoder_enc_attention,
-                            self_att_module_kwargs=decoder_self_attention_args, enc_att_module_kwargs=decoder_enc_attention_args, **decoder_args)
-
-def get_captioning_model(config: CfgNode, vocab: Vocab):
-
-    model_config = config.model
-    transformer_config = config.transformer
-    encoder_config = transformer_config.encoder
-    decoder_config = transformer_config.decoder
-
-    encoder = get_encoder(model_config, encoder_config, vocab)
-    decoder = get_decoder(model_config, decoder_config, vocab)
-
-    # init Transformer model.
-    captioning_model = Transformer(vocab.bos_idx, encoder, decoder, **config.transformer_args)
-
-    return captioning_model
-
-def get_language_model(config: CfgNode, vocab: Vocab):
-    model_config = config.model
-    language_model_config = config.model.transformer.decoder.language_model
-    language_model = pretrained_language_model(language_model_config.pretrained_language_model_name, padding_idx=vocab.padding_idx, 
-                                language_model_hidden_size=language_model_config.language_model_hidden_size,
-                                vocab_size=len(vocab), d_model=model_config.d_model, d_k=model_config.d_k, d_v=model_config.d_v, 
-                                h=model_config.nhead, d_ff=model_config.d_ff, max_len=vocab.max_caption_length, dropout=model_config.dropout)
-
-    return language_model

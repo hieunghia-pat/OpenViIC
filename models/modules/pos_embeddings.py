@@ -3,21 +3,6 @@ from torch import nn
 
 import math
 
-class Embedding(nn.Module):
-    def __init__(self, vocab_size, d_model, d_emb=None, weights=None, padding_idx=0):
-        super(Embedding, self).__init__()
-        if weights is None:
-            self.components = nn.Embedding(vocab_size, d_model, padding_idx)
-        else:
-            assert d_emb != None, "d_emb must be specified when using pretrained word-embedding"
-            self.components = nn.Sequential(
-                nn.Linear(d_emb, d_model),
-                nn.Embedding.from_pretrained(embeddings=weights, freeze=True, padding_idx=padding_idx)
-            )
-
-    def forward(self, tokens):
-        return self.components(tokens)
-
 class PositionalEmbedding(nn.Module):
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
