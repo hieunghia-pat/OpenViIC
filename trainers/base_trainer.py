@@ -6,7 +6,6 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from data_utils.utils import collate_fn
 from utils.logging_utils import setup_logger
-from utils.instances import Instances
 from builders.model_builder import build_model
 
 import os
@@ -140,13 +139,13 @@ class BaseTrainer:
 
         logger.info(f"Resuming from epoch {checkpoint['epoch']}")
 
-        return Instances(
-            use_rl = checkpoint['use_rl'],
-            patience=checkpoint['patience'],
-            epoch=checkpoint["epoch"],
-            optimizer=checkpoint["optimizer"],
-            scheduler=checkpoint["scheduler"]
-        )
+        return {
+            "use_rl": checkpoint['use_rl'],
+            "patience": checkpoint['patience'],
+            "epoch": checkpoint["epoch"],
+            "optimizer": checkpoint["optimizer"],
+            "scheduler": checkpoint["scheduler"]
+        }
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
         dict_for_saving = {
