@@ -138,10 +138,10 @@ class viTrainer(BaseTrainer):
                 caps_gt = items.captions
                 caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=True)
                 caps_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in caps_gt)))
-                gens = {f"{idx}": cap_gen for idx, cap_gen in enumerate(caps_gen)}
+                gens = {f"{idx}": [cap_gen, ] for idx, cap_gen in enumerate(caps_gen)}
                 gts = {f"{idx}": cap_gt for idx, cap_gt in enumerate(caps_gt)}
                 reward = self.train_cider.compute_score(gts, gens)[1].astype(np.float32)
-                reward = torch.from_numpy(reward).to(self.device).view(bs, self.config.training.training_beam_size)
+                reward = torch.from_numpy(reward).to(self.device).view(bs, self.training_beam_size)
                 reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
                 loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
 
@@ -160,6 +160,7 @@ class viTrainer(BaseTrainer):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
             checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
             use_rl = checkpoint["use_rl"]
+            best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
             self.optim.load_state_dict(checkpoint['optimizer'])
@@ -170,10 +171,10 @@ class viTrainer(BaseTrainer):
             patience = 0
 
         while True:
-            if not use_rl:
-                self.train()
-            else:
-                self.train_scst()
+            # if not use_rl:
+            #     self.train()
+            # else:
+            self.train_scst()
 
             val_loss = self.evaluate_loss(self.val_dataloader)
 
@@ -214,7 +215,7 @@ class viTrainer(BaseTrainer):
 
             self.save_checkpoint({
                 'val_loss': val_loss,
-                'val_cider': val_score,
+                'best_val_score': best_val_score,
                 'patience': patience,
                 'use_rl': use_rl
             })
