@@ -171,10 +171,10 @@ class viTrainer(BaseTrainer):
             patience = 0
 
         while True:
-            # if not use_rl:
-            #     self.train()
-            # else:
-            self.train_scst()
+            if not use_rl:
+                self.train()
+            else:
+                self.train_scst()
 
             val_loss = self.evaluate_loss(self.val_dataloader)
 
