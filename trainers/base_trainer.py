@@ -126,7 +126,7 @@ class BaseTrainer:
         if not os.path.exists(fname):
             return None
 
-        logger.info("Loading checkpoint from {}" % fname)
+        logger.info("Loading checkpoint from %s", fname)
 
         checkpoint = torch.load(fname)
 
@@ -137,15 +137,9 @@ class BaseTrainer:
 
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-        logger.info(f"Resuming from epoch {checkpoint['epoch']}")
+        logger.info(f"Resuming from epoch %s", checkpoint['epoch'])
 
-        return {
-            "use_rl": checkpoint['use_rl'],
-            "patience": checkpoint['patience'],
-            "epoch": checkpoint["epoch"],
-            "optimizer": checkpoint["optimizer"],
-            "scheduler": checkpoint["scheduler"]
-        }
+        return checkpoint
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
         dict_for_saving = {
