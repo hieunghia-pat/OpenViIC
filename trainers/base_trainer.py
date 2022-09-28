@@ -39,51 +39,45 @@ class BaseTrainer:
         # creating iterable-dataset data loader
         self.train_dataloader = DataLoader(
             dataset=self.train_dataset,
-            batch_size=config.DATASET.BATCH_SIZE,
+            batch_size=config.DATASET.FEATURE_BATCH_SIZE,
             shuffle=True,
             num_workers=config.DATASET.WORKERS,
             collate_fn=collate_fn
         )
         self.val_dataloader = DataLoader(
             dataset=self.dev_dataset,
-            batch_size=config.DATASET.BATCH_SIZE,
+            batch_size=config.DATASET.FEATURE_BATCH_SIZE,
             shuffle=True,
             num_workers=config.DATASET.WORKERS,
             collate_fn=collate_fn
         )
-        if self.test_dataset is not None:
-            self.test_dataloader = DataLoader(
-                dataset=self.test_dataset,
-                batch_size=config.DATASET.BATCH_SIZE,
-                shuffle=True,
-                num_workers=config.DATASET.WORKERS,
-                collate_fn=collate_fn
-            )
-        else:
-            self.test_dataloader = None
+        self.test_dataloader = DataLoader(
+            dataset=self.test_dataset,
+            batch_size=config.DATASET.FEATURE_BATCH_SIZE,
+            shuffle=True,
+            num_workers=config.DATASET.WORKERS,
+            collate_fn=collate_fn
+        )
 
         # creating dictionary iterable-dataset data loader
         self.train_dict_dataloader = DataLoader(
             dataset=self.train_dict_dataset,
-            batch_size=config.DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.val_dict_dataloader = DataLoader(
             dataset=self.dev_dict_dataset,
-            batch_size=config.DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )
-        if self.test_dict_dataset is not None:
-            self.test_dict_dataloader = DataLoader(
-                dataset=self.test_dict_dataset,
-                batch_size=config.DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
-                shuffle=True,
-                collate_fn=collate_fn
-            )
-        else:
-            self.test_dict_dataloader = None
+        self.test_dict_dataloader = DataLoader(
+            dataset=self.test_dict_dataset,
+            batch_size=config.DATASET.DICT_BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            shuffle=True,
+            collate_fn=collate_fn
+        )
 
         logger.info("Building model")
         self.model = build_model(config.MODEL, self.vocab)
