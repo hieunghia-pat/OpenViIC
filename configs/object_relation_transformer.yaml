@@ -1,7 +1,8 @@
 TRAINER: viTrainer
 
 DATASET:
-  BATCH_SIZE: 60
+  FEATURE_BATCH_SIZE: 60
+  DICT_BATCH_SIZE: 30
   WORKERS: 0
   MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
@@ -16,11 +17,11 @@ DATASET:
     USE_MAPPING: False
     PRETRAINED_LANGUAGE_MODEL: null
   JSON_PATH:
-    TRAIN: features/UIT-ViIC/annotations/uitviic_captions_train2017.json
-    DEV: features/UIT-ViIC/annotations/uitviic_captions_val2017.json
-    TEST: features/UIT-ViIC/annotations/uitviic_captions_test2017.json
+    TRAIN: features/OpenViIC/annotations/uit-openviic-train.json
+    DEV: features/OpenViIC/annotations/uit-openviic-dev.json
+    TEST: features/OpenViIC/annotations/uit-openviic-test.json
   FEATURE_PATH:
-    FEATURES: features/UIT-ViIC/features/faster_rcnn_x152++
+    FEATURES: features/OpenViIC/features/x152++_faster_rcnn
     SCENE_TEXT: null
     IMAGE: null
 
