@@ -14,6 +14,7 @@ import numpy as np
 from tqdm import tqdm
 import itertools
 from shutil import copyfile
+import json
 
 logger = setup_logger()
 
@@ -236,18 +237,19 @@ class viTrainer(BaseTrainer):
 
         self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
-        dataset = self.test_dataset
+        dataset = self.test_dict_dataset
 
         self.model.eval()
         results = []
         with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
             for it, items in enumerate(dataset):
                 items = items.to(self.device)
+                items = items.unsqueeze(dim=0)
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
                 caps_gt = items.captions
-                caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=True)
+                caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=False)
                 caps_gt = list(itertools.chain(*([c, ] * self.training_beam_size for c in caps_gt)))
                 gts = {}
                 gens = {}
@@ -255,9 +257,6 @@ class viTrainer(BaseTrainer):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
-                print(gens)
-                print(gts)
-                raise
                 pbar.update()
                 
                 if get_scores:
@@ -275,4 +274,4 @@ class viTrainer(BaseTrainer):
 
                 pbar.update()
 
-        return results
+        json.dump(results, open(os.path.join(self.checkpoint_path, "results.json"), "w+"), ensure_ascii=False)
