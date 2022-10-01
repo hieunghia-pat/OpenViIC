@@ -14,6 +14,6 @@ args = parser.parse_args()
 config = get_config(args.config_file)
 
 trainer = build_trainer(config)
-# trainer.start()
+trainer.start()
 trainer.get_predictions(get_scores=config.TRAINING.GET_SCORES)
 logger.info("Trainer done.")

@@ -41,7 +41,7 @@ class Encoder(nn.Module):
         for layer in self.layers:
             out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=padding_mask)
 
-        return 
+        return out
 
 @META_ENCODER.register()
 class GeometricEncoder(nn.Module):
