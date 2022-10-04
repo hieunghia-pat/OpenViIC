@@ -253,29 +253,26 @@ class viTrainer(BaseTrainer):
                 gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gens['%d_%d' % (it, i)] = [gen_i, ]
+                    gens['%d_%d' % (it, i)] = gen_i
                     gts['%d_%d' % (it, i)] = gts_i
                     overall_gens['%d_%d' % (it, i)] = [gen_i, ]
                     overall_gts['%d_%d' % (it, i)] = gts_i
                 pbar.update()
-                
-                if get_scores:
-                    scores, _ = evaluation.compute_scores(gts, gens)
-                else:
-                    scores = None
 
                 results.append({
                     "image_id": items.image_id,
                     "filename": items.filename,
                     "gens": gens,
                     "gts": gts,
-                    "scores": scores
                 })
 
                 pbar.update()
 
-        scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
-        logger.info("Evaluation scores on test set: %s", scores)
+        if get_scores:
+            scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+            logger.info("Evaluation scores on test set: %s", scores)
+        else:
+            scores = None
 
         json.dump({
             "results": results,
