@@ -87,8 +87,6 @@ class Instances:
         for k in self._fields:
             if isinstance(self._fields[k], torch.Tensor):
                 return self._fields[k].shape[0]
-            if isinstance(self._fields[k], list):
-                return len(self._fields[k])
 
         return 0
 
