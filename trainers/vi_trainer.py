@@ -273,7 +273,7 @@ class viTrainer(BaseTrainer):
             scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
             logger.info("Evaluation scores on test set: %s", scores)
         else:
-            scores = None
+            scores = {}
 
         json.dump({
             "results": results,
