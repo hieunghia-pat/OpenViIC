@@ -2,6 +2,7 @@ import torch
 from torch.optim import Adam
 
 from utils.logging_utils import setup_logger
+from utils.instances import Instances
 from data_utils.vocab import Vocab
 from data_utils.dataset import FeatureDataset, DictionaryDataset
 from .base_trainer import BaseTrainer
@@ -242,7 +243,7 @@ class viTrainer(BaseTrainer):
         with tqdm(desc='Getting predictions on test set: ', unit='it', total=len(dataset)) as pbar:
             for it, items in enumerate(dataset):
                 items = items.to(self.device)
-                items = items.unsqueeze(dim=0)
+                items = Instances.cat([items])
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 

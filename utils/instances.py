@@ -87,6 +87,8 @@ class Instances:
         for k in self._fields:
             if isinstance(self._fields[k], torch.Tensor):
                 return self._fields[k].shape[0]
+            if isinstance(self._fields[k], list):
+                return len(self._fields[k])
 
         return 0
 
@@ -171,10 +173,10 @@ class Instances:
         if len(instance_lists) == 1:
             ret = Instances()
             for k, v in instance_lists[0].get_fields().items():
-                if isinstance(v, list):
-                    ret.set(k, [v])
-                elif isinstance(v, torch.Tensor):
+                if isinstance(v, torch.Tensor):
                     ret.set(k, v.unsqueeze(dim=0))
+                else:
+                    ret.set(k, [v])
             
             return ret
 
