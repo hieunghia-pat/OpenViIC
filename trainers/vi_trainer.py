@@ -249,7 +249,6 @@ class viTrainer(BaseTrainer):
 
                 caps_gt = items.captions
                 caps_gen = self.vocab.decode_caption(outs.contiguous().view(-1, self.vocab.max_caption_length), join_words=False)
-                caps_gt = list(itertools.chain(*([c, ] * self.training_beam_size for c in caps_gt)))
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
