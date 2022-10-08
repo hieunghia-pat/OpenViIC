@@ -7,7 +7,6 @@ from models.modules.pos_embeddings import SinusoidPositionalEmbedding
 from models.modules.attentions import MultiHeadAttention
 from models.utils import clones, box_relational_embedding
 from builders.encoder_builder import META_ENCODER
-from utils.instances import Instances
 
 class EncoderLayer(nn.Module):
     def __init__(self, config):
@@ -33,10 +32,7 @@ class Encoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features: Instances):
-        features = input_features.features
-        padding_mask = input_features.features_padding_mask
-        
+    def forward(self, features: torch.Tensor, padding_mask: torch.Tensor):
         out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
             out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=padding_mask)
@@ -71,11 +67,7 @@ class GeometricEncoder(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, input_features: Instances):
-        features = input_features.features
-        boxes = input_features.boxes
-        padding_mask = input_features.features_padding_mask
-
+    def forward(self, features: torch.Tensor, boxes: torch.Tensor, padding_mask: torch.Tensor):
         # embedding geometric information from boxes' coordinates
         relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
         flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, self.d_g)
@@ -138,16 +130,8 @@ class DualCollaborativeLevelEncoder(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, input_features: Instances):
-        region_features = input_features.region_features
-        region_boxes = input_features.region_boxes
-        region_padding_mask = input_features.region_padding_mask
-        region2all_mask = input_features.region2all_mask
-        grid_features = input_features.grid_features
-        grid_boxes = input_features.grid_boxes
-        grid_padding_mask = input_features.grid_padding_mask
-        grid2all_mask = input_features.grid2all_mask
-
+    def forward(self, region_features: torch.Tensor, region_boxes: torch.Tensor, region_padding_mask: torch.Tensor, region2all_mask: torch.Tensor,
+                    grid_features: torch.Tensor, grid_boxes: torch.Tensor, grid_padding_mask: torch.Tensor, grid2all_mask: torch.Tensor):
         n_regions = region_features.shape[1]
 
         boxes = torch.cat([region_boxes, grid_boxes], dim=1) # (bs, n_regions + n_grids, 4)

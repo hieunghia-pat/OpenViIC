@@ -22,17 +22,17 @@ class MeshedMemoryTransformer(BaseTransformer):
         vision_features = input_features.region_features
         vision_features, vision_padding_mask = self.vision_embedding(vision_features)
 
-        encoder_features = self.encoder(Instances(
+        encoder_features = self.encoder(
             features=vision_features,
             features_padding_mask=vision_padding_mask
-        ))
+        )
 
         caption_tokens = input_features.caption_tokens
-        output = self.decoder(Instances(
+        output = self.decoder(
             caption_tokens=caption_tokens,
             encoder_features=encoder_features,
             encoder_attention_mask=vision_padding_mask
-        ))
+        )
 
         return output
 
@@ -40,9 +40,9 @@ class MeshedMemoryTransformer(BaseTransformer):
         vision_features = input_features.region_features
         vision_features, vision_padding_mask = self.vision_embedding(vision_features)
 
-        encoder_features = self.encoder(Instances(
+        encoder_features = self.encoder(
             features=vision_features,
             features_padding_mask=vision_padding_mask
-        ))
+        )
 
         return encoder_features, vision_padding_mask
