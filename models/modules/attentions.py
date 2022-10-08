@@ -302,7 +302,7 @@ class MultiHeadAttention(Module):
             values = self.running_values
 
         out = self.attention(queries, keys, values, attention_mask=attention_mask, **kwargs)
-        out = out.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
+        # out = out.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
         
         # normalization after residual connection
         out = self.dropout(out)
@@ -313,6 +313,6 @@ class MultiHeadAttention(Module):
             i = self.informative_attention(aoa_input)
             g = torch.sigmoid(self.gated_attention(aoa_input))
             out = i * g
-            out = out.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
+            # out = out.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
             
         return out
