@@ -48,8 +48,7 @@ class Decoder(Module):
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
-    def forward(self, input_features: Instances):
-        caption_tokens = input_features.caption_tokens
+    def forward(self, caption_tokens, encoder_features, encoder_attention_mask):
         b_s, seq_len = caption_tokens.shape[:2]
         caption_padding_masks = generate_padding_mask(caption_tokens, self.padding_idx).to(caption_tokens.device)
         caption_self_attention_masks = generate_sequential_mask(seq_len).to(caption_tokens.device)
@@ -64,9 +63,6 @@ class Decoder(Module):
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq
-
-        encoder_features = input_features.encoder_features
-        encoder_attention_mask = input_features.encoder_attention_mask
 
         embedded_captions, _ = self.word_emb(caption_tokens)
         out = embedded_captions + self.pos_emb(seq)
@@ -105,9 +101,7 @@ class AdaptiveDecoder(Module):
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).byte())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
-    def forward(self, input_features):
-
-        caption_tokens = input_features.caption_tokens
+    def forward(self, caption_tokens, encoder_features, encoder_attention_mask):
         b_s, seq_len = caption_tokens.shape[:2]
         caption_padding_masks = generate_padding_mask(caption_tokens, self.padding_idx).to(caption_tokens.device)
         caption_self_attention_masks = generate_sequential_mask(seq_len).to(caption_tokens.device)
@@ -123,9 +117,6 @@ class AdaptiveDecoder(Module):
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq
-
-        encoder_features = input_features.encoder_features
-        encoder_attention_mask = input_features.encoder_attention_mask
 
         # get the language_signals
         _, language_signals = self.language_model(caption_tokens)

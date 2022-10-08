@@ -23,18 +23,18 @@ class ObjectRelationTransformer(BaseTransformer):
         region_boxes = input_features.region_boxes
         region_features, region_padding_mask = self.vision_embedding(region_features)
 
-        encoder_features = self.encoder(Instances(
+        encoder_features = self.encoder(
             features=region_features,
             features_padding_mask=region_padding_mask,
             boxes=region_boxes
-        ))
+        )
 
         caption_tokens = input_features.caption_tokens
-        output = self.decoder(Instances(
+        output = self.decoder(
             caption_tokens=caption_tokens,
             encoder_features=encoder_features,
             encoder_attention_mask=region_padding_mask
-        ))
+        )
 
         return output
 
