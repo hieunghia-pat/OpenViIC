@@ -24,7 +24,7 @@ class StandardTransformerUsingRegion(BaseTransformer):
 
         encoder_features = self.encoder(
             features=vision_features,
-            features_padding_mask=vision_padding_mask
+            padding_mask=vision_padding_mask
         )
 
         caption_tokens = input_features.caption_tokens
@@ -64,7 +64,7 @@ class StandardTransformerUsingGrid(BaseTransformer):
 
         encoder_features = self.encoder(
             features=vision_features,
-            features_padding_mask=vision_padding_mask
+            padding_mask=vision_padding_mask
         )
 
         caption_tokens = input_features.caption_tokens
