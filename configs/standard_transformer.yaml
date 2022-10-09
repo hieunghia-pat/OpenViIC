@@ -1,9 +1,10 @@
-TRAINER: ViTrainer
+TRAINER: viTrainer
 
 DATASET:
-  BATCH_SIZE: 20
-  WORKERS: 2
-  MIN_FREQ: 1
+  FEATURE_BATCH_SIZE: 60
+  DICT_BATCH_SIZE: 60
+  WORKERS: 0
+  MIN_FREQ: 5
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
     TOKENIZER: null
@@ -16,11 +17,11 @@ DATASET:
     USE_MAPPING: False
     PRETRAINED_LANGUAGE_MODEL: null
   JSON_PATH:
-    TRAIN: features/UIT-ViIC/annotations/uitviic_captions_train2017.json
-    DEV: features/UIT-ViIC/annotations/uitviic_captions_val2017.json
-    TEST: features/UIT-ViIC/annotations/uitviic_captions_test2017.json
+    TRAIN: features/OpenViIC/annotations/uit-openviic-train.json
+    DEV: features/OpenViIC/annotations/uit-openviic-dev.json
+    TEST: features/OpenViIC/annotations/uit-openviic-test.json
   FEATURE_PATH:
-    FEATURES: features/UIT-ViIC/features/faster_rcnn_x152++
+    FEATURES: features/OpenViIC/features/x152++_faster_rcnn
     SCENE_TEXT: null
     IMAGE: null
 
@@ -30,14 +31,14 @@ TRAINING:
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: CIDEr
-  GET_SCORES: False
+  GET_SCORES: True
   TRAINING_BEAM_SIZE: 5
   EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: StandardTranformerUsingRegion
-  NAME: standard_transformer_region_x152++
+  ARCHITECTURE: StandardTransformerUsingRegion
+  NAME: transformer_region_x152++
   DEVICE: cuda
   VISION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
@@ -56,6 +57,7 @@ MODEL:
       D_VALUE: 64
       D_FF: 2048
       D_FEATURE: 2048
+      MEMORY: 40
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
