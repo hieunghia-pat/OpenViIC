@@ -68,13 +68,13 @@ class BaseTrainer:
         )
         self.val_dict_dataloader = DataLoader(
             dataset=self.dev_dict_dataset,
-            batch_size=config.DATASET.DICT_BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.test_dict_dataloader = DataLoader(
             dataset=self.test_dict_dataset,
-            batch_size=config.DATASET.DICT_BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )

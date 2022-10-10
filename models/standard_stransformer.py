@@ -19,19 +19,13 @@ class StandardTransformerUsingRegion(BaseTransformer):
         self.decoder = build_decoder(config.DECODER, vocab)
 
     def forward(self, input_features: Instances):
-        vision_features = input_features.region_features
-        vision_features, vision_padding_mask = self.vision_embedding(vision_features)
-
-        encoder_features = self.encoder(
-            features=vision_features,
-            padding_mask=vision_padding_mask
-        )
+        encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         caption_tokens = input_features.caption_tokens
         output = self.decoder(
             caption_tokens=caption_tokens,
             encoder_features=encoder_features,
-            encoder_attention_mask=vision_padding_mask
+            encoder_attention_mask=encoder_padding_mask
         )
 
         return output
@@ -42,7 +36,7 @@ class StandardTransformerUsingRegion(BaseTransformer):
 
         encoder_features = self.encoder(
             features=vision_features,
-            features_padding_mask=vision_padding_mask
+            padding_mask=vision_padding_mask
         )
 
         return encoder_features, vision_padding_mask
@@ -59,19 +53,13 @@ class StandardTransformerUsingGrid(BaseTransformer):
         self.decoder = build_decoder(config.DECODER, vocab)
 
     def forward(self, input_features: Instances):
-        vision_features = input_features.grid_features
-        vision_features, vision_padding_mask = self.vision_embedding(vision_features)
-
-        encoder_features = self.encoder(
-            features=vision_features,
-            padding_mask=vision_padding_mask
-        )
+        encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         caption_tokens = input_features.caption_tokens
         output = self.decoder(
             caption_tokens=caption_tokens,
             encoder_features=encoder_features,
-            encoder_attention_mask=vision_padding_mask
+            encoder_attention_mask=encoder_padding_mask
         )
 
         return output
@@ -82,7 +70,7 @@ class StandardTransformerUsingGrid(BaseTransformer):
 
         encoder_features = self.encoder(
             features=vision_features,
-            features_padding_mask=vision_padding_mask
+            padding_mask=vision_padding_mask
         )
 
         return encoder_features, vision_padding_mask
