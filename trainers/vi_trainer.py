@@ -234,16 +234,13 @@ class viTrainer(BaseTrainer):
 
         self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
-        dataset = self.test_dict_dataset
-
         self.model.eval()
         results = []
         overall_gens = {}
         overall_gts = {}
-        with tqdm(desc='Getting predictions on test set: ', unit='it', total=len(dataset)) as pbar:
-            for it, items in enumerate(dataset):
+        with tqdm(desc='Getting predictions on test set: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
+            for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
-                items = Instances.cat([items])
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 

@@ -74,7 +74,7 @@ class BaseTrainer:
         )
         self.test_dict_dataloader = DataLoader(
             dataset=self.test_dict_dataset,
-            batch_size=config.DATASET.DICT_BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
+            batch_size=1,
             shuffle=True,
             collate_fn=collate_fn
         )
