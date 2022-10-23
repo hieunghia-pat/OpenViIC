@@ -2,7 +2,6 @@ import os
 import numpy as np
 import itertools
 import collections
-import json
 import torch
 from .example import Example
 from .utils import nostdout
@@ -277,38 +276,3 @@ class COCO(PairedDataset):
                     test_samples.append(example)
 
         return train_samples, val_samples, test_samples
-
-    
-class COCO_TestOnline(Dataset):
-    def __init__(self, feat_path, ann_file, max_detections=49):
-        """
-        feat_path: COCO官方划分的训练集和验证集的特征路径
-        ann_file: 训练集或验证集的标注信息，用于获取image_id，进而检索出对应特征
-        """
-        super(COCO_TestOnline, self).__init__()
-        
-        # loading image information
-        with open(ann_file, 'r') as f:
-            self.images_info = json.load(f)['images']
-            
-        # 
-        self.f = h5py.File(feat_path, 'r')    
-        
-        # loading image features
-        self.max_detections = max_detections
-
-    def __len__(self):
-        return len(self.images_info)
-
-    def __getitem__(self, idx):
-        image_id = self.images_info[idx]['id']
-        precomp_data = self.f['%d_grids' % image_id][()]
-
-        delta = self.max_detections - precomp_data.shape[0]
-        if delta > 0:
-            precomp_data = np.concatenate([precomp_data, np.zeros((delta, precomp_data.shape[1]))], axis=0)
-        elif delta < 0:
-            precomp_data = precomp_data[:self.max_detections]
-
-        return int(image_id), precomp_data
-   

@@ -106,9 +106,8 @@ class ImageDetectionsField(RawField):
     def preprocess(self, x, avoid_precomp=False):
         image_id = int(x.split('_')[-1].split('.')[0])
         try:
-            f = h5py.File(self.detections_path, 'r')
-            if self.sort_by_prob:
-                precomp_data = precomp_data[np.argsort(np.max(f['%d_cls_prob' % image_id][()], -1))[::-1]]
+            features = np.load(os.path.join(self.detections_path, f"{image_id}.npy"), allow_pickle=True)[()]
+            precomp_data = features["grid_features"]
         except KeyError:
             warnings.warn('Could not find detections for %d' % image_id)
             precomp_data = np.random.rand(10,2048)

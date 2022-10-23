@@ -4,7 +4,7 @@ from data import COCO, DataLoader
 import evaluation
 from evaluation import PTBTokenizer, Cider
 
-from models.rstnet import Transformer, TransformerEncoder, TransformerDecoderLayer, ScaledDotProductAttention
+from models.rstnet import Transformer, TransformerEncoder, BertLinguisticDecoderLayer, ScaledDotProductAttention
 
 import torch
 from torch.optim import Adam
@@ -184,7 +184,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=os.path.join(args.logs_folder, args.exp_name))
 
     # Pipeline for image regions
-    image_field = ImageDetectionsField(detections_path=args.features_path, max_detections=49, load_in_tmp=False)
+    image_field = ImageDetectionsField(detections_path=args.features_path, max_detections=100, load_in_tmp=False)
     # Pipeline for text
     text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, tokenize='spacy', remove_punctuation=True, nopoints=False)
 
@@ -202,7 +202,7 @@ if __name__ == '__main__':
 
     # Model and dataloaders
     encoder = TransformerEncoder(3, 0, attention_module=ScaledDotProductAttention, attention_module_kwargs={'m': args.m})
-    decoder = TransformerDecoderLayer(len(text_field.vocab), 54, 3, text_field.vocab.stoi['<pad>'])
+    decoder = BertLinguisticDecoderLayer(len(text_field.vocab), 54, 3, text_field.vocab.stoi['<pad>'], pretrained_name="bert-base-multilingual-cased")
     model = Transformer(text_field.vocab.stoi['<bos>'], encoder, decoder).to(device)
 
     dict_dataset_train = train_dataset.image_dictionary({'image': image_field, 'text': RawField()})
@@ -419,11 +419,6 @@ if __name__ == '__main__':
             copyfile(os.path.join(args.dir_to_save_model, '%s_last.pth' % args.exp_name), os.path.join(args.dir_to_save_model, '%s_best.pth' % args.exp_name))
         if best_test:
             copyfile(os.path.join(args.dir_to_save_model, '%s_last.pth' % args.exp_name), os.path.join(args.dir_to_save_model, '%s_best_test.pth' % args.exp_name))
-
-
-#         # 保存模型，用于微调
-#         if e >= 25:
-#             copyfile(os.path.join(args.dir_to_save_model, '%s_last.pth' % args.exp_name), os.path.join(args.dir_to_save_model, '{}_{}.pth'.format(args.exp_name, e)))
 
         if exit_train:
             writer.close()

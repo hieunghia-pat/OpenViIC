@@ -90,3 +90,31 @@ class LanguageModel(Module):
         logits = self.proj_to_vocab(language_feature)
         out = F.log_softmax(logits, dim=-1)
         return out, language_feature
+
+class BertLanguageModel(Module):
+    def __init__(self, padding_idx=0, bert_hidden_size=768, pretrained_name="bert-base-multilingual-cased", 
+                    d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1):
+        super(LanguageModel, self).__init__()
+        self.padding_idx = padding_idx
+        self.d_model = d_model
+
+        self.encoder_layer = EncoderLayer(d_model, d_k, d_v, h, d_ff, dropout)
+
+        self.language_model = BertModel.from_pretrained(pretrained_name, return_dict=True).encoder()
+        for param in self.language_model.parameters():
+            param.requires_grad = False
+
+        self.proj_to_caption_model = nn.Linear(bert_hidden_size, d_model)
+
+        self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).byte())
+
+    def forward(self, input_features, padding_mask, attention_mask):
+        bert_output = self.language_model(
+            hidden_states=input_features,
+            attention_mask=attention_mask
+        )[0]
+        language_feature = self.proj_to_caption_model(bert_output)
+
+        out = self.encoder_layer(language_feature, padding_mask, attention_mask)
+
+        return out
