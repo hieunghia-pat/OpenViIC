@@ -40,6 +40,29 @@ class Encoder(nn.Module):
         return out
 
 @META_ENCODER.register()
+class MultilevelEncoder(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
+        self.layer_norm = nn.LayerNorm(config.D_MODEL)
+
+        self.d_model = config.D_MODEL
+        self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
+
+    def forward(self, features: torch.Tensor, padding_mask: torch.Tensor):
+        out = self.layer_norm(features) + self.pos_embedding(features)
+
+        outs = []
+        for layer in self.layers:
+            out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=padding_mask)
+            outs.append(out.unsqueeze(1))
+
+        outs = torch.cat(outs, dim=1)
+
+        return outs
+
+@META_ENCODER.register()
 class GeometricEncoder(nn.Module):
     def __init__(self, config):
         super(GeometricEncoder, self).__init__()
@@ -198,7 +221,7 @@ class CrossAttentionMultiLevelEncoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-        self.self_attn = EncoderLayer(config.SELF_ATTENTION)
+        self.self_attn = MultiHeadAttention(config.SELF_ATTENTION)
         self.mlp1 = nn.Linear(3*config.D_MODEL, config.D_MODEL)
         self.mlp2 = nn.Linear(config.D_MODEL, config.D_MODEL)
 

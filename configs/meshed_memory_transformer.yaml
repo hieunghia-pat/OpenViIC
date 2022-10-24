@@ -46,7 +46,7 @@ MODEL:
     D_MODEL: 512
     DROPOUT: 0.1
   ENCODER:
-    ARCHITECTURE: Encoder
+    ARCHITECTURE: MultilevelEncoder
     D_MODEL: 512
     LAYERS: 3
     SELF_ATTENTION:
@@ -62,10 +62,12 @@ MODEL:
       CAN_BE_STATEFUL: False
       DROPOUT: .1
   DECODER:
-    ARCHITECTURE: Decoder
+    ARCHITECTURE: MeshedDecoder
     D_MODEL: 512
     LAYERS: 3
     ATTENTION:
+      N_ENCODER_LAYERS: 3
+      D_MODEL: 512
       SELF_ATTENTION:
         ARCHITECTURE: ScaledDotProductAttention
         HEAD: 8
