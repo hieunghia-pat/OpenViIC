@@ -186,3 +186,41 @@ class DualCollaborativeLevelEncoder(nn.Module):
         padding_mask = torch.cat([region_padding_mask, grid_padding_mask], dim=-1)
         
         return out, padding_mask
+
+@META_ENCODER.register()
+class CrossAttentionMultiLevelEncoder(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
+        self.layer_norm = nn.LayerNorm(config.D_MODEL)
+
+        self.d_model = config.D_MODEL
+        self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
+
+        self.self_attn = EncoderLayer(config.SELF_ATTENTION)
+        self.mlp1 = nn.Linear(3*config.D_MODEL, config.D_MODEL)
+        self.mlp2 = nn.Linear(config.D_MODEL, config.D_MODEL)
+
+    def forward(self, features: torch.Tensor, padding_mask: torch.Tensor):
+        out = self.layer_norm(features) + self.pos_embedding(features)
+        outs = []
+        for layer in self.layers:
+            out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=padding_mask)
+            outs.append(out)
+
+        out1, out2, out3 = outs # conventionally assump that we have 3 layers for encoder block
+
+        out2 = 0.1*self.self_attn(queries=out2, keys=out1, values=out1, 
+                                    padding_mask=padding_mask, attention_mask=padding_mask) + out2
+        out3 = 0.1*self.self_attn(queries=out3, keys=out2, values=out2, 
+                                    padding_mask=padding_mask, attention_mask=padding_mask) + out3
+
+        out = self.mlp1(torch.cat(outs, dim=-1))
+        out = F.leaky_relu(out)
+        out = self.mlp2(out)
+        out = F.leaky_relu(out)
+
+        out = out3 + 0.2*out
+
+        return out
