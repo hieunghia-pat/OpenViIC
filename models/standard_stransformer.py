@@ -4,7 +4,7 @@ from builders.encoder_builder import build_encoder
 from builders.decoder_builder import build_decoder
 from builders.vision_embedding_builder import build_vision_embedding
 from builders.model_builder import META_ARCHITECTURE
-from utils.instances import Instances
+from utils.instance import Instance
 from .base_transformer import BaseTransformer
 
 @META_ARCHITECTURE.register()
@@ -18,7 +18,7 @@ class StandardTransformerUsingRegion(BaseTransformer):
         self.encoder = build_encoder(config.ENCODER)
         self.decoder = build_decoder(config.DECODER, vocab)
 
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: Instance):
         encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         caption_tokens = input_features.caption_tokens
@@ -30,7 +30,7 @@ class StandardTransformerUsingRegion(BaseTransformer):
 
         return output
 
-    def encoder_forward(self, input_features: Instances):
+    def encoder_forward(self, input_features: Instance):
         vision_features = input_features.region_features
         vision_features, vision_padding_mask = self.vision_embedding(vision_features)
 
@@ -52,7 +52,7 @@ class StandardTransformerUsingGrid(BaseTransformer):
         self.encoder = build_encoder(config.ENCODER)
         self.decoder = build_decoder(config.DECODER, vocab)
 
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: Instance):
         encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         caption_tokens = input_features.caption_tokens
@@ -64,7 +64,7 @@ class StandardTransformerUsingGrid(BaseTransformer):
 
         return output
 
-    def encoder_forward(self, input_features: Instances):
+    def encoder_forward(self, input_features: Instance):
         vision_features = input_features.grid_features
         vision_features, vision_padding_mask = self.vision_embedding(vision_features)
 

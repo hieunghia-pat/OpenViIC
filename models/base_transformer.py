@@ -3,7 +3,7 @@ from torch import nn
 
 from models.modules.containers import Module
 from models.modules.beam_search import BeamSearch
-from utils.instances import Instances
+from utils.instance import InstanceList
 
 class BaseTransformer(Module):
     def __init__(self, vocab):
@@ -21,10 +21,10 @@ class BaseTransformer(Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def encoder_forward(self, input_features: Instances):
+    def encoder_forward(self, input_features: InstanceList):
         raise NotImplementedError
 
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: InstanceList):
         raise NotImplementedError
 
     def step(self, t, prev_output):
@@ -42,7 +42,7 @@ class BaseTransformer(Module):
 
         return output
 
-    def beam_search(self, input_features: Instances, batch_size: int, beam_size: int, out_size=1, return_probs=False, **kwargs):
+    def beam_search(self, input_features: InstanceList, batch_size: int, beam_size: int, out_size=1, return_probs=False, **kwargs):
         beam_search = BeamSearch(model=self, max_len=self.max_len, eos_idx=self.eos_idx, beam_size=beam_size, 
                             b_s=batch_size, device=self.device)
 

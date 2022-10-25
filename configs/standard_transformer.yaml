@@ -38,7 +38,7 @@ TRAINING:
 
 MODEL:
   ARCHITECTURE: StandardTransformerUsingRegion
-  NAME: transformer_region_x152_faster_rcnn
+  NAME: transformer_region_x152++
   DEVICE: cuda
   VISION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding

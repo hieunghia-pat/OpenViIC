@@ -1,7 +1,7 @@
 from typing import List
 import torch
 import re
-from utils.instances import Instances
+from utils.instance import Instance, InstanceList
 
 def get_tokenizer(tokenizer):
     if tokenizer is None:
@@ -117,5 +117,5 @@ def unk_init(token, dim):
         return torch.ones(dim) * 2
     return torch.ones(dim) * 3
 
-def collate_fn(samples: List[Instances]):
-    return Instances.cat(samples)
+def collate_fn(samples: List[Instance]):
+    return InstanceList(samples)
