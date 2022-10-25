@@ -2,7 +2,7 @@ import torch
 from torch.utils import data
 
 from data_utils.utils import preprocess_caption
-from utils.instances import Instances
+from utils.instance import Instance
 
 import json
 import os
@@ -62,7 +62,7 @@ class FeatureDataset(data.Dataset):
         
         features = self.load_features(self.annotations[idx]["image_id"])
 
-        return Instances(
+        return Instance(
             caption_tokens=caption,
             shifted_right_caption_tokens=shifted_right_caption,
             **features,
@@ -120,7 +120,7 @@ class DictionaryDataset(data.Dataset):
         features = self.load_features(image_id)
         captions = self.captions_with_image[idx]
 
-        return Instances(
+        return Instance(
             filename=filename,
             captions=captions,
             **features
@@ -141,7 +141,7 @@ class ImageDataset(DictionaryDataset):
         features = self.load_features(image_id)
         captions = self.captions_with_image[idx]
 
-        return Instances(
+        return Instance(
             **features,
             captions=captions
         )
