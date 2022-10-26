@@ -183,16 +183,16 @@ class COCO(PairedDataset):
                  cut_validation=False):
         roots = {}
         roots['train'] = {
-            'img': os.path.join(img_root, 'train2014'),
-            'cap': os.path.join(ann_root, 'captions_train2014.json')
+            'img': os.path.join(img_root, 'train'),
+            'cap': os.path.join(ann_root, 'uit-openviic-train.json')
         }
         roots['val'] = {
-            'img': os.path.join(img_root, 'val2014'),
-            'cap': os.path.join(ann_root, 'captions_val2014.json')
+            'img': os.path.join(img_root, 'val'),
+            'cap': os.path.join(ann_root, 'uit-openviic-dev.json')
         }
         roots['test'] = {
-            'img': os.path.join(img_root, 'val2014'),
-            'cap': os.path.join(ann_root, 'captions_val2014.json')
+            'img': os.path.join(img_root, 'test'),
+            'cap': os.path.join(ann_root, 'uit-openviic-test.json')
         }
         roots['trainrestval'] = {
             'img': (roots['train']['img'], roots['val']['img']),
@@ -243,7 +243,7 @@ class COCO(PairedDataset):
                 root = (roots[split]['img'],)
 
             if ids_dataset is None:
-                ids = list(coco_dataset.anns.keys())
+                ids = list(coco_dataset[0].anns.keys())
             else:
                 ids = ids_dataset[split]
 

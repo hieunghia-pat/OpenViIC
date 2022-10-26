@@ -186,10 +186,11 @@ if __name__ == '__main__':
     # Pipeline for image regions
     image_field = ImageDetectionsField(detections_path=args.features_path, max_detections=100, load_in_tmp=False)
     # Pipeline for text
-    text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, tokenize='spacy', remove_punctuation=True, nopoints=False)
+    # text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, tokenize='spacy', remove_punctuation=True, nopoints=False)
+    text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, remove_punctuation=True, nopoints=False)
 
     # Create the dataset
-    dataset = COCO(image_field, text_field, 'coco/images/', args.annotation_folder, args.annotation_folder)
+    dataset = COCO(image_field, text_field, 'coco/images/', ann_root=args.annotation_folder)
     train_dataset, val_dataset, test_dataset = dataset.splits
 
     if not os.path.isfile('vocab.pkl'):

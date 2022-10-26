@@ -149,7 +149,7 @@ class BertLinguisticDecoderLayer(Module):
         self.d_model = d_model
 
         self.word_emb = nn.Embedding(vocab_size, bert_hidden_size, padding_idx=padding_idx)
-        self.language_model = BertLanguageModel(padding_idx=padding_idx, bert_hidden_size=bert_hidden_size, 
+        self.language_model = LanguageModel(padding_idx=padding_idx, bert_hidden_size=bert_hidden_size, 
                                                     pretrained_name=pretrained_name, vocab_size=vocab_size)
         self.proj_embedding_to_model = nn.Linear(bert_hidden_size, d_model)
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len + 1, d_model, 0), freeze=True)

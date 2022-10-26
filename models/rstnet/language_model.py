@@ -94,7 +94,7 @@ class LanguageModel(Module):
 class BertLanguageModel(Module):
     def __init__(self, padding_idx=0, bert_hidden_size=768, pretrained_name="bert-base-multilingual-cased", 
                     d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1):
-        super(LanguageModel, self).__init__()
+        super(BertLanguageModel, self).__init__()
         self.padding_idx = padding_idx
         self.d_model = d_model
 

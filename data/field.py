@@ -104,7 +104,7 @@ class ImageDetectionsField(RawField):
         super(ImageDetectionsField, self).__init__(preprocessing, postprocessing)
 
     def preprocess(self, x, avoid_precomp=False):
-        image_id = int(x.split('_')[-1].split('.')[0])
+        image_id = int(x.split('/')[-1].split('.')[0])
         try:
             features = np.load(os.path.join(self.detections_path, f"{image_id}.npy"), allow_pickle=True)[()]
             precomp_data = features["grid_features"]
