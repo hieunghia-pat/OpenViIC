@@ -175,8 +175,7 @@ if __name__ == '__main__':
         text_field.vocab = pickle.load(open('vocab_%s.pkl' % args.exp_name, 'rb'))
 
     # Model and dataloaders
-    encoder = TransformerEncoder(3, 0, attention_module=ScaledDotProductAttention,
-                                     attention_module_kwargs={'m': args.m})
+    encoder = TransformerEncoder(3, 0, attention_module=ScaledDotProductAttention)
     decoder = TransformerDecoderLayer(len(text_field.vocab), 130, 3, text_field.vocab.stoi['<pad>'])
     model = Transformer(text_field.vocab.stoi['<bos>'], encoder, decoder).to(device)
 
