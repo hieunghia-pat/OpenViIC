@@ -1,9 +1,9 @@
 import random
-from data import ImageDetectionsField, TextField, RawField
+from data import ImageDetectionsFieldWithBox, TextField, RawField
 from data import COCO, DataLoader
 import evaluation
 from evaluation import PTBTokenizer, Cider
-from models.camo_aoa import Transformer, TransformerEncoder, TransformerDecoderLayer, ScaledDotProductAttention
+from models.camo_ort import Transformer, GeometricEncoder, TransformerDecoderLayer, AugmentedGeometryEncoderLayer
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
@@ -73,6 +73,8 @@ def train_xe(model, dataloader, optim, text_field):
     running_loss = .0
     with tqdm(desc='Epoch %d - train' % e, unit='it', total=len(dataloader)) as pbar:
         for it, (detections, captions) in enumerate(dataloader):
+            print(detections)
+            raise
             detections, captions = detections.to(device), captions.to(device)
             out = model(detections, captions)
             optim.zero_grad()
@@ -153,12 +155,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    print('Meshed-Memory Transformer Training')
+    print('CAMO Object Relation Transformer Training')
 
     writer = SummaryWriter(log_dir=os.path.join(args.logs_folder, args.exp_name))
 
     # Pipeline for image regions
-    image_field = ImageDetectionsField(detections_path=args.features_path, max_detections=100, load_in_tmp=False)
+    image_field = ImageDetectionsFieldWithBox(detections_path=args.features_path, max_detections=100, load_in_tmp=False)
 
     # Pipeline for text
     text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, remove_punctuation=True, nopoints=False)
@@ -175,7 +177,7 @@ if __name__ == '__main__':
         text_field.vocab = pickle.load(open('vocab_%s.pkl' % args.exp_name, 'rb'))
 
     # Model and dataloaders
-    encoder = TransformerEncoder(3, 0, attention_module=ScaledDotProductAttention)
+    encoder = GeometricEncoder(3, 0, attention_module=AugmentedGeometryEncoderLayer)
     decoder = TransformerDecoderLayer(len(text_field.vocab), 130, 3, text_field.vocab.stoi['<pad>'])
     model = Transformer(text_field.vocab.stoi['<bos>'], encoder, decoder).to(device)
 
