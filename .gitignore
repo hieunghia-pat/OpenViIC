@@ -4,3 +4,4 @@ openviic_images
 __pycache__
 examine*.py
 saved_models
+*.pkl
