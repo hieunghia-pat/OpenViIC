@@ -106,6 +106,13 @@ class GeometricEncoder(nn.Module):
                                                                     attention_module_kwargs=attention_module_kwargs)
                                                         for _ in range(N)])
 
+        self.self_att = MultiHeadAttention(d_model=d_model, d_k=d_k, d_v=d_v, h=1, dropout=dropout,
+                                            identity_map_reordering=identity_map_reordering,
+                                            attention_module=attention_module,
+                                            attention_module_kwargs=attention_module_kwargs)
+        self.mlp1 = nn.Linear(3*d_model, 3*d_model)
+        self.mlp2 = nn.Linear(3*d_model, d_model)
+
         self.init_weights()
 
     def init_weights(self):
@@ -131,11 +138,24 @@ class GeometricEncoder(nn.Module):
         relative_geometry_weights = torch.cat(relative_geometry_weights_per_head, dim=1) # (bs, h, nk, nk)
         relative_geometry_weights = F.relu(relative_geometry_weights)
         
+        outs = []
         for layer in self.layers:
             out = layer(queries=out, 
                         keys=out, 
                         values=out, 
                         relative_geometry_weights=relative_geometry_weights,
                         attention_mask=attention_mask)
+            outs.append(out)
+
+        out1, out2, out3 = outs
+        out2 = 0.1*self.self_att(out2, out1, out1) + out2
+        out3 = 0.1*self.self_att(out3, out2, out2) + out3
+
+        out = self.mlp1(torch.cat(outs, dim=-1))
+        out = F.leaky_relu(out)
+        out = self.mlp2(out)
+        out = F.leaky_relu(out)
+
+        out = out3 + 0.2*out
 
         return out, attention_mask
