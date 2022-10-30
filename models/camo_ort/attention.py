@@ -42,7 +42,7 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None, **kwargs):
         '''
         Computes
         :param queries: Queries (b_s, nq, d_model)
@@ -114,7 +114,7 @@ class ScaledDotProductAttentionMemory(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None, **kwargs):
         '''
         Computes
         :param queries: Queries (b_s, nq, d_model)
@@ -182,7 +182,7 @@ class ScaledDotProductGeometryAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, relative_geometry_weights, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, relative_geometry_weights, attention_mask=None, attention_weights=None, **kwargs):
         '''
         Computes
         :param queries: Queries (b_s, nq, d_model)
@@ -235,7 +235,7 @@ class MultiHeadAttention(Module):
             self.register_state('running_keys', torch.zeros((0, d_model)))
             self.register_state('running_values', torch.zeros((0, d_model)))
 
-    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None, **kwargs):
         if self.can_be_stateful and self._is_stateful:
             self.running_keys = torch.cat([self.running_keys, keys], 1)
             keys = self.running_keys
@@ -247,10 +247,10 @@ class MultiHeadAttention(Module):
             q_norm = self.layer_norm(queries)
             k_norm = self.layer_norm(keys)
             v_norm = self.layer_norm(values)
-            out = self.attention(q_norm, k_norm, v_norm, attention_mask, attention_weights)
+            out = self.attention(q_norm, k_norm, v_norm, attention_mask, attention_weights, **kwargs)
             out = queries + self.dropout(torch.relu(out))
         else:
-            out = self.attention(queries, keys, values, attention_mask, attention_weights)
+            out = self.attention(queries, keys, values, attention_mask, attention_weights, **kwargs)
             out = self.dropout(out)
             out = self.layer_norm(queries + out)
         return out

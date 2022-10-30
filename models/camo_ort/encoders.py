@@ -1,8 +1,8 @@
 from torch.nn import functional as F
-from models.transformer.utils import PositionWiseFeedForward
+from .utils import PositionWiseFeedForward
 import torch
 from torch import nn
-from models.transformer.attention import MultiHeadAttention
+from .attention import MultiHeadAttention
 from .utils import clones, box_relational_embedding
 
 
@@ -39,7 +39,10 @@ class AugmentedGeometryEncoderLayer(nn.Module):
 
     def forward(self, queries, keys, values, relative_geometry_weights, attention_mask=None, attention_weights=None):
 
-        att = self.mhatt(queries, keys, values, relative_geometry_weights, attention_mask, attention_weights)
+        att = self.mhatt(queries=queries, keys=keys, values=values, 
+                            relative_geometry_weights=relative_geometry_weights,
+                            attention_mask=attention_mask, 
+                            attention_weights=attention_weights)
         att = self.lnorm(queries + self.dropout(att))
         ff = self.pwff(att)
         return ff
@@ -82,9 +85,9 @@ class GeometricEncoder(nn.Module):
                  trignometric_embedding=True, identity_map_reordering=False, attention_module=None, attention_module_kwargs=None):
         super(GeometricEncoder, self).__init__()
         
-        self.fc = nn.Linear(d_in, self.d_model)
-        self.dropout = nn.Dropout(p=self.dropout)
-        self.layer_norm = nn.LayerNorm(self.d_model)
+        self.fc = nn.Linear(d_in, d_model)
+        self.dropout = nn.Dropout(p=dropout)
+        self.layer_norm = nn.LayerNorm(d_model)
 
         self.padding_idx = padding_idx
 
@@ -115,6 +118,10 @@ class GeometricEncoder(nn.Module):
     def forward(self, input: torch.Tensor, boxes: torch.Tensor):
         attention_mask = (torch.sum(input, -1) == self.padding_idx).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
 
+        out = F.relu(self.fc(input))
+        out = self.dropout(out)
+        out = self.layer_norm(out)
+
         # embedding geometric information from boxes' coordinates
         relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
         flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, self.d_g)
@@ -124,7 +131,6 @@ class GeometricEncoder(nn.Module):
         relative_geometry_weights = torch.cat(relative_geometry_weights_per_head, dim=1) # (bs, h, nk, nk)
         relative_geometry_weights = F.relu(relative_geometry_weights)
         
-        out = self.layer_norm(input)
         for layer in self.layers:
             out = layer(queries=out, 
                         keys=out, 
@@ -132,4 +138,4 @@ class GeometricEncoder(nn.Module):
                         relative_geometry_weights=relative_geometry_weights,
                         attention_mask=attention_mask)
 
-        return 
+        return out, attention_mask

@@ -1,5 +1,5 @@
 import random
-from data import ImageDetectionsFieldWithBox, TextField, RawField
+from data import ImageDetectionsFieldRegionWithBox, TextField, RawField
 from data import COCO, DataLoader
 import evaluation
 from evaluation import PTBTokenizer, Cider
@@ -27,9 +27,9 @@ def evaluate_loss(model, dataloader, loss_fn, text_field):
     running_loss = .0
     with tqdm(desc='Epoch %d - validation' % e, unit='it', total=len(dataloader)) as pbar:
         with torch.no_grad():
-            for it, (detections, captions) in enumerate(dataloader):
-                detections, captions = detections.to(device), captions.to(device)
-                out = model(detections, captions)
+            for it, (detections, boxes, captions) in enumerate(dataloader):
+                detections, boxes, captions = detections.to(device), boxes.to(device), captions.to(device)
+                out = model(detections, boxes, captions)
                 captions = captions[:, 1:].contiguous()
                 out = out[:, :-1].contiguous()
                 loss = loss_fn(out.view(-1, len(text_field.vocab)), captions.view(-1))
@@ -49,10 +49,11 @@ def evaluate_metrics(model, dataloader, text_field):
     gen = {}
     gts = {}
     with tqdm(desc='Epoch %d - evaluation' % e, unit='it', total=len(dataloader)) as pbar:
-        for it, (images, caps_gt) in enumerate(iter(dataloader)):
+        for it, ((images, boxes), caps_gt) in enumerate(iter(dataloader)):
             images = images.to(device)
+            boxes = boxes.to(device)
             with torch.no_grad():
-                out, _ = model.beam_search(images, 20, text_field.vocab.stoi['<eos>'], 5, out_size=1)
+                out, _ = model.beam_search(images, boxes, 20, text_field.vocab.stoi['<eos>'], 5, out_size=1)
             caps_gen = text_field.decode(out, join_words=False)
             for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                 gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -72,11 +73,9 @@ def train_xe(model, dataloader, optim, text_field):
     scheduler.step()
     running_loss = .0
     with tqdm(desc='Epoch %d - train' % e, unit='it', total=len(dataloader)) as pbar:
-        for it, (detections, captions) in enumerate(dataloader):
-            print(detections)
-            raise
-            detections, captions = detections.to(device), captions.to(device)
-            out = model(detections, captions)
+        for it, (detections, boxes, captions) in enumerate(dataloader):
+            detections, boxes, captions = detections.to(device), boxes.to(device), captions.to(device)
+            out = model(detections, boxes, captions)
             optim.zero_grad()
             captions_gt = captions[:, 1:].contiguous()
             out = out[:, :-1].contiguous()
@@ -106,9 +105,10 @@ def train_scst(model, dataloader, optim, cider, text_field):
     beam_size = 5
 
     with tqdm(desc='Epoch %d - train' % e, unit='it', total=len(dataloader)) as pbar:
-        for it, (detections, caps_gt) in enumerate(dataloader):
+        for it, ((detections, boxes), caps_gt) in enumerate(dataloader):
             detections = detections.to(device)
-            outs, log_probs = model.beam_search(detections, seq_len, text_field.vocab.stoi['<eos>'],
+            boxes = boxes.to(device)
+            outs, log_probs = model.beam_search(detections, boxes, seq_len, text_field.vocab.stoi['<eos>'],
                                                 beam_size, out_size=beam_size)
             optim.zero_grad()
 
@@ -160,7 +160,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=os.path.join(args.logs_folder, args.exp_name))
 
     # Pipeline for image regions
-    image_field = ImageDetectionsFieldWithBox(detections_path=args.features_path, max_detections=100, load_in_tmp=False)
+    image_field = ImageDetectionsFieldRegionWithBox(detections_path=args.features_path, max_detections=100, load_in_tmp=False)
 
     # Pipeline for text
     text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, remove_punctuation=True, nopoints=False)
@@ -177,7 +177,7 @@ if __name__ == '__main__':
         text_field.vocab = pickle.load(open('vocab_%s.pkl' % args.exp_name, 'rb'))
 
     # Model and dataloaders
-    encoder = GeometricEncoder(3, 0, attention_module=AugmentedGeometryEncoderLayer)
+    encoder = GeometricEncoder(3, 0, d_in=1024, attention_module=AugmentedGeometryEncoderLayer)
     decoder = TransformerDecoderLayer(len(text_field.vocab), 130, 3, text_field.vocab.stoi['<pad>'])
     model = Transformer(text_field.vocab.stoi['<bos>'], encoder, decoder).to(device)
 

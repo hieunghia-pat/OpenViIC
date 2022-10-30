@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import copy
 from models.containers import ModuleList
-from ..captioning_model import CaptioningModel
+from .captioning_model import CaptioningModel
 from .grid_aug import PositionEmbeddingSine
 
 
@@ -27,29 +27,22 @@ class Transformer(CaptioningModel):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def get_pos_embedding(self, grids):
-        bs = grids.shape[0]
-        grid_embed = self.grid_embedding(grids.view(bs, 7, 7, -1))
-        return grid_embed
-
-    def forward(self, images, seq, *args):
-        grid_embed = self.get_pos_embedding(images)
-        enc_output, mask_enc = self.encoder(images, pos=grid_embed)
-        dec_output = self.decoder(seq, enc_output, mask_enc, pos=grid_embed)
+    def forward(self, images, boxes, seq, *args):
+        enc_output, mask_enc = self.encoder(images, boxes)
+        dec_output = self.decoder(seq, enc_output, mask_enc)
         return dec_output
 
     def init_state(self, b_s, device):
         return [torch.zeros((b_s, 0), dtype=torch.long, device=device),
                 None, None]
 
-    def step(self, t, prev_output, visual, seq, mode='teacher_forcing', **kwargs):
+    def step(self, t, prev_output, visual, boxes, seq, mode='teacher_forcing', **kwargs):
         it = None
         if mode == 'teacher_forcing':
             raise NotImplementedError
         elif mode == 'feedback':
             if t == 0:
-                self.grid_embed = self.get_pos_embedding(visual)
-                self.enc_output, self.mask_enc = self.encoder(visual, pos=self.grid_embed)
+                self.enc_output, self.mask_enc = self.encoder(visual, boxes)
 
                 if isinstance(visual, torch.Tensor):
                     it = visual.data.new_full((visual.shape[0], 1), self.bos_idx).long()
@@ -58,7 +51,7 @@ class Transformer(CaptioningModel):
             else:
                 it = prev_output
 
-        return self.decoder(it, self.enc_output, self.mask_enc, pos=self.grid_embed)
+        return self.decoder(it, self.enc_output, self.mask_enc)
 
 
 class TransformerEnsemble(CaptioningModel):
