@@ -150,8 +150,8 @@ if __name__ == '__main__':
     parser.add_argument('--features_path', type=str)
     parser.add_argument('--annotation_folder', type=str)
     parser.add_argument('--saved_folder', type=str)
-    parser.add_argument('--alpha', type=int)
-    parser.add_argument('--beta', type=int)
+    parser.add_argument('--alpha', type=float)
+    parser.add_argument('--beta', type=float)
     parser.add_argument('--logs_folder', type=str, default='tensorboard_logs')
     args = parser.parse_args()
     print(args)
@@ -178,7 +178,7 @@ if __name__ == '__main__':
         text_field.vocab = pickle.load(open(os.path.join(args.saved_folder, 'vocab_%s.pkl' % args.exp_name), 'rb'))
 
     # Model and dataloaders
-    encoder = TransformerEncoder(3, 0, alpha=args.alpha, beta=args.beta, attention_module=ScaledDotProductAttention)
+    encoder = TransformerEncoder(3, 0, alpha=args.alpha, beta=args.beta, d_in=1024, attention_module=ScaledDotProductAttention)
     decoder = TransformerDecoderLayer(len(text_field.vocab), 130, 3, text_field.vocab.stoi['<pad>'])
     model = Transformer(text_field.vocab.stoi['<bos>'], encoder, decoder).to(device)
 
@@ -319,7 +319,7 @@ if __name__ == '__main__':
 
         if best:
             copyfile(os.path.join(args.saved_folder, '%s_last.pth' % args.exp_name), 
-                        os.path.join(args.saved_folder, 'saved_models/%s_best.pth' % args.exp_name))
+                        os.path.join(args.saved_folder, '%s_best.pth' % args.exp_name))
 
         if exit_train:
             writer.close()
