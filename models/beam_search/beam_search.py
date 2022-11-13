@@ -66,9 +66,11 @@ class BeamSearch(object):
             self.all_log_probs = []
 
         outputs = []
+        dec_att_scores = []
         with self.model.statefulness(self.b_s):
             for t in range(self.max_len):
-                visual, outputs = self.iter(t, visual, outputs, return_probs, **kwargs)
+                visual, outputs, dec_att_scores_per_step = self.iter(t, visual, outputs, return_probs, **kwargs)
+                dec_att_scores.append(dec_att_scores_per_step)
 
         # Sort result
         seq_logprob, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)
@@ -89,9 +91,9 @@ class BeamSearch(object):
             log_probs = log_probs.squeeze(1)
 
         if return_probs:
-            return outputs, log_probs, all_log_probs
+            return outputs, log_probs, all_log_probs, dec_att_scores
         else:
-            return outputs, log_probs
+            return outputs, log_probs, dec_att_scores
 
     def select(self, t, candidate_logprob, **kwargs):
         selected_logprob, selected_idx = torch.sort(candidate_logprob.view(self.b_s, -1), -1, descending=True)
@@ -101,7 +103,7 @@ class BeamSearch(object):
     def iter(self, t: int, visual: utils.TensorOrSequence, outputs, return_probs, **kwargs):
         cur_beam_size = 1 if t == 0 else self.beam_size
 
-        word_logprob = self.model.step(t, self.selected_words, visual, None, mode='feedback', **kwargs)
+        word_logprob, dec_att_scores_per_step = self.model.step(t, self.selected_words, visual, None, mode='feedback', **kwargs)
         word_logprob = word_logprob.view(self.b_s, cur_beam_size, -1)
         candidate_logprob = self.seq_logprob + word_logprob
 
@@ -141,4 +143,4 @@ class BeamSearch(object):
         self.log_probs.append(this_word_logprob)
         self.selected_words = selected_words.view(-1, 1)
 
-        return visual, outputs
+        return visual, outputs, dec_att_scores_per_step

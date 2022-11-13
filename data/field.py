@@ -141,7 +141,7 @@ class ImageDetectionsFieldRegion(ImageDetectionsFieldGrid):
         elif delta < 0:
             precomp_data = precomp_data[:self.max_detections]
 
-        return precomp_data.astype(np.float32)
+        return precomp_data.astype(np.float32), image_id
 
 class ImageDetectionsFieldRegionWithBox(ImageDetectionsFieldGrid):
     def __init__(self, preprocessing=None, postprocessing=None, detections_path=None, max_detections=100,

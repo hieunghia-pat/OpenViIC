@@ -2,7 +2,7 @@ import random
 from data import ImageDetectionsFieldRegion, TextField, RawField
 from data import COCO
 from evaluation import PTBTokenizer, Cider
-from models.camo_transformer import Transformer, TransformerEncoder, TransformerDecoderLayer, ScaledDotProductAttention
+from models.transformer import Transformer, TransformerEncoder, TransformerDecoderLayer, ScaledDotProductAttention
 import torch
 from tqdm import tqdm
 import argparse, os, pickle

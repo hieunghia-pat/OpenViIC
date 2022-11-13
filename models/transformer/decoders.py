@@ -27,17 +27,17 @@ class DecoderLayer(Module):
 
     def forward(self, input, enc_output, mask_pad, mask_self_att, mask_enc_att):
         # MHA+AddNorm
-        self_att = self.self_att(input, input, input, mask_self_att)
+        self_att, self_att_score = self.self_att(input, input, input, mask_self_att)
         self_att = self.lnorm1(input + self.dropout1(self_att))
         self_att = self_att * mask_pad
         # MHA+AddNorm
-        enc_att = self.enc_att(self_att, enc_output, enc_output, mask_enc_att)
+        enc_att, enc_att_score = self.enc_att(self_att, enc_output, enc_output, mask_enc_att)
         enc_att = self.lnorm2(self_att + self.dropout2(enc_att))
         enc_att = enc_att * mask_pad
         # FFN+AddNorm
         ff = self.pwff(enc_att)
         ff = ff * mask_pad
-        return ff
+        return ff, (self_att_score, enc_att_score)
 
 
 class TransformerDecoderLayer(Module):
@@ -78,8 +78,12 @@ class TransformerDecoderLayer(Module):
 
         out = self.word_emb(input) + self.pos_emb(seq)
     
+        self_att_scores = []
+        enc_att_scores = []
         for i, l in enumerate(self.layers):
-            out = l(out, encoder_output, mask_queries, mask_self_attention, mask_encoder)
+            out, (self_att_score, enc_att_score) = l(out, encoder_output, mask_queries, mask_self_attention, mask_encoder)
+            self_att_scores.append(self_att_score)
+            enc_att_scores.append(enc_att_score)
 
         out = self.fc(out)
-        return F.log_softmax(out, dim=-1)
+        return F.log_softmax(out, dim=-1), (self_att_scores, enc_att_scores)

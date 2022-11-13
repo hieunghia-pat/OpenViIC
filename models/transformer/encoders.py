@@ -19,10 +19,10 @@ class EncoderLayer(nn.Module):
 
     def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
 
-        att = self.mhatt(queries, keys, values, attention_mask, attention_weights)
+        att, att_score = self.mhatt(queries, keys, values, attention_mask, attention_weights)
         att = self.lnorm(queries + self.dropout(att))
         ff = self.pwff(att)
-        return ff
+        return ff, att_score
 
 
 class MultiLevelEncoder(nn.Module):
@@ -43,12 +43,14 @@ class MultiLevelEncoder(nn.Module):
         attention_mask = (torch.sum(input, -1) == self.padding_idx).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
 
         out = input
+        att_scores = []
         for l in self.layers:
-            out = l(out, out, out, attention_mask, attention_weights)
+            out, att_score = l(out, out, out, attention_mask, attention_weights)
+            att_scores.append(att_score)
             # outs.append(out.unsqueeze(1))
 
         # outs = torch.cat(outs, 1)
-        return out, attention_mask
+        return out, attention_mask, att_scores
 
 
 class TransformerEncoder(MultiLevelEncoder):

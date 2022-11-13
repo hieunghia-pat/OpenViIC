@@ -5,3 +5,4 @@ __pycache__
 examine*.py
 saved_models
 *.pkl
+*.json
