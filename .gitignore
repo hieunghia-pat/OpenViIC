@@ -1,6 +1,10 @@
 __pycache__
 features*
 examine*.*
+*.json
+*.pkl
+annotations
+openviic_images
 
 meteor-1.5.jar
 

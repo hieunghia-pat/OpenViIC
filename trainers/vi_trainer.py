@@ -2,7 +2,6 @@ import torch
 from torch.optim import Adam
 
 from utils.logging_utils import setup_logger
-from utils.instances import Instances
 from data_utils.vocab import Vocab
 from data_utils.dataset import FeatureDataset, DictionaryDataset
 from .base_trainer import BaseTrainer
