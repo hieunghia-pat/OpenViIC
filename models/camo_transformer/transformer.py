@@ -25,8 +25,8 @@ class Transformer(CaptioningModel):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, images, seq, *args):
-        enc_output, mask_enc = self.encoder(images)
-        dec_output = self.decoder(seq, enc_output, mask_enc)
+        enc_output, mask_enc, _ = self.encoder(images)
+        dec_output, _ = self.decoder(seq, enc_output, mask_enc)
         return dec_output
 
     def init_state(self, b_s, device):
@@ -39,7 +39,7 @@ class Transformer(CaptioningModel):
             raise NotImplementedError
         elif mode == 'feedback':
             if t == 0:
-                self.enc_output, self.mask_enc = self.encoder(visual)
+                self.enc_output, self.mask_enc, _ = self.encoder(visual)
                 if isinstance(visual, torch.Tensor):
                     it = visual.data.new_full((visual.shape[0], 1), self.bos_idx).long()
                 else:
@@ -47,7 +47,9 @@ class Transformer(CaptioningModel):
             else:
                 it = prev_output
 
-        return self.decoder(it, self.enc_output, self.mask_enc)
+        scores, dec_att_scores = self.decoder(it, self.enc_output, self.mask_enc)
+
+        return scores, dec_att_scores
 
 
 class TransformerEnsemble(CaptioningModel):

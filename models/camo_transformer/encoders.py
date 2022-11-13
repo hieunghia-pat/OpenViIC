@@ -19,10 +19,10 @@ class EncoderLayer(nn.Module):
 
     def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
 
-        att = self.mhatt(queries, keys, values, attention_mask, attention_weights)
+        att, att_score = self.mhatt(queries, keys, values, attention_mask, attention_weights)
         att = self.lnorm(queries + self.dropout(att))
         ff = self.pwff(att)
-        return ff
+        return ff, att_score
 
 
 class TransformerEncoder(nn.Module):
@@ -59,13 +59,15 @@ class TransformerEncoder(nn.Module):
         out = self.layer_norm(out)
 
         outs = []
+        att_scores = []
         for l in self.layers:
-            out = l(out, out, out, attention_mask, attention_weights)
+            out, att_score = l(out, out, out, attention_mask, attention_weights)
             outs.append(out)
+            att_scores.append(att_score)
 
         out1, out2, out3 = outs
-        out2 = 0.1*self.self_att(out2, out1, out1) + out2
-        out3 = 0.1*self.self_att(out3, out2, out2) + out3
+        out2 = 0.1*self.self_att(out2, out1, out1)[0] + out2
+        out3 = 0.1*self.self_att(out3, out2, out2)[0] + out3
 
         out = self.mlp1(torch.cat(outs, dim=-1))
         out = F.leaky_relu(out)
@@ -74,4 +76,4 @@ class TransformerEncoder(nn.Module):
 
         out = out3 + 0.2*out
         
-        return out, attention_mask
+        return out, attention_mask, att_scores

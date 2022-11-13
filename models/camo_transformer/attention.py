@@ -70,7 +70,7 @@ class ScaledDotProductAttention(nn.Module):
 
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
-        return out
+        return out, att
 
 
 class ScaledDotProductAttentionMemory(nn.Module):
@@ -142,7 +142,7 @@ class ScaledDotProductAttentionMemory(nn.Module):
         att = torch.softmax(att, -1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
-        return out
+        return out, att
 
 
 class MultiHeadAttention(Module):
@@ -175,10 +175,10 @@ class MultiHeadAttention(Module):
             q_norm = self.layer_norm(queries)
             k_norm = self.layer_norm(keys)
             v_norm = self.layer_norm(values)
-            out = self.attention(q_norm, k_norm, v_norm, attention_mask, attention_weights)
+            out, att_score = self.attention(q_norm, k_norm, v_norm, attention_mask, attention_weights)
             out = queries + self.dropout(torch.relu(out))
         else:
-            out = self.attention(queries, keys, values, attention_mask, attention_weights)
+            out, att_score = self.attention(queries, keys, values, attention_mask, attention_weights)
             out = self.dropout(out)
             out = self.layer_norm(queries + out)
-        return out
+        return out, att_score

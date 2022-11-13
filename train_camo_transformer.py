@@ -20,9 +20,14 @@ def get_attention_scores(model, dataloader, text_field):
         for it, ((images, image_id), _) in enumerate(iter(dataloader)):
             images = torch.tensor(images).unsqueeze(0).to(device)
             with torch.no_grad():
-                _, _, dec_att_scores = model.beam_search(images, 20, text_field.vocab.stoi['<eos>'], 5, out_size=1)
+                out, _, dec_att_scores = model.beam_search(images, 20, text_field.vocab.stoi['<eos>'], 5, out_size=1)
+                inds = out[0].tolist()
+                tokens = [text_field.vocab.itos[idx] for idx in inds]
 
-            att_scores[image_id] = dec_att_scores
+            att_scores[image_id] = {
+                "attention_scores": dec_att_scores,
+                "tokens": tokens
+            }
             pbar.update()
 
     return att_scores
