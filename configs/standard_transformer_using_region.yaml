@@ -1,4 +1,4 @@
-TRAINER: viTrainer
+TRAINER: AttentionScoreGetter
 
 DATASET:
   FEATURE_BATCH_SIZE: 60
@@ -21,7 +21,7 @@ DATASET:
     DEV: features/OpenViIC/annotations/uit-openviic-dev.json
     TEST: features/OpenViIC/annotations/uit-openviic-test.json
   FEATURE_PATH:
-    FEATURES: features/OpenViIC/features/x152++_faster_rcnn
+    FEATURES: features/OpenViIC/x152++_faster_rcnn
     SCENE_TEXT: null
     IMAGE: null
 

@@ -15,7 +15,7 @@ class EncoderLayer(nn.Module):
         self.pwff = PositionWiseFeedForward(config)
 
     def forward(self, queries, keys, values, padding_mask, attention_mask, **kwargs):
-        att = self.mhatt(queries=queries, keys=keys, values=values, padding_mask=padding_mask, attention_mask=attention_mask, **kwargs)
+        att, _ = self.mhatt(queries=queries, keys=keys, values=values, padding_mask=padding_mask, attention_mask=attention_mask, **kwargs)
         ff = self.pwff(att)
         ff = ff.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
 

@@ -34,13 +34,13 @@ class BaseTransformer(Module):
         else:
             it = prev_output
 
-        output = self.decoder(
+        output, att_scores = self.decoder(
             caption_tokens=it,
             encoder_features=self.encoder_features,
             encoder_attention_mask=self.encoder_padding_mask
         )
 
-        return output
+        return output, att_scores
 
     def beam_search(self, input_features: InstanceList, batch_size: int, beam_size: int, out_size=1, return_probs=False, **kwargs):
         beam_search = BeamSearch(model=self, max_len=self.max_len, eos_idx=self.eos_idx, beam_size=beam_size, 
@@ -48,6 +48,6 @@ class BaseTransformer(Module):
 
         with self.statefulness(batch_size):
             self.encoder_features, self.encoder_padding_mask = self.encoder_forward(input_features)
-            output =  beam_search.apply(out_size, return_probs, **kwargs)
+            output, _, att_scores = beam_search.apply(out_size, return_probs, **kwargs)
 
-        return output
+        return output, att_scores

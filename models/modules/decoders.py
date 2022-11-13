@@ -19,13 +19,13 @@ class DecoderLayer(Module):
         self.pwff = PositionWiseFeedForward(config.ENC_ATTENTION)
 
     def forward(self, queries, keys, values, self_padding_mask, self_attention_mask, enc_attention_mask, **kwargs):
-        self_att = self.self_attn(queries, queries, queries, padding_mask=self_padding_mask, attention_mask=self_attention_mask, **kwargs)
-        enc_att = self.enc_attn(self_att, keys, values, padding_mask=self_padding_mask, attention_mask=enc_attention_mask, **kwargs)
+        self_att, self_att_score = self.self_attn(queries, queries, queries, padding_mask=self_padding_mask, attention_mask=self_attention_mask, **kwargs)
+        enc_att, enc_att_score = self.enc_attn(self_att, keys, values, padding_mask=self_padding_mask, attention_mask=enc_attention_mask, **kwargs)
 
         ff = self.pwff(enc_att)
         ff = ff.masked_fill(self_padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
         
-        return ff
+        return ff, (self_att_score, enc_att_score)
 
 class MeshedDecoderLayer(Module):
     def __init__(self, config):
@@ -110,17 +110,19 @@ class Decoder(Module):
 
         embedded_captions, _ = self.word_emb(caption_tokens)
         out = embedded_captions + self.pos_emb(seq)
+        att_scores = []
         for layer in self.layers:
-            out = layer(queries=out, 
+            out, att_scores_per_layer = layer(queries=out, 
                         keys=encoder_features,
                         values=encoder_features,
                         self_padding_mask=caption_padding_masks,
                         self_attention_mask=caption_self_attention_masks,
                         enc_attention_mask=encoder_attention_mask)
+            att_scores.append(att_scores_per_layer)
 
         out = self.fc(out)
 
-        return F.log_softmax(out, dim=-1)
+        return F.log_softmax(out, dim=-1), att_scores
 
 @META_DECODER.register()
 class MeshedDecoder(Module):

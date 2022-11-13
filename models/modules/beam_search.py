@@ -41,7 +41,7 @@ class BeamSearch(object):
     def iter(self, t: int, outputs, return_probs, **kwargs):
         cur_beam_size = 1 if t == 0 else self.beam_size
 
-        word_logprob = self.model.step(t, self.selected_words, **kwargs)
+        word_logprob, att_scores = self.model.step(t, self.selected_words, **kwargs)
         word_logprob = word_logprob.view(self.b_s, cur_beam_size, -1)
         candidate_logprob = self.seq_logprob + word_logprob
 
@@ -80,7 +80,7 @@ class BeamSearch(object):
         self.log_probs.append(this_word_logprob)
         self.selected_words = selected_words.view(-1, 1)
 
-        return outputs
+        return outputs, att_scores
 
     def apply(self, out_size=1, return_probs=False, **kwargs):
         self.seq_mask = torch.ones((self.b_s, self.beam_size, 1), device=self.device)
@@ -91,8 +91,10 @@ class BeamSearch(object):
             self.all_log_probs = []
 
         outputs = []
+        att_scores = []
         for t in range(self.max_len):
-            outputs = self.iter(t, outputs, return_probs, **kwargs)
+            outputs, att_scores_per_step = self.iter(t, outputs, return_probs, **kwargs)
+            att_scores.append(att_scores_per_step)
 
         # Sort result
         seq_logprob, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)
@@ -115,4 +117,4 @@ class BeamSearch(object):
         if return_probs:
             return outputs, log_probs, all_log_probs
         else:
-            return outputs, log_probs
+            return outputs, log_probs, att_scores
