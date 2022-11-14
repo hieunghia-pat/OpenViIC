@@ -162,4 +162,6 @@ class AttentionScoreGetter:
                     "tokens": tokens
                 }
 
+                pbar.update()
+
         torch.save(attention_scores, "transformer_attention_score.bin")
