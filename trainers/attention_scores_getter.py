@@ -157,8 +157,7 @@ class AttentionScoreGetter:
                 tokens = self.vocab.decode_caption(outs, join_words=False)[0]
                 tokens = [self.vocab.bos_token] + [k for k, g in itertools.groupby(tokens)] + [self.vocab.eos_token]
                 attention_scores[image_id] = {
-                    "self_attention_scores": att_scores[0],
-                    "enc_attention_scores": att_scores[1],
+                    "attention_scores": att_scores,
                     "tokens": tokens
                 }
 
