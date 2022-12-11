@@ -45,6 +45,11 @@ class Dataset(object):
             data = data[0]
         return data
 
+    def __getitems__(self, ids):
+        data = [self.__getitem__(idx) for idx in ids]
+
+        return data
+
     def __len__(self):
         return len(self.examples)
 
@@ -184,15 +189,15 @@ class COCO(PairedDataset):
         roots = {}
         roots['train'] = {
             'img': os.path.join(img_root, 'train'),
-            'cap': os.path.join(ann_root, 'uit-openviic-train.json')
+            'cap': os.path.join(ann_root, 'uitviic_captions_train2017.json')
         }
         roots['val'] = {
             'img': os.path.join(img_root, 'val'),
-            'cap': os.path.join(ann_root, 'uit-openviic-dev.json')
+            'cap': os.path.join(ann_root, 'uitviic_captions_val2017.json')
         }
         roots['test'] = {
             'img': os.path.join(img_root, 'test'),
-            'cap': os.path.join(ann_root, 'uit-openviic-test.json')
+            'cap': os.path.join(ann_root, 'uitviic_captions_test2017.json')
         }
         roots['trainrestval'] = {
             'img': (roots['train']['img'], roots['val']['img']),
