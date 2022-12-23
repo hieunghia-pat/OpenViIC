@@ -5,7 +5,6 @@ from torch import nn
 from models.rstnet.attention import MultiHeadGeometryAttention
 from models.rstnet.grid_aug import BoxRelationalEmbedding
 
-
 class EncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
                  attention_module=None, attention_module_kwargs=None):
@@ -28,7 +27,6 @@ class EncoderLayer(nn.Module):
         ff = self.pwff(att)
         return ff
 
-
 class MultiLevelEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, attention_module=None, attention_module_kwargs=None):
@@ -47,17 +45,9 @@ class MultiLevelEncoder(nn.Module):
     def forward(self, input, attention_weights=None, pos=None):
         # input (b_s, seq_len, d_in)
         attention_mask = (torch.sum(input, -1) == self.padding_idx).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
+        attention_mask = attention_mask.float() * -10e4 # for HuggingFace compatition
 
         # grid geometry embedding
-        relative_geometry_embeddings = BoxRelationalEmbedding(input)
-        flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, 64)
-        box_size_per_head = list(relative_geometry_embeddings.shape[:3])
-        box_size_per_head.insert(1, 1)
-        relative_geometry_weights_per_head = [layer(flatten_relative_geometry_embeddings).view(box_size_per_head) for layer in self.WGs]
-        relative_geometry_weights = torch.cat((relative_geometry_weights_per_head), 1)
-        relative_geometry_weights = F.relu(relative_geometry_weights)
-
-
         relative_geometry_embeddings = BoxRelationalEmbedding(input)
         flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, 64)
         box_size_per_head = list(relative_geometry_embeddings.shape[:3])
@@ -72,7 +62,6 @@ class MultiLevelEncoder(nn.Module):
 
         return out, attention_mask
 
-
 class TransformerEncoder(MultiLevelEncoder):
     def __init__(self, N, padding_idx, d_in=2048, **kwargs):
         super(TransformerEncoder, self).__init__(N, padding_idx, **kwargs)
@@ -85,5 +74,4 @@ class TransformerEncoder(MultiLevelEncoder):
         out = F.relu(self.fc(input))
         out = self.dropout(out)
         out = self.layer_norm(out)
-        out = out.masked_fill(mask, 0)
         return super(TransformerEncoder, self).forward(out, attention_weights=attention_weights, pos=pos)

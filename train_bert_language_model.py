@@ -132,7 +132,7 @@ if __name__ == '__main__':
     image_field = ImageDetectionsFieldRegion(detections_path=args.features_path, max_detections=50, load_in_tmp=False)
 
     # Pipeline for text
-    text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, tokenize='spacy',
+    text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True,
                            remove_punctuation=True, nopoints=False)
 
     # Create the dataset
@@ -165,7 +165,6 @@ if __name__ == '__main__':
         if lr > 1e-6:
             lr = 1e-6
 
-        print('s = {}, lr = {}'.format(s, lr))
         return lr
 
     # Initial conditions

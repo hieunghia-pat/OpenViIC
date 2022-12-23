@@ -63,7 +63,7 @@ class ScaledDotProductAttention(nn.Module):
         if attention_weights is not None:
             att = att * attention_weights
         if attention_mask is not None:
-            att = att.masked_fill(attention_mask, -np.inf)
+            att += attention_mask
         att = torch.softmax(att, -1)
         att = self.dropout(att)
 
@@ -132,7 +132,7 @@ class ScaledDotProductGeometryAttention(nn.Module):
         if attention_weights is not None:
             att = att * attention_weights
         if attention_mask is not None:
-            att = att.masked_fill(attention_mask, -np.inf)
+            att += attention_mask
 
         w_g = box_relation_embed_matrix
         w_a = att
@@ -209,23 +209,23 @@ class ScaledDotProductAdaptiveAttention(nn.Module):
         k = self.fc_k(keys).view(b_s, nk, self.h, self.d_k).permute(0, 2, 3, 1)  # (b_s, h, d_k, nk)
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
-        # 视觉
+        # vision
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
         if attention_weights is not None:
             att = att * attention_weights
         if attention_mask is not None:
-            att = att.masked_fill(attention_mask, -np.inf)
-        # 语言
+            att += attention_mask
+        # language
         language_att = torch.matmul(q, s.permute(0, 1, 3, 2)) / np.sqrt(self.d_k)  # (b_s, h, nq, nq)
         language_att = torch.cat([language_att[:, :, i, i].unsqueeze(-1) for i in range(nq)], -1)
 
-        # 融合att
+        # fused attention
         combined_att = torch.cat([att, language_att.unsqueeze(-1)], -1)     # (b_s, h, nq, nk + 1)
         combined_att = [torch.softmax(combined_att[:, :, i, :].unsqueeze(2), -1) for i in range(nq)]
         # # dropout
         # combined_att = [self.dropout(item) for item in combined_att]
 
-        # 融合v
+        # fused vision
         combined_v = [torch.cat([v, s[:, :, i, :].unsqueeze(2)], 2) for i in range(nq)]
 
         assert len(combined_att) == len(combined_v) == nq
@@ -301,7 +301,7 @@ class ScaledDotProductAttentionMemory(nn.Module):
         if attention_weights is not None:
             att = torch.cat([att[:, :, :, :nk] * attention_weights, att[:, :, :, nk:]], -1)
         if attention_mask is not None:
-            att[:, :, :, :nk] = att[:, :, :, :nk].masked_fill(attention_mask, -np.inf)
+            att[:, :, :, :nk] = att[:, :, :, :nk] + attention_mask
         att = torch.softmax(att, -1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)

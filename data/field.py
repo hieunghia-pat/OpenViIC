@@ -150,7 +150,7 @@ class ImageDetectionsFieldRegionWithBox(ImageDetectionsFieldGrid):
                                                     sort_by_prob, load_in_tmp)
 
     def preprocess(self, x, avoid_precomp=False):
-        image_id = int(x.split('\\')[-1].split('.')[0])
+        image_id = int(x.split('/')[-1].split('.')[0])
         try:
             features = np.load(os.path.join(self.detections_path, f"{image_id}.npy"), allow_pickle=True)[()]
             precomp_data = features["region_features"].numpy()
