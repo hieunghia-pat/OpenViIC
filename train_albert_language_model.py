@@ -1,8 +1,8 @@
 import random
-from data import ImageDetectionsField, TextField, RawField
+from data import ImageDetectionsFieldRegion, TextField, RawField
 from data import COCO, DataLoader
 
-from models.rstnet.language_model import LanguageModel
+from models.rstnet.language_model import AlbertAdaptiveLanguageModel
 
 import torch
 from torch.optim import Adam
@@ -103,6 +103,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Bert Language Model')
     parser.add_argument('--exp_name', type=str, default='bert_language')
     parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument("--pretrained_name", type=str)
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--m', type=int, default=40)
     parser.add_argument('--head', type=int, default=8)
@@ -128,7 +129,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=os.path.join(args.logs_folder, args.exp_name))
 
     # Pipeline for image regions
-    image_field = ImageDetectionsField(detections_path=args.features_path, max_detections=50, load_in_tmp=False)
+    image_field = ImageDetectionsFieldRegion(detections_path=args.features_path, max_detections=50, load_in_tmp=False)
 
     # Pipeline for text
     text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, tokenize='spacy',
@@ -146,7 +147,7 @@ if __name__ == '__main__':
         print('Loading from vocabulary')
         text_field.vocab = pickle.load(open('vocab.pkl', 'rb'))
 
-    model = LanguageModel(padding_idx=text_field.vocab.stoi['<pad>'], bert_hidden_size=768, vocab_size=len(text_field.vocab)).to(device)
+    model = AlbertAdaptiveLanguageModel(padding_idx=text_field.vocab.stoi['<pad>'], pretrained_name=args.pretrained_name, bert_hidden_size=768, vocab_size=len(text_field.vocab)).to(device)
 
     dict_dataset_train = train_dataset.image_dictionary({'image': image_field, 'text': RawField()})
     dict_dataset_val = val_dataset.image_dictionary({'image': image_field, 'text': RawField()})
