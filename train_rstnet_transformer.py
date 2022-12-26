@@ -1,10 +1,10 @@
 import random
-from data import ImageDetectionsField, TextField, RawField
+from data import ImageDetectionsFieldGrid, TextField, RawField
 from data import COCO, DataLoader
 import evaluation
 from evaluation import PTBTokenizer, Cider
 
-from models.rstnet import Transformer, TransformerEncoder, BertLinguisticDecoderLayer, ScaledDotProductAttention
+from models.rstnet import Transformer, TransformerEncoder, TransformerAlbertModelDecoderLayer, ScaledDotProductAttention
 
 import torch
 from torch.optim import Adam
@@ -151,6 +151,7 @@ if __name__ == '__main__':
     device = torch.device('cuda')
     parser = argparse.ArgumentParser(description='RSTNet')
     parser.add_argument('--exp_name', type=str, default='rstnet')
+    parser.add_argument('--exp_language_model_name', type=str, default='phobert_language')
     parser.add_argument('--batch_size', type=int, default=50)
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--m', type=int, default=40)
@@ -184,9 +185,8 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=os.path.join(args.logs_folder, args.exp_name))
 
     # Pipeline for image regions
-    image_field = ImageDetectionsField(detections_path=args.features_path, max_detections=100, load_in_tmp=False)
+    image_field = ImageDetectionsFieldGrid(detections_path=args.features_path, max_detections=100, load_in_tmp=False)
     # Pipeline for text
-    # text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, tokenize='spacy', remove_punctuation=True, nopoints=False)
     text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, remove_punctuation=True, nopoints=False)
 
     # Create the dataset
@@ -203,7 +203,11 @@ if __name__ == '__main__':
 
     # Model and dataloaders
     encoder = TransformerEncoder(3, 0, attention_module=ScaledDotProductAttention, attention_module_kwargs={'m': args.m})
-    decoder = BertLinguisticDecoderLayer(len(text_field.vocab), 54, 3, text_field.vocab.stoi['<pad>'], pretrained_name="bert-base-multilingual-cased")
+    decoder = TransformerAlbertModelDecoderLayer(
+        len(text_field.vocab), 54, 3, 
+        text_field.vocab.stoi['<pad>'], 
+        pretrained_name="vinai/phobert-base",
+        language_model_path=os.path.join(args.dir_to_save_model, f"{args.exp_language_model_name}_best.path"))
     model = Transformer(text_field.vocab.stoi['<bos>'], encoder, decoder).to(device)
 
     dict_dataset_train = train_dataset.image_dictionary({'image': image_field, 'text': RawField()})
@@ -220,7 +224,6 @@ if __name__ == '__main__':
     '''
 
     def lambda_lr(s):
-        print("s:", s)
         if s <= 3:
             lr = args.xe_base_lr * s / 4
         elif s <= 10:
@@ -233,7 +236,6 @@ if __name__ == '__main__':
     
     def lambda_lr_rl(s):
         refine_epoch = args.refine_epoch_rl 
-        print("rl_s:", s)
         if s <= refine_epoch:
             lr = args.rl_base_lr
         elif s <= refine_epoch + 3:
